@@ -1,0 +1,1626 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <meta name="theme-color" content="#0b1020">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="apple-touch-icon" href="./icons/icon-192.png">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Study Planner + Focus Timer</title>
+  <style>
+    :root{
+      --bg: #0b1020;
+      --panel: #121a33;
+      --panel2: #0f1730;
+      --text: #eaf0ff;
+      --muted: #b7c2e6;
+      --border: rgba(255,255,255,.10);
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+      --radius: 16px;
+      --focus: #7aa7ff;
+      --good: #5fe1a1;
+      --warn: #ffd166;
+      --bad: #ff6b6b;
+    }
+    *{ box-sizing:border-box; }
+    body{
+      margin:0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      background: radial-gradient(1200px 600px at 20% 10%, rgba(122,167,255,.25), transparent 55%),
+                  radial-gradient(1000px 500px at 80% 0%, rgba(95,225,161,.18), transparent 55%),
+                  radial-gradient(900px 600px at 50% 100%, rgba(255,209,102,.12), transparent 60%),
+                  var(--bg);
+      color: var(--text);
+      line-height: 1.4;
+    }
+    header{
+      padding: 28px 18px 10px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    header h1{
+      margin:0 0 6px;
+      font-size: clamp(1.2rem, 1.6vw + 1rem, 2rem);
+      letter-spacing: .3px;
+    }
+    header p{
+      margin:0;
+      color: var(--muted);
+      max-width: 75ch;
+    }
+    main{
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 14px 18px 40px;
+      display: grid;
+      grid-template-columns: 1.1fr .9fr;
+      gap: 16px;
+    }
+    @media (max-width: 980px){
+      main{ grid-template-columns: 1fr; }
+    }
+    .card{
+      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .card .hd{
+      padding: 14px 14px 10px;
+      border-bottom: 1px solid var(--border);
+      display:flex;
+      align-items:center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .card .hd h2{
+      margin:0;
+      font-size: 1rem;
+      letter-spacing:.2px;
+    }
+    .card .bd{ padding: 14px; }
+    .grid2{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .grid3{
+      display:grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+    }
+    @media (max-width: 560px){
+      .grid2, .grid3{ grid-template-columns: 1fr; }
+    }
+    label{
+      display:block;
+      font-size:.85rem;
+      color: var(--muted);
+      margin: 0 0 6px;
+    }
+    input, select, button, textarea{
+      width:100%;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: rgba(10,14,30,.65);
+      color: var(--text);
+      padding: 10px 12px;
+      font-size: .95rem;
+      outline: none;
+    }
+    textarea{ min-height: 74px; resize: vertical; }
+    input:focus, select:focus, textarea:focus{
+      border-color: rgba(122,167,255,.55);
+      box-shadow: 0 0 0 3px rgba(122,167,255,.15);
+    }
+    .row{
+      display:flex; gap: 10px; flex-wrap: wrap;
+      align-items:center;
+    }
+    .row > *{ flex: 1; min-width: 160px; }
+    .btnRow{
+      display:flex;
+      gap:10px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+    button{
+      cursor:pointer;
+      background: rgba(122,167,255,.16);
+      border-color: rgba(122,167,255,.35);
+      transition: transform .05s ease, background .15s ease;
+      font-weight: 600;
+    }
+    button:hover{ background: rgba(122,167,255,.22); }
+    button:active{ transform: translateY(1px); }
+    button.secondary{
+      background: rgba(255,255,255,.08);
+      border-color: var(--border);
+      font-weight: 600;
+    }
+    button.danger{
+      background: rgba(255,107,107,.16);
+      border-color: rgba(255,107,107,.35);
+    }
+    button.good{
+      background: rgba(95,225,161,.16);
+      border-color: rgba(95,225,161,.35);
+    }
+    button:disabled{
+      opacity:.55; cursor:not-allowed;
+    }
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(0,0,0,.18);
+      font-size:.85rem;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .pill strong{ color: var(--text); font-weight: 700; }
+    .status{
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: rgba(0,0,0,.16);
+      color: var(--muted);
+    }
+    .status[aria-live="polite"] strong{ color: var(--text); }
+    .timerWrap{
+      display:grid;
+      grid-template-columns: 150px 1fr;
+      gap: 14px;
+      align-items:center;
+    }
+    @media (max-width: 560px){
+      .timerWrap{ grid-template-columns: 1fr; }
+    }
+    .ring{
+      width: 150px; height: 150px;
+      position: relative;
+      display:grid;
+      place-items:center;
+      margin: 0 auto;
+    }
+    .ring svg{ width:150px; height:150px; }
+    .ring .time{
+      position:absolute;
+      text-align:center;
+    }
+    .ring .time .mode{
+      font-size:.8rem;
+      color: var(--muted);
+      letter-spacing:.3px;
+      text-transform: uppercase;
+    }
+    .ring .time .clock{
+      font-variant-numeric: tabular-nums;
+      font-size: 1.8rem;
+      font-weight: 800;
+      margin-top: 2px;
+      letter-spacing: .5px;
+    }
+    .hint{
+      color: var(--muted);
+      font-size: .9rem;
+      margin: 8px 0 0;
+    }
+    .split{
+      display:flex; gap:8px; flex-wrap: wrap;
+      align-items:center;
+    }
+    .split > .pill{ flex: 0 0 auto; }
+    .table{
+      width:100%;
+      border-collapse: collapse;
+      overflow:hidden;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: rgba(0,0,0,.15);
+    }
+    .table th, .table td{
+      padding: 10px 10px;
+      border-bottom: 1px solid var(--border);
+      text-align:left;
+      font-size: .92rem;
+      vertical-align: top;
+    }
+    .table th{
+      color: var(--muted);
+      font-weight: 700;
+      background: rgba(255,255,255,.04);
+    }
+    .table tr:last-child td{ border-bottom: none; }
+    .small{
+      font-size:.85rem;
+      color: var(--muted);
+    }
+    .logList{
+      display:flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .logItem{
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: rgba(0,0,0,.14);
+      padding: 10px 12px;
+      display:flex;
+      gap: 10px;
+      justify-content: space-between;
+      align-items: start;
+    }
+    .logItem .meta{
+      display:flex;
+      flex-direction: column;
+      gap: 3px;
+      min-width: 0;
+    }
+    .logItem .meta .title{
+      font-weight: 800;
+      letter-spacing:.2px;
+      white-space: nowrap;
+      overflow:hidden;
+      text-overflow: ellipsis;
+      max-width: 62ch;
+    }
+    .logItem .meta .sub{
+      color: var(--muted);
+      font-size:.86rem;
+    }
+    .logItem .actions{
+      display:flex;
+      gap: 8px;
+      flex: 0 0 auto;
+    }
+    .logItem .actions button{
+      width:auto;
+      padding: 8px 10px;
+      font-size: .85rem;
+    }
+    .planOut{
+      margin-top: 12px;
+      display:flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .dayBlock{
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: rgba(0,0,0,.14);
+      overflow:hidden;
+    }
+    .dayBlock .dhd{
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      display:flex; align-items:center; justify-content: space-between;
+      gap: 10px;
+    }
+    .dayBlock .dhd strong{ letter-spacing:.2px; }
+    .dayBlock .dhd span{ color: var(--muted); font-size: .85rem; }
+    .dayBlock .dbd{ padding: 10px 12px; display:flex; flex-direction: column; gap: 8px; }
+    .planItem{
+      display:flex;
+      gap: 10px;
+      align-items: center;
+      justify-content: space-between;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: rgba(255,255,255,.03);
+      padding: 10px 10px;
+    }
+    .planItem .left{
+      min-width: 0;
+      display:flex; flex-direction: column;
+      gap: 2px;
+    }
+    .planItem .left .t{
+      font-weight: 800;
+      white-space: nowrap;
+      overflow:hidden;
+      text-overflow: ellipsis;
+      max-width: 65ch;
+    }
+    .planItem .left .s{
+      color: var(--muted);
+      font-size: .85rem;
+      white-space: nowrap;
+      overflow:hidden;
+      text-overflow: ellipsis;
+      max-width: 65ch;
+    }
+    .planItem button{
+      width:auto;
+      padding: 8px 10px;
+      font-size: .85rem;
+      white-space: nowrap;
+    }
+    .note{
+      margin-top: 10px;
+      border-left: 3px solid rgba(122,167,255,.6);
+      padding: 8px 10px;
+      border-radius: 10px;
+      background: rgba(122,167,255,.10);
+      color: var(--muted);
+    }
+    .toggle{
+      display:flex;
+      align-items:center;
+      gap: 10px;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: rgba(0,0,0,.14);
+    }
+    .toggle input[type="checkbox"]{
+      width: 18px; height: 18px;
+      accent-color: var(--focus);
+      margin: 0;
+      flex: 0 0 auto;
+    }
+    .toggle .t{
+      display:flex; flex-direction: column;
+      gap: 2px;
+    }
+    .toggle .t strong{ font-size: .92rem; }
+    .toggle .t span{ font-size: .85rem; color: var(--muted); }
+    .kbd{
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: .82rem;
+      padding: 2px 6px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: rgba(0,0,0,.18);
+      color: var(--muted);
+      white-space: nowrap;
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>Study Planner + Focus Timer</h1>
+    <p>
+      Build a realistic plan from your courses + deadlines, then run focused intervals with breaks.
+      Designed to support performance <em>and</em> well-being: consistent pacing, clear stopping points, and session logs.
+    </p>
+  </header>
+
+  <main>
+    <!-- LEFT: TIMER -->
+    <section class="card" id="timerCard">
+      <div class="hd">
+        <h2>Focus Timer</h2>
+        <div class="split">
+          <span class="pill">Mode: <strong id="modePill">Study</strong></span>
+          <span class="pill">Auto: <strong id="autoPill">On</strong></span>
+        </div>
+      </div>
+
+      <div class="bd">
+        <div class="timerWrap">
+          <div class="ring" aria-label="Countdown timer">
+            <svg viewBox="0 0 120 120" role="img" aria-hidden="true">
+              <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="10"></circle>
+              <circle id="ringFg" cx="60" cy="60" r="52" fill="none" stroke="rgba(122,167,255,.9)" stroke-linecap="round"
+                      stroke-width="10" stroke-dasharray="326.7" stroke-dashoffset="0"
+                      transform="rotate(-90 60 60)"></circle>
+            </svg>
+            <div class="time">
+              <div class="mode" id="modeLabel">STUDY</div>
+              <div class="clock" id="clock">60:00</div>
+            </div>
+          </div>
+
+          <div>
+            <div class="grid2">
+              <div>
+                <label for="studyMin">Study duration (minutes)</label>
+                <input id="studyMin" type="number" min="1" max="240" step="1" value="60" />
+              </div>
+              <div>
+                <label for="breakMin">Break duration (minutes)</label>
+                <input id="breakMin" type="number" min="1" max="120" step="1" value="15" />
+              </div>
+            </div>
+
+            <div class="grid2" style="margin-top:10px;">
+              <div>
+                <label for="focusSel">Focus (course / subject)</label>
+                <select id="focusSel">
+                  <option value="General">General</option>
+                </select>
+              </div>
+              <div>
+                <label for="nextModeSel">Next interval to run</label>
+                <select id="nextModeSel">
+                  <option value="study">Study</option>
+                  <option value="break">Break</option>
+                </select>
+              </div>
+            </div>
+
+            <div style="margin-top:10px;">
+              <label for="notes">Notes (optional)</label>
+              <textarea id="notes" placeholder="What are you working on? Any obstacles? What will “done” look like?"></textarea>
+            </div>
+
+            <div class="btnRow">
+              <button class="good" id="startBtn">Start</button>
+              <button class="secondary" id="pauseBtn" disabled>Pause</button>
+              <button class="secondary" id="resumeBtn" disabled>Resume</button>
+              <button class="secondary" id="resetBtn">Reset</button>
+              <button class="secondary" id="skipBtn">Skip</button>
+            </div>
+
+            <div class="grid2" style="margin-top:10px;">
+              <div class="toggle">
+                <input type="checkbox" id="autoContinue" checked />
+                <div class="t">
+                  <strong>Auto-continue</strong>
+                  <span>Automatically start the next interval (study ↔ break).</span>
+                </div>
+              </div>
+              <div class="toggle">
+                <input type="checkbox" id="soundOn" checked />
+                <div class="t">
+                  <strong>Sound cue</strong>
+                  <span>Plays a short tone at start/end (if allowed).</span>
+                </div>
+              </div>
+              <div class="toggle">
+                <input type="checkbox" id="logBreaks" />
+                <div class="t">
+                  <strong>Log breaks</strong>
+                  <span>Optional: include breaks in the session log.</span>
+                </div>
+              </div>
+              <div class="toggle">
+                <input type="checkbox" id="logPartialOnSkip" />
+                <div class="t">
+                  <strong>Log partial on skip</strong>
+                  <span>If you skip a study interval, log time spent so far.</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="btnRow">
+              <button class="secondary" id="enableNotifBtn">Enable notifications</button>
+              <button class="secondary" id="logNowBtn">Log progress now</button>
+            </div>
+
+            <div class="status" id="status" aria-live="polite">
+              <strong>Status:</strong> Ready. Tip: pick a clear “done” outcome before starting.
+              <div class="hint">
+                Shortcuts: <span class="kbd">Space</span> start/pause/resume • <span class="kbd">R</span> reset • <span class="kbd">S</span> skip
+              </div>
+            </div>
+
+            <div class="note">
+              Well-being nudges: During breaks, stand up, drink water, and look at something far away for 20 seconds (eye reset).
+              If you’re exhausted, reduce the study duration and protect sleep.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT: LOG -->
+    <section class="card" id="logCard">
+      <div class="hd">
+        <h2>Session Log</h2>
+        <div class="split">
+          <span class="pill">Today: <strong id="todayMin">0 min</strong></span>
+          <span class="pill">This week: <strong id="weekMin">0 min</strong></span>
+        </div>
+      </div>
+      <div class="bd">
+        <div class="btnRow">
+          <button class="secondary" id="exportBtn">Export CSV</button>
+          <button class="danger" id="clearLogBtn">Clear log</button>
+        </div>
+        <div class="logList" id="logList"></div>
+        <div class="small" style="margin-top:10px;">
+          Logs are stored locally in your browser (localStorage).
+        </div>
+      </div>
+    </section>
+
+    <!-- LEFT BOTTOM: PLAN BUILDER -->
+    <section class="card" id="planCard">
+      <div class="hd">
+        <h2>Study Plan Builder (7 days)</h2>
+        <span class="pill">Click a plan item to load it into the timer</span>
+      </div>
+      <div class="bd">
+        <div class="grid2">
+          <div>
+            <label for="courseName">Course</label>
+            <input id="courseName" placeholder="e.g., Calculus II" />
+          </div>
+          <div>
+            <label for="difficulty">Difficulty (1–5)</label>
+            <input id="difficulty" type="number" min="1" max="5" step="1" value="3" />
+          </div>
+        </div>
+
+        <div class="grid3" style="margin-top:10px;">
+          <div>
+            <label for="taskTitle">Task</label>
+            <input id="taskTitle" placeholder="e.g., Problem set 4" />
+          </div>
+          <div>
+            <label for="dueDate">Due date</label>
+            <input id="dueDate" type="date" />
+          </div>
+          <div>
+            <label for="estHours">Estimated hours</label>
+            <input id="estHours" type="number" min="0.25" step="0.25" value="2" />
+          </div>
+        </div>
+
+        <div class="btnRow">
+          <button class="good" id="addTaskBtn">Add task</button>
+          <button class="secondary" id="seedExampleBtn">Add example tasks</button>
+        </div>
+
+        <div style="margin-top: 12px;">
+          <table class="table" aria-label="Task list">
+            <thead>
+              <tr>
+                <th>Course</th>
+                <th>Task</th>
+                <th>Due</th>
+                <th>Est.</th>
+                <th>Diff.</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="taskTbody"></tbody>
+          </table>
+          <div class="small" style="margin-top:8px;">
+            Tip: Put your next 1–3 deadlines per course here. Keep estimates honest; the plan adapts to your available hours.
+          </div>
+        </div>
+
+        <div style="margin-top: 14px;">
+          <h3 style="margin:0 0 8px; font-size: 1rem;">Availability (hours you can study)</h3>
+          <div class="grid3">
+            <div><label for="aMon">Mon</label><input id="aMon" type="number" min="0" max="12" step="0.5" /></div>
+            <div><label for="aTue">Tue</label><input id="aTue" type="number" min="0" max="12" step="0.5" /></div>
+            <div><label for="aWed">Wed</label><input id="aWed" type="number" min="0" max="12" step="0.5" /></div>
+            <div><label for="aThu">Thu</label><input id="aThu" type="number" min="0" max="12" step="0.5" /></div>
+            <div><label for="aFri">Fri</label><input id="aFri" type="number" min="0" max="12" step="0.5" /></div>
+            <div><label for="aSat">Sat</label><input id="aSat" type="number" min="0" max="12" step="0.5" /></div>
+            <div><label for="aSun">Sun</label><input id="aSun" type="number" min="0" max="12" step="0.5" /></div>
+          </div>
+
+          <div class="btnRow" style="margin-top:10px;">
+            <button class="good" id="genPlanBtn">Generate 7‑day plan</button>
+            <button class="secondary" id="clearTasksBtn">Clear tasks</button>
+          </div>
+
+          <div class="status" id="planStatus" aria-live="polite">
+            <strong>Plan status:</strong> Add tasks and availability, then generate.
+          </div>
+
+          <div class="planOut" id="planOut"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT BOTTOM: QUICK GUIDELINES -->
+    <section class="card">
+      <div class="hd">
+        <h2>How to Study (Performance + Well-being)</h2>
+        <span class="pill">Practical guardrails</span>
+      </div>
+      <div class="bd">
+        <ul style="margin:0; padding-left: 18px; color: var(--muted);">
+          <li><strong style="color:var(--text);">Define “done”</strong>: one concrete output per session (e.g., 10 problems, 2 pages summarized).</li>
+          <li><strong style="color:var(--text);">Start hard, then easy</strong>: do the most demanding work when attention is highest.</li>
+          <li><strong style="color:var(--text);">Use breaks actively</strong>: stand up, water, light movement, sunlight if possible.</li>
+          <li><strong style="color:var(--text);">Protect sleep</strong>: if you’re consistently sleep-deprived, lower daily load rather than grinding.</li>
+          <li><strong style="color:var(--text);">If overwhelmed</strong>: reduce session length (e.g., 45/15) and focus on minimum viable progress.</li>
+        </ul>
+        <div class="note">
+          This tool supports structure and reflection, but it’s not medical care. If anxiety, depression, or burnout feels persistent or severe,
+          consider reaching out to a trusted professional or your school’s support services.
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // ----------------------------
+    // Defaults (per your variables)
+    // ----------------------------
+    const DEFAULT_STUDY_MIN = 60;
+    const DEFAULT_BREAK_MIN = 15;
+
+    // ----------------------------
+    // Helpers
+    // ----------------------------
+    const $ = (sel) => document.querySelector(sel);
+    const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+    const pad2 = (n) => String(n).padStart(2, "0");
+
+    function safeUUID(){
+      if (crypto && crypto.randomUUID) return crypto.randomUUID();
+      return String(Date.now()) + "-" + Math.random().toString(16).slice(2);
+    }
+
+    function loadJSON(key, fallback){
+      try{
+        const raw = localStorage.getItem(key);
+        if (!raw) return fallback;
+        return JSON.parse(raw);
+      }catch{
+        return fallback;
+      }
+    }
+    function saveJSON(key, value){
+      localStorage.setItem(key, JSON.stringify(value));
+    }
+
+    function formatClock(totalSeconds){
+      totalSeconds = Math.max(0, Math.floor(totalSeconds));
+      const m = Math.floor(totalSeconds / 60);
+      const s = totalSeconds % 60;
+      return `${m}:${pad2(s)}`;
+    }
+
+    function formatDate(d){
+      return new Intl.DateTimeFormat(undefined, {
+        weekday: "short", year: "numeric", month: "short", day: "2-digit"
+      }).format(d);
+    }
+    function formatDateTime(d){
+      return new Intl.DateTimeFormat(undefined, {
+        year: "numeric", month: "short", day: "2-digit",
+        hour: "2-digit", minute: "2-digit"
+      }).format(d);
+    }
+
+    function startOfISOWeek(date){
+      const d = new Date(date);
+      const day = d.getDay(); // 0 Sun ... 6 Sat
+      const diff = (day === 0 ? -6 : 1 - day); // Monday as start
+      d.setDate(d.getDate() + diff);
+      d.setHours(0,0,0,0);
+      return d;
+    }
+
+    // ----------------------------
+    // Settings + State
+    // ----------------------------
+    const SETTINGS_KEY = "st_settings_v1";
+    const LOG_KEY = "st_log_v1";
+    const TASKS_KEY = "st_tasks_v1";
+    const AVAIL_KEY = "st_availability_v1";
+
+    const settings = loadJSON(SETTINGS_KEY, {
+      studyMin: DEFAULT_STUDY_MIN,
+      breakMin: DEFAULT_BREAK_MIN,
+      autoContinue: true,
+      soundOn: true,
+      logBreaks: false,
+      logPartialOnSkip: false
+    });
+
+    let logEntries = loadJSON(LOG_KEY, []);
+    let tasks = loadJSON(TASKS_KEY, []);
+    let availability = loadJSON(AVAIL_KEY, {
+      Mon: 2, Tue: 2, Wed: 2, Thu: 2, Fri: 2, Sat: 3, Sun: 3
+    });
+
+    const timer = {
+      active: false,
+      running: false,
+      paused: false,
+      mode: "study",               // 'study' | 'break'
+      durationSec: settings.studyMin * 60,
+      remainingMs: settings.studyMin * 60 * 1000,
+      startedAtMs: null,
+      endAtMs: null,
+      intervalId: null
+    };
+
+    // Progress ring
+    const r = 52;
+    const circumference = 2 * Math.PI * r;
+    $("#ringFg").setAttribute("stroke-dasharray", String(circumference));
+
+    // ----------------------------
+    // Audio cue (simple beep)
+    // ----------------------------
+    let audioCtx = null;
+    function beep(freq=880, durationMs=180){
+      if (!settings.soundOn) return;
+      try{
+        audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+        const o = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        o.frequency.value = freq;
+        o.type = "sine";
+        g.gain.value = 0.04;
+        o.connect(g);
+        g.connect(audioCtx.destination);
+        o.start();
+        setTimeout(() => { o.stop(); }, durationMs);
+      }catch{
+        // If audio is blocked, silently ignore.
+      }
+    }
+
+    // ----------------------------
+    // Notifications
+    // ----------------------------
+    async function enableNotifications(){
+      if (!("Notification" in window)){
+        setStatus("Notifications not supported in this browser.");
+        return;
+      }
+      const perm = await Notification.requestPermission();
+      if (perm === "granted"){
+        setStatus("Notifications enabled ✅");
+        try{
+          new Notification("Notifications enabled", { body: "You’ll get alerts at interval start/end." });
+        }catch{}
+      }else{
+        setStatus("Notifications not enabled (permission denied).");
+      }
+    }
+
+    function notify(title, body){
+      // Always also update status as a friendly fallback.
+      setStatus(`${title} — ${body}`);
+      // Visual pulse in title bar
+      try{ document.title = `${title} • ${document.title.replace(/^.* • /, "")}`; }catch{}
+      // System notification if allowed
+      if ("Notification" in window && Notification.permission === "granted"){
+        try{ new Notification(title, { body }); }catch{}
+      }
+    }
+
+    // ----------------------------
+    // UI render helpers
+    // ----------------------------
+    function setStatus(text){
+      $("#status").innerHTML = `<strong>Status:</strong> ${escapeHTML(text)}` +
+        `<div class="hint">Shortcuts: <span class="kbd">Space</span> start/pause/resume • <span class="kbd">R</span> reset • <span class="kbd">S</span> skip</div>`;
+    }
+
+    function escapeHTML(s){
+      return String(s)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function updateModeUI(){
+      const modeUpper = timer.mode.toUpperCase();
+      $("#modeLabel").textContent = modeUpper;
+      $("#modePill").textContent = timer.mode === "study" ? "Study" : "Break";
+      $("#autoPill").textContent = settings.autoContinue ? "On" : "Off";
+      const nextModeSel = $("#nextModeSel");
+      if (!timer.active) nextModeSel.value = timer.mode;
+    }
+
+    function updateRingAndClock(remainingSec, durationSec){
+      $("#clock").textContent = formatClock(remainingSec);
+      const progress = durationSec > 0 ? (remainingSec / durationSec) : 0;
+      const offset = circumference * (1 - clamp(progress, 0, 1));
+      $("#ringFg").setAttribute("stroke-dashoffset", String(offset));
+    }
+
+    function updateButtons(){
+      $("#startBtn").disabled = timer.running;
+      $("#pauseBtn").disabled = !timer.running;
+      $("#resumeBtn").disabled = !timer.paused;
+    }
+
+    function updateDocumentTitleCountdown(remainingSec){
+      const modeLabel = timer.mode === "study" ? "Study" : "Break";
+      document.title = `${modeLabel} • ${formatClock(remainingSec)} • Study Planner + Focus Timer`;
+    }
+
+    // ----------------------------
+    // Timer core
+    // ----------------------------
+    function getStudySeconds(){
+      const v = clamp(Number($("#studyMin").value || DEFAULT_STUDY_MIN), 1, 240);
+      return Math.round(v * 60);
+    }
+    function getBreakSeconds(){
+      const v = clamp(Number($("#breakMin").value || DEFAULT_BREAK_MIN), 1, 120);
+      return Math.round(v * 60);
+    }
+
+    function setRemainingToFull(mode){
+      timer.mode = mode;
+      timer.durationSec = (mode === "study") ? getStudySeconds() : getBreakSeconds();
+      timer.remainingMs = timer.durationSec * 1000;
+      updateRingAndClock(timer.durationSec, timer.durationSec);
+      updateModeUI();
+      updateButtons();
+      updateDocumentTitleCountdown(timer.durationSec);
+    }
+
+    function startInterval(mode){
+      // Sync settings in case user changed inputs
+      settings.studyMin = clamp(Number($("#studyMin").value || DEFAULT_STUDY_MIN), 1, 240);
+      settings.breakMin = clamp(Number($("#breakMin").value || DEFAULT_BREAK_MIN), 1, 120);
+      settings.autoContinue = $("#autoContinue").checked;
+      settings.soundOn = $("#soundOn").checked;
+      settings.logBreaks = $("#logBreaks").checked;
+      settings.logPartialOnSkip = $("#logPartialOnSkip").checked;
+      saveJSON(SETTINGS_KEY, settings);
+
+      timer.active = true;
+      timer.running = true;
+      timer.paused = false;
+      timer.mode = mode;
+      timer.durationSec = (mode === "study") ? Math.round(settings.studyMin * 60) : Math.round(settings.breakMin * 60);
+
+      // If user starts while we were idle, reset remaining to full
+      timer.remainingMs = timer.durationSec * 1000;
+
+      timer.startedAtMs = Date.now();
+      timer.endAtMs = timer.startedAtMs + timer.remainingMs;
+
+      clearInterval(timer.intervalId);
+      timer.intervalId = setInterval(tick, 250);
+
+      updateModeUI();
+      updateButtons();
+      tick(true);
+
+      beep(mode === "study" ? 880 : 660, 160);
+      notify(
+        mode === "study" ? "Study started" : "Break started",
+        mode === "study" ? "Focus on one clear outcome." : "Rest: stand up, water, breathe."
+      );
+    }
+
+    function tick(force=false){
+      if (!timer.running) return;
+
+      const now = Date.now();
+      const remainingMs = timer.endAtMs - now;
+      timer.remainingMs = remainingMs;
+
+      const remainingSec = Math.max(0, Math.ceil(remainingMs / 1000));
+      updateRingAndClock(remainingSec, timer.durationSec);
+      updateDocumentTitleCountdown(remainingSec);
+
+      if (remainingMs <= 0){
+        finishInterval();
+      }else if (force){
+        // Force already updated above
+      }
+    }
+
+    function pauseTimer(){
+      if (!timer.running) return;
+      timer.running = false;
+      timer.paused = true;
+      clearInterval(timer.intervalId);
+
+      const now = Date.now();
+      timer.remainingMs = Math.max(0, timer.endAtMs - now);
+
+      updateButtons();
+      setStatus("Paused. When you resume, aim for a small win to rebuild momentum.");
+    }
+
+    function resumeTimer(){
+      if (!timer.paused) return;
+      timer.paused = false;
+      timer.running = true;
+
+      timer.startedAtMs = Date.now();
+      timer.endAtMs = timer.startedAtMs + timer.remainingMs;
+
+      clearInterval(timer.intervalId);
+      timer.intervalId = setInterval(tick, 250);
+
+      updateButtons();
+      setStatus("Resumed. Keep it simple: one step at a time.");
+    }
+
+    function resetTimer(){
+      clearInterval(timer.intervalId);
+      timer.active = false;
+      timer.running = false;
+      timer.paused = false;
+
+      // Keep current selected "next mode"
+      const nextMode = $("#nextModeSel").value;
+      setRemainingToFull(nextMode);
+      setStatus("Reset. Choose your focus, then start when ready.");
+      document.title = "Study Planner + Focus Timer";
+    }
+
+    function finishInterval(){
+      clearInterval(timer.intervalId);
+      timer.running = false;
+      timer.paused = false;
+
+      // Log completed interval
+      const endedAt = new Date();
+      const startedAt = timer.startedAtMs ? new Date(timer.startedAtMs) : new Date(endedAt.getTime() - timer.durationSec*1000);
+
+      const focus = $("#focusSel").value || "General";
+      const notes = $("#notes").value || "";
+
+      const isStudy = timer.mode === "study";
+      const shouldLog = isStudy || settings.logBreaks;
+
+      if (shouldLog){
+        addLogEntry({
+          id: safeUUID(),
+          type: timer.mode,
+          focus,
+          plannedMin: Math.round(timer.durationSec / 60),
+          actualSec: timer.durationSec,
+          partial: false,
+          startedAtISO: startedAt.toISOString(),
+          endedAtISO: endedAt.toISOString(),
+          notes
+        });
+      }
+
+      beep(timer.mode === "study" ? 520 : 740, 220);
+      notify(
+        timer.mode === "study" ? "Study complete" : "Break complete",
+        timer.mode === "study" ? "Nice. Take the break seriously." : "Back to focus when you're ready."
+      );
+
+      // Switch mode
+      const nextMode = (timer.mode === "study") ? "break" : "study";
+      timer.mode = nextMode;
+      $("#nextModeSel").value = nextMode;
+
+      // Reset remaining to full for the next mode
+      setRemainingToFull(nextMode);
+
+      // Auto-continue if enabled
+      if (settings.autoContinue){
+        // Small delay so the UI updates cleanly
+        setTimeout(() => startInterval(nextMode), 600);
+      }else{
+        timer.active = false;
+        setStatus(`Interval finished. Next: ${nextMode.toUpperCase()}. Press Start when ready.`);
+        updateButtons();
+      }
+    }
+
+    function skipInterval(){
+      // If skipping during a running/paused interval:
+      // - optionally log partial study progress
+      const wasActive = timer.running || timer.paused;
+      const isStudy = timer.mode === "study";
+
+      if (wasActive){
+        const now = Date.now();
+        const elapsedMs = (timer.paused)
+          ? (timer.durationSec * 1000 - timer.remainingMs)
+          : Math.max(0, now - timer.startedAtMs);
+
+        const elapsedSec = clamp(Math.floor(elapsedMs / 1000), 0, timer.durationSec);
+
+        if (isStudy && settings.logPartialOnSkip && elapsedSec >= 60){
+          addLogEntry({
+            id: safeUUID(),
+            type: "study",
+            focus: $("#focusSel").value || "General",
+            plannedMin: Math.round(timer.durationSec / 60),
+            actualSec: elapsedSec,
+            partial: true,
+            startedAtISO: new Date(timer.startedAtMs).toISOString(),
+            endedAtISO: new Date().toISOString(),
+            notes: $("#notes").value || ""
+          });
+          setStatus(`Skipped. Logged partial study: ${Math.round(elapsedSec/60)} min.`);
+        }else{
+          setStatus("Skipped interval.");
+        }
+      }
+
+      clearInterval(timer.intervalId);
+      timer.running = false;
+      timer.paused = false;
+      timer.active = false;
+
+      const nextMode = (timer.mode === "study") ? "break" : "study";
+      timer.mode = nextMode;
+      $("#nextModeSel").value = nextMode;
+      setRemainingToFull(nextMode);
+
+      beep(700, 120);
+      notify("Interval skipped", `Next: ${nextMode.toUpperCase()}.`);
+    }
+
+    function logProgressNow(){
+      if (!(timer.running || timer.paused) || timer.mode !== "study"){
+        setStatus("You can log progress during an active STUDY interval.");
+        return;
+      }
+      const now = Date.now();
+      const elapsedMs = (timer.paused)
+        ? (timer.durationSec * 1000 - timer.remainingMs)
+        : Math.max(0, now - timer.startedAtMs);
+      const elapsedSec = clamp(Math.floor(elapsedMs / 1000), 0, timer.durationSec);
+
+      if (elapsedSec < 60){
+        setStatus("Log progress after at least 1 minute.");
+        return;
+      }
+
+      addLogEntry({
+        id: safeUUID(),
+        type: "study",
+        focus: $("#focusSel").value || "General",
+        plannedMin: Math.round(timer.durationSec / 60),
+        actualSec: elapsedSec,
+        partial: true,
+        startedAtISO: new Date(timer.startedAtMs).toISOString(),
+        endedAtISO: new Date().toISOString(),
+        notes: $("#notes").value || ""
+      });
+      setStatus(`Logged progress: ${Math.round(elapsedSec/60)} min (partial).`);
+    }
+
+    // ----------------------------
+    // Log render + stats
+    // ----------------------------
+    function addLogEntry(entry){
+      logEntries.unshift(entry);
+      saveJSON(LOG_KEY, logEntries);
+      renderLog();
+      renderStats();
+    }
+
+    function deleteLogEntry(id){
+      logEntries = logEntries.filter(e => e.id !== id);
+      saveJSON(LOG_KEY, logEntries);
+      renderLog();
+      renderStats();
+    }
+
+    function clearLog(){
+      logEntries = [];
+      saveJSON(LOG_KEY, logEntries);
+      renderLog();
+      renderStats();
+      setStatus("Log cleared.");
+    }
+
+    function renderLog(){
+      const list = $("#logList");
+      list.innerHTML = "";
+
+      if (logEntries.length === 0){
+        list.innerHTML = `<div class="small">No sessions logged yet. Start a study interval to begin logging.</div>`;
+        return;
+      }
+
+      for (const e of logEntries.slice(0, 40)){
+        const started = new Date(e.startedAtISO);
+        const ended = new Date(e.endedAtISO);
+        const mins = Math.max(1, Math.round(e.actualSec / 60));
+
+        const label = (e.type === "study") ? "Study" : "Break";
+        const partial = e.partial ? " (partial)" : "";
+        const title = `${label}${partial} • ${mins} min • ${e.focus || "General"}`;
+
+        const sub = `${formatDateTime(started)} → ${formatDateTime(ended)}` + (e.notes ? ` • Notes: ${e.notes}` : "");
+
+        const item = document.createElement("div");
+        item.className = "logItem";
+        item.innerHTML = `
+          <div class="meta">
+            <div class="title">${escapeHTML(title)}</div>
+            <div class="sub">${escapeHTML(sub)}</div>
+          </div>
+          <div class="actions">
+            <button class="secondary" data-act="load" data-id="${e.id}">Load</button>
+            <button class="danger" data-act="del" data-id="${e.id}">Delete</button>
+          </div>
+        `;
+        list.appendChild(item);
+      }
+
+      // button handlers
+      list.querySelectorAll("button").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const act = btn.dataset.act;
+          const id = btn.dataset.id;
+          const entry = logEntries.find(x => x.id === id);
+          if (!entry) return;
+          if (act === "del") deleteLogEntry(id);
+          if (act === "load"){
+            $("#focusSel").value = entry.focus || "General";
+            $("#notes").value = entry.notes || "";
+            $("#nextModeSel").value = "study";
+            timer.mode = "study";
+            setRemainingToFull("study");
+            setStatus("Loaded log entry into the timer. Adjust notes if needed, then Start.");
+          }
+        });
+      });
+    }
+
+    function renderStats(){
+      const now = new Date();
+      const startToday = new Date(now); startToday.setHours(0,0,0,0);
+      const weekStart = startOfISOWeek(now);
+
+      let todaySec = 0;
+      let weekSec = 0;
+
+      for (const e of logEntries){
+        if (e.type !== "study") continue; // stats focus on study only
+        const ended = new Date(e.endedAtISO);
+        const sec = Number(e.actualSec || 0);
+        if (ended >= startToday) todaySec += sec;
+        if (ended >= weekStart) weekSec += sec;
+      }
+
+      $("#todayMin").textContent = `${Math.round(todaySec/60)} min`;
+      $("#weekMin").textContent = `${Math.round(weekSec/60)} min`;
+    }
+
+    function exportCSV(){
+      const rows = [
+        ["type", "focus", "plannedMin", "actualMin", "partial", "startedAt", "endedAt", "notes"]
+      ];
+      for (const e of logEntries){
+        rows.push([
+          e.type,
+          e.focus || "",
+          String(e.plannedMin ?? ""),
+          String(Math.round((e.actualSec || 0)/60)),
+          e.partial ? "yes" : "no",
+          e.startedAtISO,
+          e.endedAtISO,
+          (e.notes || "").replaceAll("\n", " ")
+        ]);
+      }
+      const csv = rows.map(r => r.map(v => `"${String(v).replaceAll('"','""')}"`).join(",")).join("\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "study_sessions.csv";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      setStatus("Exported CSV.");
+    }
+
+    // ----------------------------
+    // Tasks + Plan builder
+    // ----------------------------
+    function renderFocusOptions(){
+      const sel = $("#focusSel");
+      const current = sel.value || "General";
+
+      // unique course names
+      const courses = Array.from(new Set(tasks.map(t => t.course).filter(Boolean))).sort((a,b)=>a.localeCompare(b));
+
+      sel.innerHTML = `<option value="General">General</option>` +
+        courses.map(c => `<option value="${escapeHTML(c)}">${escapeHTML(c)}</option>`).join("");
+
+      // restore if possible
+      if ([...sel.options].some(o => o.value === current)){
+        sel.value = current;
+      }
+    }
+
+    function renderTasksTable(){
+      const tb = $("#taskTbody");
+      tb.innerHTML = "";
+      if (tasks.length === 0){
+        tb.innerHTML = `<tr><td colspan="6" class="small">No tasks yet. Add one above.</td></tr>`;
+        return;
+      }
+
+      const sorted = [...tasks].sort((a,b) => {
+        const da = new Date(a.dueDateISO).getTime();
+        const db = new Date(b.dueDateISO).getTime();
+        return da - db;
+      });
+
+      for (const t of sorted){
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${escapeHTML(t.course)}</td>
+          <td>${escapeHTML(t.title)}</td>
+          <td>${escapeHTML(t.dueDateISO)}</td>
+          <td>${escapeHTML(String(t.estHours))}h</td>
+          <td>${escapeHTML(String(t.difficulty))}</td>
+          <td><button class="danger" data-id="${t.id}" style="width:auto; padding:6px 10px;">Remove</button></td>
+        `;
+        tb.appendChild(tr);
+      }
+
+      tb.querySelectorAll("button").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const id = btn.dataset.id;
+          tasks = tasks.filter(t => t.id !== id);
+          saveJSON(TASKS_KEY, tasks);
+          renderTasksTable();
+          renderFocusOptions();
+          $("#planStatus").innerHTML = `<strong>Plan status:</strong> Task removed. Generate again when ready.`;
+        });
+      });
+    }
+
+    function addTask(){
+      const course = ($("#courseName").value || "").trim();
+      const title = ($("#taskTitle").value || "").trim();
+      const due = $("#dueDate").value;
+      const estHours = Number($("#estHours").value || 0);
+      const difficulty = clamp(Number($("#difficulty").value || 3), 1, 5);
+
+      if (!course || !title || !due || !estHours){
+        $("#planStatus").innerHTML = `<strong>Plan status:</strong> Please fill Course, Task, Due date, and Estimated hours.`;
+        return;
+      }
+
+      tasks.push({
+        id: safeUUID(),
+        course,
+        title,
+        dueDateISO: due,
+        estHours: clamp(estHours, 0.25, 200),
+        difficulty
+      });
+
+      saveJSON(TASKS_KEY, tasks);
+      renderTasksTable();
+      renderFocusOptions();
+
+      $("#taskTitle").value = "";
+      $("#estHours").value = "2";
+      $("#planStatus").innerHTML = `<strong>Plan status:</strong> Task added ✅ Add more, or generate your plan.`;
+    }
+
+    function seedExample(){
+      const today = new Date();
+      const plusDays = (n) => {
+        const d = new Date(today);
+        d.setDate(d.getDate() + n);
+        return d.toISOString().slice(0,10);
+      };
+      tasks.push(
+        { id: safeUUID(), course:"Calculus II", title:"Problem Set 4", dueDateISO: plusDays(3), estHours: 3, difficulty: 4 },
+        { id: safeUUID(), course:"Calculus II", title:"Quiz review (integration techniques)", dueDateISO: plusDays(5), estHours: 2, difficulty: 4 },
+        { id: safeUUID(), course:"Psychology", title:"Read Ch. 6 + notes", dueDateISO: plusDays(4), estHours: 2.5, difficulty: 3 },
+        { id: safeUUID(), course:"Programming", title:"Project milestone 1", dueDateISO: plusDays(6), estHours: 4, difficulty: 5 }
+      );
+      saveJSON(TASKS_KEY, tasks);
+      renderTasksTable();
+      renderFocusOptions();
+      $("#planStatus").innerHTML = `<strong>Plan status:</strong> Example tasks added. Edit/remove as needed.`;
+    }
+
+    function renderAvailability(){
+      const map = {
+        Mon:"#aMon", Tue:"#aTue", Wed:"#aWed", Thu:"#aThu", Fri:"#aFri", Sat:"#aSat", Sun:"#aSun"
+      };
+      for (const k of Object.keys(map)){
+        $(map[k]).value = availability[k] ?? 0;
+      }
+    }
+
+    function saveAvailabilityFromUI(){
+      availability = {
+        Mon: clamp(Number($("#aMon").value || 0), 0, 12),
+        Tue: clamp(Number($("#aTue").value || 0), 0, 12),
+        Wed: clamp(Number($("#aWed").value || 0), 0, 12),
+        Thu: clamp(Number($("#aThu").value || 0), 0, 12),
+        Fri: clamp(Number($("#aFri").value || 0), 0, 12),
+        Sat: clamp(Number($("#aSat").value || 0), 0, 12),
+        Sun: clamp(Number($("#aSun").value || 0), 0, 12),
+      };
+      saveJSON(AVAIL_KEY, availability);
+    }
+
+    function generatePlan(){
+      saveAvailabilityFromUI();
+
+      if (tasks.length === 0){
+        $("#planStatus").innerHTML = `<strong>Plan status:</strong> Add at least one task first.`;
+        return;
+      }
+
+      // Use current study duration as the session unit
+      const studySec = getStudySeconds();
+      const sessionMin = Math.max(15, Math.round(studySec / 60)); // safety min
+      const sessionHours = sessionMin / 60;
+
+      // Build a mutable copy of tasks with remaining hours
+      const work = tasks.map(t => ({
+        ...t,
+        remaining: Number(t.estHours),
+        dueMs: new Date(t.dueDateISO + "T23:59:59").getTime()
+      }));
+
+      // Total required vs total available (rough)
+      const totalNeedHrs = work.reduce((a,t) => a + t.remaining, 0);
+      const totalAvailHrs = Object.values(availability).reduce((a,v) => a + Number(v||0), 0);
+
+      // Plan over next 7 days starting today
+      const today = new Date();
+      today.setHours(0,0,0,0);
+
+      const dayNames = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+      const out = [];
+
+      let lastCourse = null;
+
+      for (let i = 0; i < 7; i++){
+        const day = new Date(today);
+        day.setDate(day.getDate() + i);
+
+        const dn = dayNames[day.getDay()];
+        const availHrs = Number(availability[dn] ?? 0);
+        const sessions = Math.floor((availHrs * 60) / sessionMin);
+
+        const items = [];
+        for (let s = 0; s < sessions; s++){
+          // Choose the highest priority task remaining
+          const dayMs = day.getTime();
+          const candidates = work.filter(t => t.remaining > 0.01);
+
+          if (candidates.length === 0) break;
+
+          let best = null;
+          let bestScore = -Infinity;
+
+          for (const t of candidates){
+            // days until due (0 = today/overdue)
+            const daysLeft = Math.ceil((t.dueMs - dayMs) / (24*3600*1000));
+            const daysFactor = (daysLeft <= 0) ? 4 : (1 / (daysLeft + 1)); // overdue/today gets boosted
+            const pace = t.remaining / Math.max(1, (daysLeft <= 0 ? 1 : daysLeft)); // hours per day needed
+            const diffFactor = 1 + (t.difficulty - 3) * 0.12; // subtle effect (±)
+            let score = (pace + 0.15) * daysFactor * diffFactor;
+
+            // spacing effect: avoid same course repeatedly if possible
+            if (lastCourse && t.course === lastCourse) score *= 0.82;
+
+            if (score > bestScore){
+              bestScore = score;
+              best = t;
+            }
+          }
+
+          if (!best) break;
+
+          // Allocate one session (or what's left)
+          const alloc = Math.min(sessionHours, best.remaining);
+          best.remaining = Math.max(0, best.remaining - alloc);
+
+          items.push({
+            course: best.course,
+            title: best.title,
+            minutes: Math.round(alloc * 60),
+            dueISO: best.dueDateISO
+          });
+
+          lastCourse = best.course;
+        }
+
+        out.push({
+          date: new Date(day),
+          dayName: dn,
+          availHrs,
+          sessionMin,
+          items
+        });
+      }
+
+      // Render + warnings
+      renderPlan(out, { totalNeedHrs, totalAvailHrs, sessionMin });
+    }
+
+    function renderPlan(days, meta){
+      const planOut = $("#planOut");
+      planOut.innerHTML = "";
+
+      const warn = [];
+      if (meta.totalNeedHrs > meta.totalAvailHrs + 0.01){
+        warn.push(`Your tasks estimate ≈ ${meta.totalNeedHrs.toFixed(1)}h but your weekly availability is ≈ ${meta.totalAvailHrs.toFixed(1)}h. Consider reducing tasks, extending deadlines, or increasing available time.`);
+      }
+      if (meta.sessionMin >= 75){
+        warn.push(`Your study session is ${meta.sessionMin} minutes. If you’re struggling to start, try 45–60 minutes to reduce friction.`);
+      }
+
+      $("#planStatus").innerHTML =
+        `<strong>Plan status:</strong> Generated with ${meta.sessionMin}-minute sessions. ` +
+        (warn.length ? `<br><span style="color: var(--warn);">${escapeHTML(warn.join(" "))}</span>` : `Click a session to load it into the timer.`);
+
+      for (const d of days){
+        const block = document.createElement("div");
+        block.className = "dayBlock";
+
+        const totalPlannedMin = d.items.reduce((a,x)=>a + x.minutes, 0);
+
+        block.innerHTML = `
+          <div class="dhd">
+            <strong>${escapeHTML(formatDate(d.date))}</strong>
+            <span>Available: ${escapeHTML(String(d.availHrs))}h • Planned: ${escapeHTML(String(totalPlannedMin))} min</span>
+          </div>
+          <div class="dbd">
+            ${d.items.length ? "" : `<div class="small">No sessions planned (0 availability or tasks completed). Consider light review or rest.</div>`}
+          </div>
+        `;
+
+        const dbd = block.querySelector(".dbd");
+
+        for (const it of d.items){
+          const node = document.createElement("div");
+          node.className = "planItem";
+          node.innerHTML = `
+            <div class="left">
+              <div class="t">${escapeHTML(it.course)} — ${escapeHTML(it.minutes)} min</div>
+              <div class="s">${escapeHTML(it.title)} • Due ${escapeHTML(it.dueISO)}</div>
+            </div>
+            <button class="good">Load & Start</button>
+          `;
+          node.querySelector("button").addEventListener("click", () => {
+            // Load into timer
+            $("#focusSel").value = it.course;
+            $("#notes").value = `${it.title} (Due ${it.dueISO})`;
+            $("#nextModeSel").value = "study";
+            timer.mode = "study";
+            setRemainingToFull("study");
+            setStatus("Plan loaded. Starting study session now.");
+            startInterval("study");
+          });
+          dbd.appendChild(node);
+        }
+
+        planOut.appendChild(block);
+      }
+    }
+
+    function clearTasks(){
+      tasks = [];
+      saveJSON(TASKS_KEY, tasks);
+      renderTasksTable();
+      renderFocusOptions();
+      $("#planOut").innerHTML = "";
+      $("#planStatus").innerHTML = `<strong>Plan status:</strong> Tasks cleared.`;
+    }
+
+    // ----------------------------
+    // Wire up events
+    // ----------------------------
+    function syncSettingsToUI(){
+      $("#studyMin").value = settings.studyMin;
+      $("#breakMin").value = settings.breakMin;
+      $("#autoContinue").checked = settings.autoContinue;
+      $("#soundOn").checked = settings.soundOn;
+      $("#logBreaks").checked = settings.logBreaks;
+      $("#logPartialOnSkip").checked = settings.logPartialOnSkip;
+      $("#nextModeSel").value = "study";
+    }
+
+    $("#startBtn").addEventListener("click", () => {
+      const mode = $("#nextModeSel").value;
+      startInterval(mode);
+    });
+    $("#pauseBtn").addEventListener("click", pauseTimer);
+    $("#resumeBtn").addEventListener("click", resumeTimer);
+    $("#resetBtn").addEventListener("click", resetTimer);
+    $("#skipBtn").addEventListener("click", skipInterval);
+    $("#enableNotifBtn").addEventListener("click", enableNotifications);
+    $("#logNowBtn").addEventListener("click", logProgressNow);
+
+    $("#autoContinue").addEventListener("change", () => {
+      settings.autoContinue = $("#autoContinue").checked;
+      saveJSON(SETTINGS_KEY, settings);
+      updateModeUI();
+    });
+    $("#soundOn").addEventListener("change", () => {
+      settings.soundOn = $("#soundOn").checked;
+      saveJSON(SETTINGS_KEY, settings);
+    });
+    $("#logBreaks").addEventListener("change", () => {
+      settings.logBreaks = $("#logBreaks").checked;
+      saveJSON(SETTINGS_KEY, settings);
+    });
+    $("#logPartialOnSkip").addEventListener("change", () => {
+      settings.logPartialOnSkip = $("#logPartialOnSkip").checked;
+      saveJSON(SETTINGS_KEY, settings);
+    });
+
+    $("#nextModeSel").addEventListener("change", () => {
+      if (timer.running || timer.paused) return;
+      timer.mode = $("#nextModeSel").value;
+      setRemainingToFull(timer.mode);
+    });
+
+    $("#studyMin").addEventListener("change", () => {
+      if (!timer.active){
+        timer.mode = $("#nextModeSel").value;
+        setRemainingToFull(timer.mode);
+      }
+    });
+    $("#breakMin").addEventListener("change", () => {
+      if (!timer.active){
+        timer.mode = $("#nextModeSel").value;
+        setRemainingToFull(timer.mode);
+      }
+    });
+
+    // Plan builder buttons
+    $("#addTaskBtn").addEventListener("click", addTask);
+    $("#seedExampleBtn").addEventListener("click", seedExample);
+    $("#genPlanBtn").addEventListener("click", generatePlan);
+    $("#clearTasksBtn").addEventListener("click", clearTasks);
+
+    // Log buttons
+    $("#exportBtn").addEventListener("click", exportCSV);
+    $("#clearLogBtn").addEventListener("click", clearLog);
+
+    // Keyboard shortcuts
+    document.addEventListener("keydown", (e) => {
+      if (e.target && ["INPUT","TEXTAREA","SELECT"].includes(e.target.tagName)) return;
+
+      if (e.code === "Space"){
+        e.preventDefault();
+        if (!timer.running && !timer.paused) $("#startBtn").click();
+        else if (timer.running) $("#pauseBtn").click();
+        else if (timer.paused) $("#resumeBtn").click();
+      }
+      if (e.key.toLowerCase() === "r"){
+        e.preventDefault();
+        $("#resetBtn").click();
+      }
+      if (e.key.toLowerCase() === "s"){
+        e.preventDefault();
+        $("#skipBtn").click();
+      }
+    });
+
+    // ----------------------------
+    // Init
+    // ----------------------------
+    function init(){
+      syncSettingsToUI();
+      renderAvailability();
+      renderTasksTable();
+      renderFocusOptions();
+      renderLog();
+      renderStats();
+
+      timer.mode = "study";
+      setRemainingToFull("study");
+      updateModeUI();
+      updateButtons();
+
+      setStatus("Ready. Pick a focus, define “done”, then Start.");
+    }
+    init();
+  </script>
+  <script>
+</script>
+
+</body>
+</html>
