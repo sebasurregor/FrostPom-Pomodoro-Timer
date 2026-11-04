@@ -1,5 +1,5 @@
 /*
- * StudyTimer — compañeros del polo (skins limitadas que se ganan con logros).
+ * FrostPom — compañeros del polo (skins limitadas que se ganan con logros).
  * Pingüino, Oso Polar, Oso Marino, Tiburón Martillo y Zorro Ártico usan el arte que
  * proporcionó el autor del proyecto (assets/companions/*.webp).
  *

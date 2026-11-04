@@ -1,5 +1,5 @@
 /*
- * StudyTimer — paisaje polar del fondo.
+ * FrostPom — paisaje polar del fondo.
  * Estilo simple con montañas en #93c0ed, #749eda y #2d68bc, nieve y animales que pasan.
  * - El cielo sigue la hora real: amanecer, día, atardecer y noche (data-phase).
  *   De noche hay estrellas, luna, aurora y una fogata con el oso polar asando malvaviscos.

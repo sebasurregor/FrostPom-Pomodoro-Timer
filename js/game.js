@@ -1,5 +1,5 @@
 /*
- * StudyTimer — reglas del progreso: rangos, XP, rachas, misiones, logros y salud del polo.
+ * FrostPom — reglas del progreso: rangos, XP, rachas, misiones, logros y salud del polo.
  * Todo aquí son funciones puras (no tocan el DOM ni el almacenamiento) para poder probarlas.
  * Lo que se puede elegir o poseer (temas, compañeros, sonidos, duraciones) vive en catalog.js.
  */

@@ -1,5 +1,5 @@
 /*
- * StudyTimer — vista Enfocar: el anillo del temporizador, los modos y "Mi ritmo".
+ * FrostPom — vista Enfocar: el anillo del temporizador, los modos y "Mi ritmo".
  * El bloque en curso vive en session.js; aquí se decide qué se ve y qué suena.
  */
 import * as U from '../util.js';
@@ -219,7 +219,7 @@ function updateClock() {
   const ang = (1 - frac) * Math.PI * 2;
   $('#ringKnob').setAttribute('cx', (150 + RING_R * Math.sin(ang)).toFixed(2));
   $('#ringKnob').setAttribute('cy', (150 - RING_R * Math.cos(ang)).toFixed(2));
-  document.title = st.status === 'idle' ? 'StudyTimer' : `${U.formatClock(sec)} ${MODE_NAMES[st.mode].toLowerCase()} - StudyTimer`;
+  document.title = st.status === 'idle' ? 'FrostPom' : `${U.formatClock(sec)} ${MODE_NAMES[st.mode].toLowerCase()} - FrostPom`;
 }
 
 let eatingUntil = 0;

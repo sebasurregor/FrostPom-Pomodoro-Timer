@@ -1,5 +1,5 @@
 /*
- * StudyTimer — vista Progreso: rango y racha, misiones diarias e historial.
+ * FrostPom — vista Progreso: rango y racha, misiones diarias e historial.
  * "Tu estudio" (semana y calendario) vive en activity.js.
  */
 import * as U from '../util.js';

@@ -1,11 +1,11 @@
 /*
- * StudyTimer — piezas de interfaz que se repiten en varias vistas
+ * FrostPom — piezas de interfaz que se repiten en varias vistas
  * (bienvenida, perfil, ranking y Enfocar): avatar, banderas, buscador de país,
  * selector de animal, botones de modo y el pingüino que celebra.
  */
 import { fold } from '../util.js';
 import * as C from '../catalog.js';
-import { AVATARS, animalName, flagEmoji, countryList } from '../identity.js';
+import { flagEmoji, countryList } from '../identity.js';
 import { h } from './dom.js';
 import { companion, penguin } from './companions.js';
 import { photoImg } from './photo.js';
@@ -120,14 +120,6 @@ export function countryPicker(initial, onChange) {
   toggle.addEventListener('click', () => (list.hidden ? input.focus() : close()));
   showValue();
   return wrap;
-}
-
-/** Botones de radio con los animales. isChecked(emoji) y onPick(emoji). */
-export function avatarOptions({ isChecked, onPick, labelPrefix }) {
-  return AVATARS.map((a) => h('button', {
-    type: 'button', role: 'radio', class: 'avatar-opt', 'aria-checked': String(isChecked(a)), 'aria-label': `${labelPrefix} ${animalName(a)}`,
-    onclick: () => onPick(a),
-  }, a));
 }
 
 /** Botón de un modo del pomodoro ("Clásico 25 + 5"). */

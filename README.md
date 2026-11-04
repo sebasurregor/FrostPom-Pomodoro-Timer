@@ -1,8 +1,12 @@
-# StudyTimer v3: edición polar
+# FrostPom: Pomodoro Timer (v3.4)
+
+> Antes se llamaba **StudyTimer**. Publicada en **https://sebasurregor.github.io/FrostPom-Pomodoro-Timer/**
 
 Pomodoro gamificado para niños y estudiantes, ambientado en el polo. Mientras más estudias (sin pasarte del límite saludable), más subes de rango, desbloqueas compañeros kawaii de edición limitada y **mantienes limpio tu polo**: si dejas de estudiar, el paisaje se llena de esmog, basura y petróleo.
 
-> Este archivo reemplaza al antiguo `README.txt`.
+> Este archivo reemplaza al antiguo `README.txt` (puedes borrarlo del repositorio).
+
+**¿Qué sigue?** El paso a paso para publicar está en [`docs/PROXIMOS-PASOS.md`](docs/PROXIMOS-PASOS.md).
 
 ## Cómo probarla en tu computador (Windows)
 
@@ -24,14 +28,16 @@ Si ya usabas la v2, la v3 **abre tus datos tal cual** (mismo almacenamiento). Si
 
 ## Qué tiene
 
+**Registro en dos pasos:** primero el nombre de usuario, la contraseña y la nacionalidad (opcional); después, una vista aparte para subir la foto de perfil (opcional, con recorte y zoom). Si no sube foto, la app le asigna un animal al azar; no hay lista de emojis para elegir ni botón de "Sugerir" nombre.
+
 Diseño: paisaje polar simple (montañas en #2d68bc, #749eda y #93c0ed) con pingüinos, un oso polar, un zorro ártico y una foca que caminan, dan salticos y de vez en cuando dicen algo ("¡Cuac!", "¡Grrr!", "¡Yip yip!"). El cielo sigue la hora real (amanecer, día, atardecer y noche) y de noche el oso polar asa malvaviscos junto a la fogata y a su iglú. El clima cambia cada 3 horas: despejado, nieve ligera, nevando o nevada fuerte. Encima van paneles claros tipo pegatina y botones de videojuego.
 
 | Vista | Para qué sirve |
 |---|---|
 | **Enfocar** | Temporizador con modos (Mini 15+5, Clásico 25+5, Enfoque 45+10, Profundo 50+10, Largo 60+15) y **Mi ritmo**, donde eliges tus minutos de estudio y descanso. El descanso largo llega solo cada 4 pomodoros. Solo registra *cuánto* estudiaste, no *qué*. |
-| **Premium 👑** | Corona en la barra superior. Modo prueba sin cobro: duración libre, todos los temas, sonidos y tonos, y recordatorios de enfoque. |
+| **Premium 👑** | Corona en la barra superior. Modo prueba sin cobro: duración libre, todos los temas, sonidos y tonos, y recordatorios de enfoque. **Regalo de bienvenida (una sola vez):** 1000 gemas para alimentar a la mascota y una mascota de edición limitada que el usuario elige. |
 | **Progreso** | Salud de tu polo, rango (Bronce → Leyenda), racha, misiones diarias, **Tu estudio** (pestañas: gráfica de los últimos 7 días o calendario del mes con los minutos de cada día) e historial (las 5 últimas sesiones, con "Ver más"). |
-| **Ranking** | Top de la semana y de la temporada. Por ahora en **modo demostración**: rivales simulados y solo tus minutos son reales. |
+| **Ranking** | Primer MVP: **sin rivales simulados**. Muestra tu marca de la semana y de la temporada, y el aviso "El ranking global llega pronto" (se activa cuando exista el servidor). |
 | **Tienda (en Enfocar)** | El ícono de la bolsa junto al compañero del reloj abre la bandeja de comida. **Arrastra** la comida hasta tu compañero con el mouse o con el dedo (con el teclado: Tab + Enter). 12 comidas de 2 a 8 gemas; la barriguita baja un poco cada hora y cada animal tiene favoritas. Es solo por cariño: no da XP. |
 | **Perfil** | Tu personaje, resumen de estadísticas, **compañeros de edición limitada** (se ganan con logros), **foto de perfil** (opcional, solo en tu dispositivo), temas del temporizador (con gemas o Premium), **temporadas** (barra con los días que faltan, (i) con la explicación y tus medallas) y logros. Desde aquí se entra a **Ajustes**. |
 | **Ajustes** | Cuenta, región y "Eliminar mi cuenta", Premium, sonidos de concentración y tonos, recordatorios, temporizador ("Menos animaciones"), límite saludable diario, ranking y **guardado automático**. |
@@ -43,9 +49,9 @@ Diseño: paisaje polar simple (montañas en #2d68bc, #749eda y #93c0ed) con ping
 - **Rangos:** Bronce, Plata, Oro, Platino, Diamante y Maestro (cada uno con III, II, I), y Leyenda con estrellas.
 - **Temporadas:** cada 3 meses (ene–mar, abr–jun, jul–sep, oct–dic) empieza una temporada nueva. Tu rango vuelve a Bronce III, ganas gemas según el rango que alcanzaste (de 10 a 100) y queda una medalla en tu perfil. Logros, compañeros, temas, gemas, racha y calendario se conservan; el historial detallado de sesiones viejas se borra. La duración se cambia en `js/config.js → season.months`.
 - **Guardado automático:** cada minuto se guarda al instante y el total de cada día queda en el calendario. Ya no hay copias manuales.
-- **Gemas:** salen de misiones, logros, subidas de rango y el premio de cada temporada. Solo se ganan estudiando: **no hay compras con dinero real**.
+- **Gemas:** salen de misiones, logros, subidas de rango, el premio de cada temporada y el regalo de bienvenida de Premium (1000, una sola vez). Hoy **no hay compras con dinero real** (Premium está en modo prueba gratis).
 - **Salud del polo:** cada día que estudias al menos 45 min el paisaje se mantiene limpio. Cuentan hoy y los últimos 3 días, y al empezar el polo arranca casi limpio.
-- **Compañeros de edición limitada:** 5 personajes (Pingüino, Zorro Ártico, Oso Polar, Oso Marino y Tiburón Martillo). Cada uno se desbloquea con un logro y te acompaña en el temporizador, el HUD y el ranking.
+- **Compañeros de edición limitada:** 5 personajes (Pingüino, Zorro Ártico, Oso Polar, Oso Marino y Tiburón Martillo). Cada uno se desbloquea con un logro (o uno de ellos como regalo de Premium) y te acompaña en el temporizador, el HUD y el ranking.
 - **Pingüino animado:** te saluda al empezar y al completar una sesión, se enamora cuando subes de rango o reclamas una misión, y camina por el paisaje. Si no tienes otro compañero equipado, se queda contigo junto al temporizador.
 
 ### Arte
@@ -93,7 +99,7 @@ js/                     Lógica pura: sin DOM, se prueba en Node
   ui/feeding.js         Bandeja de comida en Enfocar: arrastrar y soltar (Pointer Events)
   ui/photo.js           Foto de perfil: recorte, zoom y sin datos ocultos (EXIF)
   security.js           Contraseña de la cuenta (PBKDF2 + bloqueo por intentos)
-  leaderboard.js        Ranking (demo hoy; interfaz lista para el servidor)
+  leaderboard.js        Ranking (local hoy, sin bots; interfaz lista para el servidor)
   main.js               Arranque, navegación y eventos globales
   ui/                   Interfaz (un archivo por vista o pieza)
     context.js          Dueño del estado en pantalla: state, mutate(), session
@@ -113,7 +119,7 @@ docs/                   Seguridad, cambios y hoja de ruta
 ## Pruebas
 
 ```
-npm test                                             # 54 pruebas de la lógica (necesita Node 18+)
+npm test                                             # 57 pruebas de la lógica (necesita Node 18+)
 python tests/e2e_smoke.py http://localhost:8000/     # recorrido en navegador (opcional, ver el archivo)
 python tests/store_check.py http://localhost:8000/   # lista para Microsoft Store: manifiesto, instalable,
                                                      # sin conexión, 8 tamaños de ventana y accesibilidad (axe)
@@ -127,6 +133,7 @@ Sigue `docs/MICROSOFT-STORE.md`: GitHub Pages, cuenta individual en Partner Cent
 
 ## Documentación
 
+- [`docs/PROXIMOS-PASOS.md`](docs/PROXIMOS-PASOS.md): **qué hacer ahora**, en orden, hasta tener la app en Microsoft Store.
 - [`docs/SEGURIDAD.md`](docs/SEGURIDAD.md): cómo se protegen los datos hoy y qué hacer antes de lanzar.
 - [`docs/CAMBIOS-v3.md`](docs/CAMBIOS-v3.md): reorganización del código y errores corregidos en la v3.
 - [`docs/CAMBIOS-v2.md`](docs/CAMBIOS-v2.md): errores que tenía la v1 y cómo se corrigieron.

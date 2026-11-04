@@ -1,10 +1,10 @@
-# Seguridad y privacidad de StudyTimer
+# Seguridad y privacidad de FrostPom
 
 Este documento explica qué protege la app hoy, cuáles son sus límites honestos y qué falta antes de lanzarla en las tiendas. La idea central es simple: **el dato más seguro es el que nunca se recolecta.**
 
 ## 1. Lo que la app NO recolecta (minimización de datos)
 
-- **No pide nombre real, correo, edad ni ubicación.** El apodo se genera con palabras de una lista (por ejemplo, `ZorroVeloz42`) y el avatar es un animal o un compañero.
+- **No pide nombre real, correo, edad ni ubicación.** Cada quien crea su nombre de usuario (pasa por un filtro de groserías e insultos, y el registro recuerda no usar uno que revele quién eres). El avatar es un animal asignado al azar, un compañero ganado o una foto opcional que no sale del dispositivo.
 - **No registra en qué estudias.** Se eliminó la materia y la meta de cada sesión: solo se guarda cuánto tiempo estudiaste y cuándo. Al migrar desde la v1, tampoco se traen las materias ni las notas antiguas.
 - **No hay terceros.** Ni analítica, ni anuncios, ni CDNs, ni Google Fonts: las fuentes vienen dentro de la app. Ninguna petición sale del dispositivo. Esto es justamente lo que Apple exige para apps infantiles (ver sección 5).
 
@@ -25,7 +25,8 @@ Este documento explica qué protege la app hoy, cuáles son sus límites honesto
 ### Límites honestos
 
 - **El almacenamiento local no está cifrado.** Quien tenga el teléfono desbloqueado y conocimientos técnicos puede ver o editar los datos. Por eso la contraseña local protege de un uso casual, no es una caja fuerte.
-- **Por la misma razón, el ranking real no puede calcularse en el teléfono:** cualquiera podría editar sus minutos. El ranking global debe validarse en el servidor (sección 3).
+- **Por la misma razón, el ranking real no puede calcularse en el teléfono:** cualquiera podría editar sus minutos. El ranking global debe validarse en el servidor (sección 3). En el primer MVP (v3.4) el ranking es solo local y no muestra rivales simulados.
+- **El regalo de Premium (1000 gemas y una mascota) se entrega hoy en el dispositivo**, porque Premium está en modo prueba. La copia guardada se valida (solo mascotas que existen, sin repetir, y el regalo pendiente solo si de verdad se activó Premium), pero alguien con conocimientos técnicos podría editarla. Cuando haya cobro real, el estado Premium y el regalo deben venir de la compra validada por la tienda o el servidor, no del dispositivo.
 - **En la app nativa** (Capacitor), si algún día guardas un token de sesión, debe ir en el llavero del sistema (Keychain en iOS, Keystore en Android) y no en `localStorage`.
 
 ## 3. Servidor del ranking global (`server/supabase/schema.sql`)

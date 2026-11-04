@@ -1,5 +1,5 @@
 /*
- * StudyTimer — efectos: sonidos sintetizados (sin archivos), vibración, confeti y textos flotantes.
+ * FrostPom — efectos: sonidos sintetizados (sin archivos), vibración, confeti y textos flotantes.
  * Todo respeta las preferencias: sonido apagado, vibración apagada y "reducir movimiento".
  */
 

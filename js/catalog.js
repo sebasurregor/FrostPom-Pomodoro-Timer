@@ -1,5 +1,5 @@
 /*
- * StudyTimer — catálogo: lo que se puede elegir o poseer y qué está "en efecto".
+ * FrostPom — catálogo: lo que se puede elegir o poseer y qué está "en efecto".
  * Temas del temporizador, compañeros, modos del pomodoro, tonos, sonidos de concentración,
  * regiones y Premium. Funciones puras, sin DOM ni almacenamiento.
  *
@@ -64,7 +64,7 @@ export function skinStatusFor(state, skin) {
 
 // =========================================================
 // Compañeros: skins limitadas que SOLO se desbloquean con logros.
-// Personajes originales de StudyTimer (no usan memes ni personajes de terceros).
+// Personajes originales de FrostPom (no usan memes ni personajes de terceros).
 // =========================================================
 export const COMPANIONS = [
   { id: 'pinguino',         name: 'Pingüino',         unlock: 'primer-paso', tagline: 'Tu primer amigo del polo. Se emociona con cada sesión.' },
@@ -75,9 +75,14 @@ export const COMPANIONS = [
 ];
 export const COMPANION_BY_ID = U.byId(COMPANIONS);
 export const COMPANION_BY_ACHIEVEMENT = U.byId(COMPANIONS, 'unlock');
-export function companionUnlocked(id, achievements) {
+/** Un compañero está desbloqueado si ganaste su logro o te lo regalaron (regalo de Premium). */
+export function companionUnlocked(id, achievements, gifted = []) {
   const c = COMPANION_BY_ID[id];
-  return !!c && !!(achievements && achievements[c.unlock]);
+  return !!c && (!!(achievements && achievements[c.unlock]) || (Array.isArray(gifted) && gifted.includes(id)));
+}
+/** Compañeros que todavía no tienes (los que se pueden elegir como regalo). */
+export function lockedCompanions(progress) {
+  return COMPANIONS.filter((c) => !companionUnlocked(c.id, progress.achievements, progress.gifted));
 }
 
 // =========================================================

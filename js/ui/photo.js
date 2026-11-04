@@ -1,5 +1,5 @@
 /*
- * StudyTimer — foto de perfil.
+ * FrostPom — foto de perfil.
  * La foto se recorta cuadrada (con zoom y arrastrando para encuadrar) y se vuelve a dibujar
  * en un lienzo de 256 × 256. Así:
  *  - pesa poco (unos 20 KB) y cabe en el almacenamiento local;
@@ -7,8 +7,13 @@
  *    teléfono, fecha), porque solo se guardan los píxeles.
  * La foto se queda SOLO en este dispositivo. En el ranking los demás ven tu animal: cuando
  * exista el servidor, la foto nunca se envía (ver docs/SEGURIDAD.md).
+ *
+ * Dos formas de usarla:
+ *  - pickProfilePhoto(): desde Perfil, abre el selector y luego un diálogo para encuadrar.
+ *  - chooseAndLoad() + photoCropper(): el recortador "en línea", dentro de un diálogo que ya
+ *    está abierto (el paso de la foto del registro). Un diálogo no puede abrir otro encima.
  */
-import { $, h } from './dom.js';
+import { h } from './dom.js';
 import { openDialog, toast } from './feedback.js';
 
 const OUT = 256; // tamaño final en píxeles
@@ -17,38 +22,40 @@ const MAX_FILE = 15 * 1024 * 1024;
 export const PHOTO_RE = /^data:image\/(webp|jpeg|png);base64,[A-Za-z0-9+/]+=*$/;
 export const PHOTO_MAX_CHARS = 300000;
 
-/** Abre el selector de archivos (o la cámara en el celular). Debe llamarse desde un toque o clic. */
+/**
+ * Abre el selector de archivos (o la cámara en el celular). Debe llamarse desde un toque o clic.
+ * El <input> se pone DENTRO del diálogo abierto: con un diálogo modal, todo lo que está fuera
+ * queda inerte y el navegador ignora el clic (por eso antes el botón no hacía nada en el registro).
+ */
 function chooseFile() {
   return new Promise((resolve) => {
     const input = h('input', { type: 'file', accept: 'image/png,image/jpeg,image/webp,image/*', hidden: true });
     input.addEventListener('change', () => { resolve(input.files[0] || null); input.remove(); }, { once: true });
     input.addEventListener('cancel', () => { resolve(null); input.remove(); }, { once: true });
-    document.body.append(input);
+    (document.querySelector('dialog[open]') || document.body).append(input);
     input.click();
   });
 }
 
-/** Elegir, encuadrar y convertir. Devuelve la foto como data URL (WebP o JPEG) o null. */
-export async function pickProfilePhoto() {
+/** Elige una imagen y la abre. Devuelve { bmp } , { error } o null si el usuario canceló. */
+export async function chooseAndLoad() {
   const file = await chooseFile();
   if (!file) return null;
-  if (file.size > MAX_FILE) {
-    toast('Esa foto es muy pesada (máximo 15 MB).', 'warn');
-    return null;
-  }
-  let bmp;
+  if (file.size > MAX_FILE) return { error: 'Esa foto es muy pesada (máximo 15 MB).' };
   try {
-    bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
+    return { bmp: await createImageBitmap(file, { imageOrientation: 'from-image' }) };
   } catch {
-    toast('No pudimos abrir esa imagen. Prueba con una foto JPG o PNG.', 'warn');
-    return null;
+    return { error: 'No pudimos abrir esa imagen. Prueba con una foto JPG o PNG.' };
   }
-  return cropDialog(bmp);
 }
 
-function cropDialog(bmp) {
+/**
+ * Recortador en línea: círculo con la foto (se arrastra para encuadrar) y control de zoom.
+ * Devuelve { el, focus, toDataURL, close }. toDataURL() da la foto final o null si falla.
+ */
+export function photoCropper(bmp, { id = 'photoZoom' } = {}) {
   const canvas = h('canvas', { class: 'photo-crop__canvas', width: String(VIEW * 2), height: String(VIEW * 2), 'aria-label': 'Vista previa de tu foto. Arrástrala para encuadrarla.', role: 'img' });
-  const zoom = h('input', { type: 'range', id: 'photoZoom', min: '1', max: '3', step: '0.01', value: '1', 'aria-label': 'Zoom' });
+  const zoom = h('input', { type: 'range', id, min: '1', max: '3', step: '0.01', value: '1', 'aria-label': 'Zoom' });
   const base = VIEW / Math.min(bmp.width, bmp.height); // la foto siempre cubre el círculo
   let z = 1;
   let ox = 0; // desplazamiento del centro, en px de pantalla
@@ -91,13 +98,35 @@ function cropDialog(bmp) {
   }, { passive: false });
   redraw();
 
+  const el = h('div', { class: 'photo-cropper' },
+    h('div', { class: 'photo-crop' }, canvas),
+    h('label', { class: 'photo-crop__zoom', for: id }, h('span', { 'aria-hidden': 'true', text: '🔍' }), ' Zoom', zoom));
+  return {
+    el,
+    focus: () => zoom.focus(),
+    toDataURL() {
+      const out = h('canvas', { width: String(OUT), height: String(OUT) });
+      drawTo(out.getContext('2d'), OUT);
+      let url = out.toDataURL('image/webp', 0.86);
+      if (!url.startsWith('data:image/webp')) url = out.toDataURL('image/jpeg', 0.86); // Safari antiguo
+      return PHOTO_RE.test(url) && url.length <= PHOTO_MAX_CHARS ? url : null;
+    },
+    close: () => { if (bmp.close) bmp.close(); },
+  };
+}
+
+/** Desde Perfil: elegir, encuadrar y convertir. Devuelve la foto como data URL o null. */
+export async function pickProfilePhoto() {
+  const got = await chooseAndLoad();
+  if (!got) return null;
+  if (got.error) { toast(got.error, 'warn'); return null; }
+  const crop = photoCropper(got.bmp);
   let result = null;
-  return openDialog({
+  const v = await openDialog({
     title: 'Tu foto de perfil',
     className: 'dlg--photo',
     body: [
-      h('div', { class: 'photo-crop' }, canvas),
-      h('label', { class: 'photo-crop__zoom', for: 'photoZoom' }, h('span', { 'aria-hidden': 'true', text: '🔍' }), ' Zoom', zoom),
+      crop.el,
       h('p', { class: 'dlg__note', text: 'Arrastra la foto para encuadrarla. Se guarda solo en este dispositivo: en el ranking, los demás verán tu animal.' }),
     ],
     actions: [
@@ -105,24 +134,16 @@ function cropDialog(bmp) {
       {
         label: 'Usar esta foto', value: 'ok', variant: 'btn--gold', primary: true,
         validate: () => {
-          const out = h('canvas', { width: String(OUT), height: String(OUT) });
-          drawTo(out.getContext('2d'), OUT);
-          let url = out.toDataURL('image/webp', 0.86);
-          if (!url.startsWith('data:image/webp')) url = out.toDataURL('image/jpeg', 0.86); // Safari antiguo
-          if (!PHOTO_RE.test(url) || url.length > PHOTO_MAX_CHARS) {
-            toast('No pudimos guardar esa foto. Prueba con otra.', 'warn');
-            return false;
-          }
-          result = url;
-          return true;
+          result = crop.toDataURL();
+          if (!result) toast('No pudimos guardar esa foto. Prueba con otra.', 'warn');
+          return !!result;
         },
       },
     ],
-    onOpen: () => zoom.focus(),
-  }).then((v) => {
-    if (bmp.close) bmp.close();
-    return v === 'ok' ? result : null;
+    onOpen: crop.focus,
   });
+  crop.close();
+  return v === 'ok' ? result : null;
 }
 
 /** Imagen de la foto para un avatar. */

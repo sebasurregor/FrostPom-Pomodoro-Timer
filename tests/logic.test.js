@@ -218,8 +218,9 @@ test('tienda: con Premium usar un tema NO cobra gemas (antes las cobraba)', () =
   const st = S.defaultState();
   st.progress.gems = 100;
   E.setPremium(st, true);
+  const g = st.progress.gems; // ya incluye el regalo de bienvenida
   assert.equal(E.chooseSkin(st, 'menta', '2026-11-02').ok, true);
-  assert.equal(st.progress.gems, 100);
+  assert.equal(st.progress.gems, g);
   assert.equal(st.settings.skin, 'menta');
   assert.ok(!st.progress.owned.includes('menta')); // se usa con Premium, no se compra
   E.setPremium(st, false);
@@ -260,7 +261,7 @@ test('almacenamiento: una copia manipulada se limpia sin romper nada', () => {
 
 test('almacenamiento: importar rechaza archivos ajenos o enormes', () => {
   assert.throws(() => S.importBackup('no es json'), /no es una copia válida/);
-  assert.throws(() => S.importBackup('{"app":"otra"}'), /no es una copia de StudyTimer/);
+  assert.throws(() => S.importBackup('{"app":"otra"}'), /no es una copia de FrostPom/);
   assert.throws(() => S.importBackup('x'.repeat(3 * 1024 * 1024)), /demasiado grande/);
 });
 
@@ -294,17 +295,23 @@ test('almacenamiento: wipe borra solo las claves de la app', () => {
   assert.equal(b.getItem('otra_app'), 'x');
 });
 
-test('ranking demo: estable, con límite diario y con tu fila', () => {
-  const now = new Date(2026, 10, 4, 18, 0);
-  const you = { nick: 'ZorroVeloz42', avatar: '🦊', xp: 500, week: 9999, all: 10, optIn: true };
-  const a = L.demoBoard({ period: 'week', you, now });
-  const b = L.demoBoard({ period: 'week', you, now });
-  assert.deepEqual(a.map((r) => r.nick), b.map((r) => r.nick));
-  assert.equal(a[0].isYou, true);
-  assert.ok(a.filter((r) => !r.isYou).every((r) => r.minutes <= 240 * 3));
-  const hidden = L.demoBoard({ period: 'week', you: { ...you, optIn: false }, now });
-  assert.ok(!hidden.some((r) => r.isYou));
-  assert.ok(a.every((r, i) => i === 0 || a[i - 1].minutes >= r.minutes));
+test('ranking (primer MVP): sin rivales simulados, solo tu marca', () => {
+  const you = { nick: 'ZorroVeloz42', avatar: '🦊', xp: 500, week: 75, season: 900, optIn: true };
+  const week = L.localBoard({ period: 'week', you });
+  assert.equal(week.length, 1);
+  assert.equal(week[0].isYou, true);
+  assert.equal(week[0].minutes, 75);
+  assert.equal(L.localBoard({ period: 'season', you })[0].minutes, 900);
+  assert.equal(L.getProvider({ leaderboard: { mode: 'local' } }).mode, 'local');
+  assert.equal(L.getProvider({}).mode, 'local'); // por defecto nunca aparecen bots
+});
+
+test('ranking: el orden y los empates para el futuro ranking en línea', () => {
+  const rows = L.rankRows([
+    { nick: 'b', minutes: 30, xp: 0 }, { nick: 'tú', minutes: 50, xp: 0, isYou: true },
+    { nick: 'a', minutes: 50, xp: 0 }, { nick: 'c', minutes: 10, xp: 0 },
+  ]);
+  assert.deepEqual(rows.map((r) => [r.nick, r.position]), [['tú', 1], ['a', 1], ['b', 3], ['c', 4]]);
 });
 
 test('apodos: el generador siempre produce apodos válidos', () => {
@@ -627,9 +634,8 @@ test('temporadas: el archivo se valida y el ranking usa minutos de la temporada'
   assert.equal(st.seasons[0].rank, 'Oro II'); // el nombre se recalcula, no se confía en la copia
   assert.equal(st.seasons[0].gems, 1000);
   assert.equal(E.boardMinutes(st, new Date(2026, 10, 3, 12)).season, 10);
-  const rows = L.demoBoard({ period: 'season', you: { nick: 'pingu_estudia', avatar: '🐧', xp: 10, week: 0, season: 10, optIn: true }, now: new Date(2026, 10, 3, 12), seasonStartKey: '2026-10-01' });
+  const rows = L.localBoard({ period: 'season', you: { nick: 'pingu_estudia', avatar: '🐧', xp: 10, week: 0, season: 10, optIn: true } });
   assert.equal(rows.find((x) => x.isYou).minutes, 10);
-  assert.ok(rows.filter((x) => !x.isYou).every((x) => x.minutes >= 0 && x.xp >= 0));
 });
 
 test('clima: nieva casi siempre, cambia cada 3 horas y es igual para todos', () => {
@@ -729,4 +735,42 @@ test('foto de perfil: solo imágenes WebP, JPEG o PNG en base64 y de tamaño raz
   assert.equal(v('data:image/png;base64,abc"><img src=x onerror=alert(1)>'), '');
   assert.equal(v('data:image/jpeg;base64,' + 'A'.repeat(400000)), ''); // demasiado grande
   assert.equal(S.defaultState().profile.photo, '');
+});
+
+test('premium: el regalo de bienvenida da 1000 gemas y una mascota limitada, una sola vez', () => {
+  const st = S.defaultState();
+  st.progress.gems = 20;
+  const r = E.setPremium(st, true);
+  assert.equal(st.progress.gems, 1020);
+  assert.ok(r.events.some((e) => e.type === 'premiumGift' && e.gems === 1000 && e.choosePet));
+  assert.equal(st.premium.bonusClaimed, true);
+  assert.equal(st.premium.giftPending, true);
+  // Activar y desactivar no repite el regalo
+  E.setPremium(st, false);
+  E.setPremium(st, true);
+  assert.equal(st.progress.gems, 1020);
+  // Elegir la mascota: solo una que no tengas
+  assert.equal(E.giftCompanion(st, 'no-existe').ok, false);
+  assert.equal(E.giftCompanion(st, 'oso-polar').ok, true);
+  assert.deepEqual(st.progress.gifted, ['oso-polar']);
+  assert.equal(st.premium.giftPending, false);
+  assert.equal(E.giftCompanion(st, 'zorro-artico').ok, false); // el regalo ya se usó
+  assert.equal(E.equipCompanion(st, 'oso-polar').ok, true);
+  assert.equal(st.profile.companion, 'oso-polar');
+});
+
+test('premium: la mascota regalada sobrevive a guardar/cargar y no repite la ceremonia', () => {
+  const st = S.defaultState();
+  E.setPremium(st, true);
+  E.giftCompanion(st, 'oso-polar');
+  E.equipCompanion(st, 'oso-polar');
+  const back = S.validateState(JSON.parse(JSON.stringify(st)));
+  assert.deepEqual(back.progress.gifted, ['oso-polar']);
+  assert.equal(back.profile.companion, 'oso-polar');
+  assert.equal(back.premium.bonusClaimed, true);
+  assert.equal(back.premium.giftPending, false);
+  // Una copia manipulada no puede inventarse mascotas ni un regalo pendiente
+  const evil = S.validateState({ ...JSON.parse(JSON.stringify(S.defaultState())), premium: { active: true, giftPending: true }, progress: { gifted: ['dragon', 'oso-polar', 'oso-polar'] } });
+  assert.deepEqual(evil.progress.gifted, ['oso-polar']);
+  assert.equal(evil.premium.giftPending, false);
 });

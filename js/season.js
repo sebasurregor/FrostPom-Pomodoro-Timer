@@ -1,5 +1,5 @@
 /*
- * StudyTimer — temporadas de estudio.
+ * FrostPom — temporadas de estudio.
  * Cada temporada dura `months` meses del calendario (por defecto 3: ene–mar, abr–jun,
  * jul–sep y oct–dic, como un periodo escolar). Al empezar una nueva:
  *  - el rango vuelve a Bronce III y recibes gemas según el rango que alcanzaste;

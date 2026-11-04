@@ -1,5 +1,5 @@
 /*
- * StudyTimer — arranque y navegación.
+ * FrostPom — arranque y navegación.
  * Aquí se conectan las piezas: qué se pinta, en qué orden, y los eventos globales
  * (cambio de ruta, otra pestaña, volver a la app, barra espaciadora).
  */

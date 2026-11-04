@@ -1,5 +1,5 @@
 /*
- * StudyTimer — barra superior (rango, XP, racha, gemas) y salud del polo (paisaje del fondo).
+ * FrostPom — barra superior (rango, XP, racha, gemas) y salud del polo (paisaje del fondo).
  */
 import * as U from '../util.js';
 import * as G from '../game.js';

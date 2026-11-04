@@ -1,5 +1,5 @@
 /*
- * StudyTimer — motor de progreso.
+ * FrostPom — motor de progreso.
  * Aplica sesiones, descansos, misiones y compras sobre el estado, y devuelve "eventos"
  * (XP ganada, subida de rango, logro desbloqueado…) que la interfaz convierte en animaciones.
  * Es puro respecto al DOM: recibe el estado, lo modifica y devuelve qué pasó.
@@ -74,7 +74,7 @@ function checkAchievements(state, todayKey, events) {
     state.progress.gems += gems;
     events.push({ type: 'achievement', id, gems });
     const comp = C.COMPANION_BY_ACHIEVEMENT[id];
-    if (comp) events.push({ type: 'companion', companion: comp });
+    if (comp && !state.progress.gifted.includes(comp.id)) events.push({ type: 'companion', companion: comp });
   }
 }
 
@@ -244,7 +244,7 @@ export function chooseSkin(state, skinId, todayKey) {
 }
 
 export function equipCompanion(state, id) {
-  if (id !== null && !C.companionUnlocked(id, state.progress.achievements)) return refused();
+  if (id !== null && !C.companionUnlocked(id, state.progress.achievements, state.progress.gifted)) return refused();
   state.profile.companion = id;
   return done();
 }
@@ -284,9 +284,34 @@ export function setCustomMinutes(state, key, minutes, todayKey) {
 // =========================================================
 // Premium (modo prueba: sin cobro)
 // =========================================================
+export const PREMIUM_GEMS = 1000;
+
+/**
+ * Activa o desactiva Premium. La PRIMERA vez que se activa llega el regalo de bienvenida:
+ * 1000 gemas y una mascota de edición limitada que el usuario elige (giftCompanion).
+ * El regalo se da una sola vez: activar y desactivar no lo repite.
+ */
 export function setPremium(state, active) {
-  state.premium = { active, demo: true, since: active ? new Date().toISOString() : null };
-  return done();
+  const pm = state.premium;
+  const events = [];
+  pm.active = !!active;
+  pm.since = active ? new Date().toISOString() : null;
+  if (active && !pm.bonusClaimed) {
+    pm.bonusClaimed = true;
+    addGems(state, PREMIUM_GEMS, events, 'premium');
+    pm.giftPending = C.lockedCompanions(state.progress).length > 0;
+    events.push({ type: 'premiumGift', gems: PREMIUM_GEMS, choosePet: pm.giftPending });
+  }
+  return done(events);
+}
+
+/** Elige la mascota de regalo de Premium (solo si el regalo está pendiente y no la tenías). */
+export function giftCompanion(state, id) {
+  const c = C.COMPANION_BY_ID[id];
+  if (!state.premium.giftPending || !c || C.companionUnlocked(id, state.progress.achievements, state.progress.gifted)) return refused();
+  state.progress.gifted.push(id);
+  state.premium.giftPending = false;
+  return done([{ type: 'companion', companion: c, gift: true }]);
 }
 
 // =========================================================

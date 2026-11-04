@@ -1,5 +1,5 @@
 /*
- * StudyTimer — tu mascota y su comida.
+ * FrostPom — tu mascota y su comida.
  * La mascota es el compañero que tienes equipado (o el pingüino si no tienes ninguno).
  * Su barriguita va de 0 a 100 y baja sola con el tiempo (3 puntos por hora: de llena a vacía
  * en poco más de un día). Con gemas le das de comer en la Tienda; cada animal tiene comidas

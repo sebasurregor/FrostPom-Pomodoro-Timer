@@ -1,5 +1,5 @@
 /*
- * StudyTimer — clima del polo.
+ * FrostPom — clima del polo.
  * Nieva casi siempre (como en el Ártico), con días despejados de vez en cuando. El clima
  * cambia cada 3 horas y se decide con un azar determinista a partir del día y la hora
  * de tu región: así todas las pestañas (y todos los usuarios de la misma región) ven lo mismo.

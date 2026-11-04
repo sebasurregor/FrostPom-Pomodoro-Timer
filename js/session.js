@@ -1,5 +1,5 @@
 /*
- * StudyTimer — el bloque en curso.
+ * FrostPom — el bloque en curso.
  * Une el temporizador (timer.js) con su guardado y con las otras pestañas abiertas:
  *  - cada acción (empezar, pausar, saltar…) se guarda al instante, así una recarga no pierde nada;
  *  - cuando el bloque llega a cero, solo UNA pestaña lo registra (la otra se sincroniza);

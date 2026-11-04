@@ -1,5 +1,5 @@
 /*
- * StudyTimer — el estado de la app en la interfaz.
+ * FrostPom — el estado de la app en la interfaz.
  * Un solo dueño del estado: todos los módulos de la interfaz leen `state` (enlace vivo) y lo
  * cambian SOLO con mutate(), que relee lo que otra pestaña haya guardado, aplica el cambio,
  * guarda, vuelve a pintar y reproduce los eventos (XP, logros…).
@@ -72,5 +72,5 @@ export const session = createSession({
     const d = prefs().durations;
     return (mode === 'study' ? d.study : mode === 'long' ? d.long : d.brk) * 60;
   },
-  withLock: (fn) => (navigator.locks && navigator.locks.request ? navigator.locks.request('studytimer-complete', fn) : fn()),
+  withLock: (fn) => (navigator.locks && navigator.locks.request ? navigator.locks.request('frostpom-complete', fn) : fn()),
 });

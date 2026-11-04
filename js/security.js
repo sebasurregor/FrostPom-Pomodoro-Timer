@@ -1,5 +1,5 @@
 /*
- * StudyTimer — contraseña de la cuenta.
+ * FrostPom — contraseña de la cuenta.
  * La contraseña NUNCA se guarda: se guarda un hash PBKDF2-SHA256 con sal aleatoria.
  * Tras 5 intentos fallidos se bloquea 60 segundos (y el bloqueo crece si siguen fallando).
  *

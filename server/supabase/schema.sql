@@ -1,5 +1,5 @@
 -- =====================================================================
--- StudyTimer: servidor del ranking global (Supabase / PostgreSQL 15+)
+-- FrostPom: servidor del ranking global (Supabase / PostgreSQL 15+)
 --
 -- Por qué existe: si el ranking se calculara en el teléfono, cualquiera podría
 -- editar sus minutos. Aquí el SERVIDOR mide el tiempo y decide cuánto cuenta.

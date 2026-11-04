@@ -1,5 +1,5 @@
 /*
- * StudyTimer — service worker (modo sin conexión).
+ * FrostPom — service worker (modo sin conexión).
  * Correcciones respecto a la v1:
  *  - Antes la página nunca registraba este archivo, así que no había modo offline.
  *  - addAll() fallaba porque la carpeta icons/ no existía; ahora todos los archivos existen.
@@ -7,8 +7,8 @@
  *  - Solo se guarda en caché lo de este mismo sitio y respuestas correctas. Nunca respuestas de APIs
  *    ni de otros dominios (podrían contener datos personales).
  */
-const VERSION = '3.3.0';
-const CACHE = `studytimer-${VERSION}`;
+const VERSION = '3.4.0';
+const CACHE = `frostpom-${VERSION}`;
 const PRECACHE = [
   './',
   './index.html',
@@ -97,7 +97,7 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k.startsWith('studytimer') && k !== CACHE).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => (k.startsWith('frostpom') || k.startsWith('studytimer')) && k !== CACHE).map((k) => caches.delete(k))))
       .then(() => self.clients.claim()),
   );
 });
@@ -109,16 +109,22 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return; // otros dominios: sin caché
 
   if (req.mode === 'navigate') {
+    // Cada página se guarda con su propia dirección. Antes TODA navegación se guardaba como
+    // index.html: si abrías la política de privacidad con internet, sin conexión la app
+    // arrancaba mostrando la política en vez del temporizador (corregido en la v3.4).
+    const root = new URL('./', self.location).pathname;
+    const isApp = url.pathname === root || url.pathname === root + 'index.html';
+    const key = isApp ? './index.html' : req;
     event.respondWith(
       fetch(req)
         .then((res) => {
-          if (res.ok && res.type === 'basic') {
+          if (res.ok && res.type === 'basic' && !res.redirected) {
             const copy = res.clone();
-            caches.open(CACHE).then((c) => c.put('./index.html', copy));
+            caches.open(CACHE).then((c) => c.put(key, copy));
           }
           return res;
         })
-        .catch(() => caches.match('./index.html')),
+        .catch(async () => (await caches.match(key, { ignoreSearch: true })) || caches.match('./index.html')),
     );
     return;
   }

@@ -1,5 +1,5 @@
 /*
- * StudyTimer — sonidos de concentración (suenan mientras estudias) y tonos de aviso.
+ * FrostPom — sonidos de concentración (suenan mientras estudias) y tonos de aviso.
  * Qué suena lo decide catalog.effectivePrefs(): un sonido Premium sin Premium no suena.
  */
 import * as U from '../util.js';

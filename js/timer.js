@@ -1,5 +1,5 @@
 /*
- * StudyTimer — motor del temporizador.
+ * FrostPom — motor del temporizador.
  * Lleva la cuenta del tiempo REAL trabajado aunque pauses varias veces o recargues la página.
  * Correcciones respecto a la v1:
  *  - Antes, al pausar y reanudar se perdía la hora real de inicio y el tiempo parcial se contaba mal.

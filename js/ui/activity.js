@@ -1,5 +1,5 @@
 /*
- * StudyTimer — "Tu estudio": últimos 7 días o calendario del mes.
+ * FrostPom — "Tu estudio": últimos 7 días o calendario del mes.
  */
 import * as U from '../util.js';
 import * as G from '../game.js';

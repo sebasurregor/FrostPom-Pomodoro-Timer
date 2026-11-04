@@ -1,5 +1,5 @@
 /* =====================================================================
-   StudyTimer — estilos
+   FrostPom — estilos
    Idea visual: un polo kawaii. Paisaje simple con montañas en #93c0ed, #749eda y #2d68bc,
    paneles tipo "sticker" (borde grueso y sombra dura) y botones que se hunden al tocarlos.
    ===================================================================== */
@@ -1119,6 +1119,11 @@ select:disabled { opacity: 0.6; }
 .row.is-you { background: var(--gold); box-shadow: 0 4px 0 var(--ink); }
 .row.is-you .row__pos { color: var(--ink); }
 .row--gap { display: block; text-align: center; border: 0; background: transparent; color: var(--on-night-muted); padding: 0; }
+.board__label { list-style: none; justify-self: start; font-weight: 800; color: var(--on-night); font-size: 0.88rem; padding: 4px 12px; border-radius: 999px; background: rgba(13, 35, 70, 0.6); }
+/* Ranking local (primer MVP): tarjeta "llega pronto" */
+.soon { max-width: 640px; margin: 18px auto 16px; text-align: center; display: grid; justify-items: center; }
+.soon .panel__text { margin-bottom: 0; }
+.soon__icon { font-size: 2.6rem; line-height: 1; width: 72px; height: 72px; display: grid; place-items: center; border-radius: 50%; background: var(--paper-2); border: 2.5px solid var(--ink); box-shadow: 0 4px 0 var(--ink); margin-bottom: 12px; }
 
 /* =====================================================================
    PERFIL
@@ -1860,3 +1865,28 @@ html.is-feeding, html.is-feeding * { cursor: grabbing !important; }
 .photo-crop__canvas:active { cursor: grabbing; }
 .photo-crop__zoom { display: flex; align-items: center; gap: 8px; font-weight: 800; }
 .photo-crop__zoom input { flex: 1; }
+
+/* =====================================================================
+   v3.4 — Registro en dos pasos (foto aparte) y regalo de Premium
+   ===================================================================== */
+.dlg--onb-photo .dlg__actions .btn { width: auto; flex: 1 1 140px; }
+.onb-photo__stage { display: grid; justify-items: center; margin: 6px 0 12px; }
+.avatar--hero { width: 128px; height: 128px; font-size: 4.4rem; box-shadow: 0 6px 0 var(--ink); }
+.onb-photo__hint { text-align: center; }
+.onb-photo__pick { justify-content: center; }
+.photo-cropper { display: grid; gap: 4px; width: 100%; max-width: 280px; }
+
+.gift-pets { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; margin: 4px 0 6px; }
+.gift-pet {
+  display: grid; justify-items: center; gap: 6px; padding: 10px 6px 12px;
+  border: 2.5px solid var(--ink); border-radius: var(--r-md);
+  background: var(--paper-2); color: var(--ink); cursor: pointer;
+  font: inherit; box-shadow: 0 4px 0 var(--ink);
+  transition: transform 0.12s ease, background-color 0.12s ease;
+}
+.gift-pet:hover { transform: translateY(-2px); }
+.gift-pet[aria-checked="true"] { background: var(--gold); transform: translateY(-2px); box-shadow: 0 0 0 3px var(--ink), 0 6px 0 var(--ink); }
+.gift-pet__art { display: grid; place-items: center; height: 80px; }
+.gift-pet__name { font-weight: 800; font-size: 0.88rem; text-align: center; line-height: 1.15; }
+.gift-art { display: block; font-size: 128px; line-height: 1; }
+@media (forced-colors: active) { .gift-pet[aria-checked="true"] { outline: 3px solid Highlight; } }

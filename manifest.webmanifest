@@ -1,7 +1,7 @@
 {
   "id": "./",
-  "name": "StudyTimer",
-  "short_name": "StudyTimer",
+  "name": "FrostPom: Pomodoro Timer",
+  "short_name": "FrostPom",
   "description": "Pomodoro polar con rangos, misiones, temporadas y compañeros kawaii: cada minuto que estudias mantiene limpio tu polo.",
   "lang": "es",
   "dir": "ltr",
@@ -32,7 +32,7 @@
     { "src": "assets/screenshots/escritorio-enfocar.webp", "sizes": "1366x768", "type": "image/webp", "form_factor": "wide", "label": "El temporizador con tu compañero y el paisaje polar" },
     { "src": "assets/screenshots/escritorio-noche.webp", "sizes": "1366x768", "type": "image/webp", "form_factor": "wide", "label": "De noche, el oso asa malvaviscos junto a la fogata" },
     { "src": "assets/screenshots/escritorio-progreso.webp", "sizes": "1366x768", "type": "image/webp", "form_factor": "wide", "label": "Tu rango, misiones y calendario de estudio" },
-    { "src": "assets/screenshots/celular-enfocar.webp", "sizes": "780x1688", "type": "image/webp", "form_factor": "narrow", "label": "StudyTimer en el celular" },
+    { "src": "assets/screenshots/celular-enfocar.webp", "sizes": "780x1688", "type": "image/webp", "form_factor": "narrow", "label": "FrostPom en el celular" },
     { "src": "assets/screenshots/celular-tienda.webp", "sizes": "780x1688", "type": "image/webp", "form_factor": "narrow", "label": "Arrastra la comida hasta tu compañero" }
   ]
 }

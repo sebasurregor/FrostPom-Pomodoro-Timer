@@ -1,5 +1,5 @@
 /*
- * StudyTimer — avisos: toasts, notificaciones del sistema y diálogos (uno a la vez).
+ * FrostPom — avisos: toasts, notificaciones del sistema y diálogos (uno a la vez).
  */
 import { $, h } from './dom.js';
 
@@ -21,7 +21,7 @@ export async function notify(title, body) {
   if (!document.hidden || !('Notification' in window) || Notification.permission !== 'granted') return;
   try {
     const reg = 'serviceWorker' in navigator ? await Promise.race([navigator.serviceWorker.ready, new Promise((r) => setTimeout(r, 800))]) : null;
-    const opts = { body, icon: 'assets/icons/icon-192.png', badge: 'assets/icons/icon-192.png', tag: 'studytimer', renotify: true };
+    const opts = { body, icon: 'assets/icons/icon-192.png', badge: 'assets/icons/icon-192.png', tag: 'frostpom', renotify: true };
     if (reg && reg.showNotification) await reg.showNotification(title, opts);
     else new Notification(title, opts);
   } catch {

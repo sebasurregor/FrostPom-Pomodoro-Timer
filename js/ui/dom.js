@@ -1,5 +1,5 @@
 /*
- * StudyTimer — ayudantes de DOM.
+ * FrostPom — ayudantes de DOM.
  * Regla de seguridad: nunca se usa innerHTML. Todo texto escrito por el usuario entra con textContent.
  */
 

@@ -6,14 +6,14 @@
   <!-- Política de seguridad: solo se ejecuta y carga código de este mismo sitio. -->
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; media-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'; trusted-types st-sw">
   <meta name="referrer" content="no-referrer">
-  <title>StudyTimer</title>
+  <title>FrostPom</title>
   <meta name="description" content="Pomodoro polar con rangos, misiones y compañeros kawaii: cada minuto que estudias mantiene limpio tu polo.">
   <meta name="theme-color" content="#2d68bc">
   <meta name="color-scheme" content="light">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="StudyTimer">
+  <meta name="apple-mobile-web-app-title" content="FrostPom">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="assets/icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
@@ -48,7 +48,7 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path class="i-flame" d="M12 2.5c.8 3.6 5.8 5.7 5.8 11.2a5.8 5.8 0 0 1-11.6 0c0-2.9 1.6-4.7 2.7-6.5.2 1.9 1 3 2.1 3.2-.3-2.9-.4-5.3 1-7.9z"/></svg>
           <b id="hudStreakN">0</b><span class="sr-only"> días de racha</span>
         </span>
-        <button type="button" class="chip-stat chip-stat--crown" id="hudCrown" aria-label="StudyTimer Premium">
+        <button type="button" class="chip-stat chip-stat--crown" id="hudCrown" aria-label="FrostPom Premium">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path class="i-crown" d="M3 8.5l4.2 3.6L12 5l4.8 7.1L21 8.5l-2 10H5z"/><circle class="i-crown-gem" cx="12" cy="15" r="1.6"/></svg><b class="crown-label" id="hudCrownLabel">Premium</b>
         </button>
         <a class="chip-stat chip-stat--gems" id="hudGems" href="#/tienda" title="Gemas: úsalas en la tienda de Enfocar">
@@ -273,6 +273,7 @@
           <button class="seg__btn" role="tab" type="button" data-period="season" id="seasonTab" aria-selected="false">Esta temporada</button>
         </div>
         <p class="notice" id="boardNotice"></p>
+        <div id="boardSoon"></div>
         <div class="podium" id="podium"></div>
         <ol class="board" id="board"></ol>
       </section>
@@ -390,7 +391,7 @@
 
           <section class="panel ord-9 panel--quiet" aria-labelledby="h-acerca">
             <h2 class="panel__title" id="h-acerca">Acerca de</h2>
-            <p class="panel__text">StudyTimer <span id="appVersion"></span>. Esta app ayuda a organizarte y a descansar a tiempo, pero no reemplaza a un profesional. Si el estrés o el cansancio no se van, habla con un adulto de confianza o con bienestar de tu colegio o universidad.</p>
+            <p class="panel__text">FrostPom <span id="appVersion"></span>. Esta app ayuda a organizarte y a descansar a tiempo, pero no reemplaza a un profesional. Si el estrés o el cansancio no se van, habla con un adulto de confianza o con bienestar de tu colegio o universidad.</p>
             <p class="panel__text"><a class="link-btn" href="privacidad.html">Política de privacidad</a></p>
             <p class="panel__text credits">Banderas: Twemoji (CC BY 4.0), mediante la fuente Twemoji Country Flags.</p>
           </section>
@@ -398,7 +399,7 @@
 
           <div class="col">
           <section class="panel ord-2 panel--premium" aria-labelledby="h-premium">
-            <h2 class="panel__title" id="h-premium"><span class="crown-inline"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="i-crown" d="M3 8.5l4.2 3.6L12 5l4.8 7.1L21 8.5l-2 10H5z"/><circle class="i-crown-gem" cx="12" cy="15" r="1.6"/></svg></span> StudyTimer Premium</h2>
+            <h2 class="panel__title" id="h-premium"><span class="crown-inline"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="i-crown" d="M3 8.5l4.2 3.6L12 5l4.8 7.1L21 8.5l-2 10H5z"/><circle class="i-crown-gem" cx="12" cy="15" r="1.6"/></svg></span> FrostPom Premium</h2>
             <p class="panel__text" id="premiumStatus"></p>
             <div class="btn-row" id="premiumActions"></div>
           </section>
@@ -449,6 +450,6 @@
   <div class="toasts" id="toasts" aria-live="polite" aria-atomic="false"></div>
   <dialog class="dlg" id="dlg" aria-labelledby="dlgTitle"></dialog>
   <canvas class="fx" id="fx" aria-hidden="true"></canvas>
-  <noscript><p class="noscript">StudyTimer necesita JavaScript para funcionar.</p></noscript>
+  <noscript><p class="noscript">FrostPom necesita JavaScript para funcionar.</p></noscript>
 </body>
 </html>

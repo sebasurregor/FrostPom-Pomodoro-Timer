@@ -1,5 +1,5 @@
 /*
- * StudyTimer — emblemas de rango dibujados en SVG (sin imágenes externas).
+ * FrostPom — emblemas de rango dibujados en SVG (sin imágenes externas).
  * Cada rango sube en detalle: Bronce (círculo) → Plata (estrella de 4) → Oro (5) → Platino (6)
  * → Diamante (gema) → Maestro (estrella de 8 + alas) → Leyenda (corona + alas).
  * Las divisiones se ven como puntos: III = 1, II = 2, I = 3.

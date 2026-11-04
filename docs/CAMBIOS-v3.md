@@ -1,5 +1,34 @@
 # Cambios de la v2 a la v3
 
+## v3.4: la app ahora se llama FrostPom (primer MVP para Microsoft Store)
+
+- **Nuevo nombre: FrostPom.**
+  - Cambia en la ventana, la pestaña del navegador, el manifiesto (`FrostPom: Pomodoro Timer`, nombre corto `FrostPom`), la política de privacidad, Acerca de, Premium, las notificaciones y la documentación.
+  - Dirección pública: `https://sebasurregor.github.io/FrostPom-Pomodoro-Timer/`.
+  - **No se pierde nada:** los datos siguen guardados con las mismas claves (`st2_…`), así que quien ya usaba la app conserva su progreso. Las copias hechas con el nombre anterior también se pueden restaurar.
+  - El modo sin conexión usa ahora la caché `frostpom-3.4.0` y borra las cachés viejas de `studytimer`.
+- **Registro en dos pasos.**
+  - Paso 1: nombre de usuario, contraseña y nacionalidad (opcional). Se quitó el botón **"Sugerir uno"**: cada quien crea su nombre.
+  - Paso 2: una **vista aparte para la foto de perfil**, después de crear la cuenta, con "Ahora no" y "Guardar foto". La cuenta ya queda guardada antes de este paso.
+  - Si no sube foto, la app le **asigna un animal al azar**. Se quitó la lista de emojis, tanto del registro como del Perfil.
+- **Arreglado: el botón de la foto no hacía nada en el registro.** El selector de archivos se creaba fuera de la ventana de bienvenida, y el navegador ignora los clics fuera de una ventana modal. Además, el recorte abría una segunda ventana, que no puede abrirse encima de otra. Ahora el selector se crea dentro de la ventana abierta y el recorte aparece en la misma vista.
+- **Arreglado: sin conexión, la app podía abrir en la política de privacidad.** El modo sin conexión guardaba cualquier página que se abriera como si fuera la portada. Si alguien abría la política de privacidad con internet y después abría la app sin conexión, veía la política en vez del temporizador. Ahora cada página se guarda con su propia dirección. Lo detectó `store_check.py`.
+- **En Perfil**, la sección se llama "Tu foto de perfil" (subir, cambiar o quitar la foto) y sigue abierta después de guardar. El botón "Usar animal" ahora se llama "Quitar compañero".
+- **Ranking sin datos inventados.** Se quitaron los 42 rivales simulados: en una app nueva no tenía sentido que ya hubiera gente. Ahora la pantalla muestra:
+  - un aviso, **"El ranking global llega pronto"**;
+  - tu marca de la semana y de la temporada.
+  - El código del ranking en línea quedó listo (`rankRows` ordena y maneja empates) para cuando exista el servidor.
+- **Regalo de bienvenida de Premium** (una sola vez, aunque se desactive y se vuelva a activar):
+  - **1000 gemas** para alimentar a la mascota en la tienda de Enfocar;
+  - **una mascota de edición limitada** que el usuario elige entre las que todavía no tiene. Si dice "Luego", puede elegirla después con el botón **🎁 Elige tu mascota** en Perfil → Compañeros o desde la corona.
+  - La mascota regalada tiene su ceremonia ("Tu regalo por ser Premium") y la etiqueta "Regalo Premium". Si más adelante gana el logro de esa mascota, no se repite la ceremonia.
+  - La oferta Premium muestra los dos regalos al principio de la lista.
+- **Pruebas:**
+  - 57 de lógica: regalo de Premium (una sola vez y sin trampas en la copia guardada) y ranking sin bots;
+  - 95 comprobaciones en el navegador, incluidas la foto en el registro con EXIF/GPS, "Ahora no" y el regalo completo;
+  - `store_check.py` en la raíz y en la subcarpeta `/FrostPom-Pomodoro-Timer/`.
+- **Nuevo:** `docs/PROXIMOS-PASOS.md`, con el paso a paso de lo que sigue.
+
 ## v3.3: tienda en Enfocar (arrastrar la comida), foto de perfil y lista para Microsoft Store
 
 - **La tienda ahora vive en Enfocar.**

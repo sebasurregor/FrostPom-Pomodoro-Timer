@@ -13,7 +13,7 @@
 ```
 npm init -y
 npm install @capacitor/core @capacitor/cli @capacitor/ios @capacitor/android
-npx cap init StudyTimer com.tuempresa.studytimer --web-dir .
+npx cap init FrostPom com.tuempresa.frostpom --web-dir .
 npx cap add android
 npx cap add ios        # requiere un Mac con Xcode
 ```

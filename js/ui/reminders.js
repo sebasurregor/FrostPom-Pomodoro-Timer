@@ -1,5 +1,5 @@
 /*
- * StudyTimer — recordatorios de enfoque (Premium). En la web solo suenan con la app
+ * FrostPom — recordatorios de enfoque (Premium). En la web solo suenan con la app
  * abierta o instalada; en la app nativa serán notificaciones locales.
  */
 import * as U from '../util.js';

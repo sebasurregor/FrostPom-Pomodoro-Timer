@@ -1,5 +1,5 @@
 /*
- * StudyTimer — tienda de comida dentro de Enfocar.
+ * FrostPom — tienda de comida dentro de Enfocar.
  * Un ícono junto al compañero del reloj abre una bandeja. La comida se ARRASTRA hasta la
  * mascota con el mouse o con el dedo (Pointer Events: funciona igual en computador y celular).
  * Con el teclado (Tab + Enter) la comida se le da directamente, para que nadie se quede por

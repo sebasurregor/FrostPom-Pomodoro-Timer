@@ -1,5 +1,5 @@
 /*
- * StudyTimer — utilidades compartidas.
+ * FrostPom — utilidades compartidas.
  * Sin dependencias. Módulo ES: lo usan el navegador y las pruebas de Node por igual.
  */
 

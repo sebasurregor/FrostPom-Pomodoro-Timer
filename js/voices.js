@@ -1,5 +1,5 @@
 /*
- * StudyTimer — onomatopeyas de los animales del polo.
+ * FrostPom — onomatopeyas de los animales del polo.
  * De vez en cuando, los animales del paisaje y tu compañero "dicen" algo en un globo.
  * Lo que dicen depende del momento: de noche tienen sueño, con nevada fuerte tienen frío,
  * con esmog tosen y mientras estudias hablan bajito para no distraerte.

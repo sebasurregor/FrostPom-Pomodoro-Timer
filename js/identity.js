@@ -1,5 +1,5 @@
 /*
- * StudyTimer — identidad: apodos, avatares, nombre de usuario y nacionalidad.
+ * FrostPom — identidad: apodos, avatares, nombre de usuario y nacionalidad.
  * Se generan apodos para no pedir nombres reales a los niños, y los nombres elegidos
  * pasan por un filtro de groserías y suplantación. Funciones puras.
  */
@@ -55,7 +55,7 @@ const BLOCKED = [
   'nigg', 'negrata', 'sudaca', 'chink', 'kike', 'faggot', 'tranny',
   'nazi', 'hitler', 'kkk', 'genocid', 'terroris',
   // suplantación
-  'admin', 'moderador', 'soporte', 'studytimer', 'oficial',
+  'admin', 'moderador', 'soporte', 'studytimer', 'frostpom', 'oficial',
 ];
 const LEET = { 0: 'o', 1: 'i', 3: 'e', 4: 'a', 5: 's', 7: 't', 8: 'b', '@': 'a', $: 's' };
 function normalizeName(value) {

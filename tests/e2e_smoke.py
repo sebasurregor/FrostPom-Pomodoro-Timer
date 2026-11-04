@@ -8,13 +8,17 @@ Requisitos (una sola vez):
 Uso (con la app servida en otra terminal: python -m http.server 8000):
     python tests/e2e_smoke.py http://localhost:8000/
 
-Recorre: bienvenida con cuenta (nombre, contraseña y país en lista emergente), duración personalizada (60 + 15),
+Recorre: bienvenida en dos pasos (1: nombre, contraseña y país en lista emergente; 2: foto de perfil opcional,
+con animal al azar si no hay foto), duración personalizada (60 + 15),
 una sesión con reloj simulado (y el anillo que avanza junto a la bola), compañero desbloqueado y su onomatopeya,
-subida de rango, misiones, calendario del mes, perfil, Premium y sonidos, ranking, ajustes en modo oscuro del
+subida de rango, misiones, calendario del mes, perfil, Premium (con su regalo: 1000 gemas y una mascota limitada)
+y sonidos, ranking sin rivales simulados, ajustes en modo oscuro del
 sistema, guardado automático del día, cambio de temporada, modo sin conexión, eliminar la cuenta y animaciones
 del paisaje aunque el sistema pida "reducir movimiento".
 Termina con código 1 si algo falla.
 """
+import atexit
+import base64
 import datetime
 import os
 import sys
@@ -35,6 +39,20 @@ def state(pg):
     return pg.evaluate("JSON.parse(localStorage.getItem('st2_state'))")
 
 
+# Foto de prueba con datos ocultos (EXIF con modelo de teléfono y GPS) para comprobar que se borran.
+FOTO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_foto_prueba.jpg")
+from PIL import Image
+_img = Image.linear_gradient("L").resize((900, 600)).convert("RGB")  # con degradado: el zoom cambia la foto
+_exif = Image.Exif(); _exif[0x010F] = "TelefonoDePrueba"; _exif[0x8825] = {2: (6.0, 15.0, 0.0), 1: "N"}
+_img.save(FOTO, "JPEG", exif=_exif.tobytes())
+atexit.register(lambda: os.path.exists(FOTO) and os.remove(FOTO))
+
+
+def photo_ok(ph):
+    raw = base64.b64decode(ph.split(",", 1)[1]) if ph else b""
+    return ph.startswith("data:image/") and len(ph) < 300000 and b"Exif" not in raw and b"TelefonoDePrueba" not in raw
+
+
 with sync_playwright() as p:
     launch = {"executable_path": os.environ["CHROME_PATH"]} if os.environ.get("CHROME_PATH") else {}
     browser = p.chromium.launch(**launch)
@@ -52,14 +70,31 @@ with sync_playwright() as p:
     check(pg.evaluate("!!document.querySelector('#dlg #accPrivacy')"), "el registro recuerda no usar un nombre que revele quién eres")
     check(pg.evaluate("!document.querySelector('#dlg .presets, #dlg .presets--onb')"), "el registro ya no pregunta cuánto estudiar por bloque")
     check(pg.evaluate("document.querySelector('#dlg .country-list').hidden"), "la lista de países empieza cerrada")
+    check(pg.evaluate("!document.querySelector('#dlg button') || ![...document.querySelectorAll('#dlg button')].some(b => b.textContent.includes('Sugerir'))"), "ya no está el botón 'Sugerir uno'")
+    check(pg.evaluate("!document.querySelector('#dlg .avatar-opt, #dlg .avatars')"), "el registro no tiene lista de emojis para elegir")
     pg.fill("#accUser", "putito99"); pg.fill("#accPass1", "Pingu2026"); pg.fill("#accPass2", "Pingu2026")
-    pg.click("text=¡Listo, a estudiar!"); pg.wait_for_timeout(400)
+    pg.click("#dlg button:has-text('Crear cuenta')"); pg.wait_for_timeout(400)
     check(pg.evaluate("document.getElementById('dlg').open"), "un nombre ofensivo no se acepta")
     pg.fill(".country-search", "colom")
     check(pg.evaluate("!document.querySelector('#dlg .country-list').hidden"), "al escribir se abre la lista de países")
     pg.click(".country-opt:has-text('Colombia')")
     check(pg.evaluate("document.querySelector('#dlg .country-list').hidden && document.querySelector('#dlg .country-search').value === 'Colombia'"), "al elegir, la lista se cierra y el campo muestra Colombia")
-    pg.fill("#accUser", "pingu_estudia"); pg.click("text=¡Listo, a estudiar!"); pg.wait_for_timeout(1500); pg.clock.run_for(300)
+    pg.fill("#accUser", "pingu_estudia"); pg.click("#dlg button:has-text('Crear cuenta')"); pg.wait_for_timeout(1500); pg.clock.run_for(300)
+    # Paso 2: la foto es una vista aparte, después de crear la cuenta
+    check(pg.evaluate("document.getElementById('dlg').open && !!document.querySelector('#dlg #onbPhotoBtn') && !document.querySelector('#dlg #accUser')"), "después de la cuenta aparece una vista aparte para la foto")
+    check(state(pg)["account"]["username"] == "pingu_estudia", "la cuenta ya quedó guardada antes del paso de la foto")
+    animal = state(pg)["profile"]["avatar"]
+    check(bool(animal) and pg.inner_text("#dlg .avatar--hero") == animal, f"sin foto, se asigna un animal al azar ({animal})")
+    pg.click("#dlg button:has-text('Guardar foto')"); pg.wait_for_timeout(200)
+    check(pg.evaluate("document.getElementById('dlg').open") and "Primero elige una foto" in pg.inner_text("#dlg"), "'Guardar foto' sin foto pide elegir una (o 'Ahora no')")
+    with pg.expect_file_chooser() as fc:
+        pg.click("#onbPhotoBtn")
+    fc.value.set_files(FOTO); pg.wait_for_timeout(700); pg.clock.run_for(200)
+    check(pg.evaluate("!!document.querySelector('#dlg .photo-crop__canvas')"), "en el registro, el botón de la foto SÍ abre el recorte (antes no hacía nada)")
+    pg.click("#dlg button:has-text('Guardar foto')"); pg.wait_for_timeout(500); pg.clock.run_for(300)
+    ph0 = state(pg)["profile"]["photo"]
+    check(photo_ok(ph0), "la foto del registro se guarda recortada, liviana y sin EXIF/GPS")
+    check(pg.evaluate("!document.getElementById('dlg').open && !!document.querySelector('#hudAvatar img.avatar__photo')"), "termina el registro y la foto aparece en la barra de arriba")
     st0 = state(pg)
     check(st0["profile"]["onboarded"] and st0["account"]["username"] == "pingu_estudia", "la cuenta queda creada con el nombre elegido")
     check("Pingu2026" not in str(st0), "la contraseña se guarda solo como hash")
@@ -130,6 +165,7 @@ with sync_playwright() as p:
     check(pg.evaluate("!document.querySelector('.profile-card__note') && !document.body.innerText.includes('no revele quién eres')"), "el perfil ya no repite el consejo del nombre")
     check(pg.evaluate("document.querySelectorAll('.companion-card').length") == 5, "perfil muestra los 5 compañeros")
     check(pg.evaluate("!document.querySelector('#view-progreso .badge')"), "Progreso ya no muestra logros")
+    check(pg.evaluate("!document.querySelector('#view-perfil .avatar-opt') && !document.body.innerText.includes('O elige un animal')"), "el perfil ya no deja elegir emoji (solo foto)")
 
     check(pg.evaluate("parseFloat(getComputedStyle(document.getElementById('seasonFill')).width) > 0 && document.getElementById('seasonInfo').hidden"), "Temporadas muestra una barra que se llena y la explicación va en la (i)")
     pg.click("#seasonInfoBtn")
@@ -169,27 +205,18 @@ with sync_playwright() as p:
     check(pg.evaluate("!!document.querySelector('.sc-roast__strip') && !document.querySelector('[href*=explorador]')"), "de noche, el oso asa malvaviscos (ya no está el explorador)")
     check(pg.evaluate("!!document.querySelector('.walker--bear .sprite--oso-camina')"), "el oso que pasea usa su ciclo de caminar")
 
-    # Foto de perfil: se recorta, se guarda pequeña y SIN los datos ocultos (EXIF/GPS)
-    foto = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_foto_prueba.jpg")
-    try:
-        from PIL import Image
-        img = Image.new("RGB", (900, 600), (90, 160, 220))
-        exif = Image.Exif(); exif[0x010F] = "TelefonoDePrueba"; exif[0x8825] = {2: (6.0, 15.0, 0.0), 1: "N"}
-        img.save(foto, "JPEG", exif=exif.tobytes())
-        pg.goto(URL + "#/perfil"); pg.clock.run_for(300)
-        pg.click(".avatar-picker summary")
-        with pg.expect_file_chooser() as fc:
-            pg.click("#photoBtn")
-        fc.value.set_files(foto); pg.wait_for_timeout(600); pg.clock.run_for(200)
-        pg.click("#dlg button:has-text('Usar esta foto')"); pg.wait_for_timeout(400); pg.clock.run_for(200)
-        ph = state(pg)["profile"]["photo"]
-        import base64
-        raw = base64.b64decode(ph.split(",", 1)[1]) if ph else b""
-        check(ph.startswith("data:image/") and len(ph) < 300000, "la foto de perfil se guarda recortada y liviana")
-        check(b"Exif" not in raw and b"TelefonoDePrueba" not in raw, "la foto guardada no lleva datos ocultos (EXIF ni GPS)")
-        check(pg.evaluate("!!document.querySelector('#hudAvatar img.avatar__photo')"), "la foto aparece en la barra de arriba")
-    finally:
-        if os.path.exists(foto): os.remove(foto)
+    # Foto de perfil desde el Perfil: cambiarla y quitarla
+    pg.goto(URL + "#/perfil"); pg.clock.run_for(300)
+    pg.click(".avatar-picker summary")
+    with pg.expect_file_chooser() as fc:
+        pg.click("#photoBtn")
+    fc.value.set_files(FOTO); pg.wait_for_timeout(600); pg.clock.run_for(200)
+    pg.evaluate("document.getElementById('photoZoom').value = '2'; document.getElementById('photoZoom').dispatchEvent(new Event('input'))")
+    pg.click("#dlg button:has-text('Usar esta foto')"); pg.wait_for_timeout(400); pg.clock.run_for(200)
+    ph = state(pg)["profile"]["photo"]
+    check(photo_ok(ph) and ph != ph0, "desde el Perfil se cambia la foto (con zoom), sin EXIF/GPS")
+    pg.click("#photoRemoveBtn"); pg.clock.run_for(200)
+    check(state(pg)["profile"]["photo"] == "" and state(pg)["profile"]["avatar"] == animal, "al quitar la foto vuelve el animal asignado")
 
     # Ya no existe la vista Plan
     check(pg.evaluate("!document.querySelector('[data-route=\"plan\"], #view-plan')"), "la vista Plan fue eliminada")
@@ -198,8 +225,21 @@ with sync_playwright() as p:
     pg.goto(URL + "#/ajustes"); pg.clock.run_for(300)
     pg.click("#ambientGrid .sound-chip:has-text('Olas')"); pg.clock.run_for(300)
     check(pg.evaluate("document.getElementById('dlg').open && document.querySelector('.dlg--premium') !== null"), "un sonido Premium abre la oferta Premium")
-    pg.click("#dlg button:has-text('Probar Premium gratis')"); pg.wait_for_timeout(500); pg.clock.run_for(300)
+    gems_before = state(pg)["progress"]["gems"]
+    check("1.000 gemas" in pg.inner_text("#dlg") or "1000 gemas" in pg.inner_text("#dlg"), "la oferta Premium anuncia las 1000 gemas de regalo")
+    pg.click("#dlg button:has-text('Probar Premium gratis')"); pg.wait_for_timeout(800); pg.clock.run_for(600)
     check(state(pg)["premium"]["active"], "Premium se activa en modo prueba")
+    check(state(pg)["progress"]["gems"] == gems_before + 1000, "al activar Premium llegan 1000 gemas")
+    check(pg.evaluate("document.getElementById('dlg').open") and "Tu regalo" in pg.inner_text("#dlg"), "aparece la ceremonia del regalo Premium")
+    pg.click("#dlg button:has-text('Elegir mi mascota')"); pg.wait_for_timeout(400); pg.clock.run_for(300)
+    opts = pg.evaluate("[...document.querySelectorAll('#dlg .gift-pet')].map(b => b.dataset.id)")
+    check(len(opts) >= 1 and "pinguino" not in opts, f"se elige entre las mascotas limitadas que aún no tienes ({', '.join(opts)})")
+    pick = opts[-1]
+    pg.click(f'#dlg .gift-pet[data-id="{pick}"]'); pg.click("#dlg button:has-text('Quedármela')"); pg.wait_for_timeout(800); pg.clock.run_for(1500)
+    check("Tu regalo por ser Premium" in pg.inner_text("#dlg"), "la mascota regalada tiene su ceremonia")
+    pg.click("text=¡Que me acompañe!"); pg.wait_for_timeout(300); pg.clock.run_for(800)
+    sp = state(pg)
+    check(sp["progress"]["gifted"] == [pick] and sp["profile"]["companion"] == pick and not sp["premium"]["giftPending"], "la mascota regalada queda tuya y te acompaña")
     pg.click("#ambientGrid .sound-chip:has-text('Olas')"); pg.clock.run_for(300)
     check(state(pg)["settings"]["ambient"] == "olas", "con Premium se puede elegir un sonido Premium")
     bg = pg.evaluate("getComputedStyle(document.getElementById('remTime')).backgroundColor")
@@ -208,9 +248,12 @@ with sync_playwright() as p:
     pg.click("#ambientBtn"); pg.clock.run_for(200)
     check(state(pg)["settings"]["ambient"] == "", "el botón de silencio apaga el sonido")
 
-    # Ranking
+    # Ranking: primer MVP sin rivales simulados
     pg.goto(URL + "#/ranking"); pg.clock.run_for(300)
-    check(pg.evaluate("!!document.querySelector('.row.is-you, .podium__spot.is-you')"), "apareces en el ranking demo")
+    check(pg.evaluate("document.querySelectorAll('#board .row').length === 1 && !!document.querySelector('#board .row.is-you') && !document.querySelector('.podium__spot')"), "el ranking solo muestra tu marca (sin bots)")
+    check("llega pronto" in pg.inner_text("#view-ranking"), "el ranking avisa que el global llega pronto")
+    pg.click("#seasonTab"); pg.clock.run_for(300)
+    check("temporada" in pg.inner_text("#board").lower(), "en 'Esta temporada' se ve tu marca de la temporada")
 
     # Ajustes sin control parental
     pg.goto(URL + "#/ajustes"); pg.clock.run_for(300)
@@ -252,6 +295,19 @@ with sync_playwright() as p:
     check(pg.evaluate("!localStorage.getItem('st2_state') || !JSON.parse(localStorage.getItem('st2_state')).account"), "con la contraseña correcta, la cuenta se elimina")
 
     check(not errors, "sin errores en consola" + (": " + " | ".join(errors) if errors else ""))
+
+    # Registro saltando la foto: queda el animal al azar
+    ctx3 = browser.new_context(viewport={"width": 1280, "height": 800}, color_scheme="light")
+    pg3 = ctx3.new_page(); errs3 = []
+    pg3.on("pageerror", lambda e: errs3.append(str(e)))
+    pg3.goto(URL); pg3.wait_for_timeout(800)
+    pg3.fill("#accUser", "zorrito.lector"); pg3.fill("#accPass1", "Zorro2026"); pg3.fill("#accPass2", "Zorro2026")
+    pg3.click("#dlg button:has-text('Crear cuenta')"); pg3.wait_for_timeout(1500)
+    pg3.click("#dlg button:has-text('Ahora no')"); pg3.wait_for_timeout(400)
+    s3 = pg3.evaluate("JSON.parse(localStorage.getItem('st2_state'))")
+    check(s3["profile"]["onboarded"] and s3["profile"]["photo"] == "" and bool(s3["profile"]["avatar"]) and not pg3.evaluate("document.getElementById('dlg').open"), "con 'Ahora no' se entra con el animal al azar y sin foto")
+    check(not errs3, "sin errores al saltar la foto" + (": " + " | ".join(errs3) if errs3 else ""))
+    ctx3.close()
 
     # Paisaje animado aunque el sistema pida "reducir movimiento" (y quieto con el ajuste de la app)
     ctx2 = browser.new_context(viewport={"width": 1280, "height": 800}, reduced_motion="reduce")

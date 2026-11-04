@@ -1,5 +1,5 @@
 /*
- * StudyTimer — vista Ajustes: cuenta, región, sonido, recordatorios, temporizador,
+ * FrostPom — vista Ajustes: cuenta, región, sonido, recordatorios, temporizador,
  * límite saludable, ranking y guardado automático.
  * Ya no hay copias manuales ni "borrar todo": el progreso se guarda solo, y cada temporada
  * (season.js) archiva lo viejo. Solo queda "Eliminar mi cuenta", que exigen Apple y Google.

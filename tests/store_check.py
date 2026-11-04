@@ -3,7 +3,7 @@ Revisión "lista para la tienda" (Microsoft Store / PWABuilder), en un navegador
 
 Uso (con la app servida):
     python tests/store_check.py http://localhost:8000/
-    python tests/store_check.py https://TU-USUARIO.github.io/study-timer/      # ya publicada
+    python tests/store_check.py https://sebasurregor.github.io/FrostPom-Pomodoro-Timer/      # ya publicada
 
 Opcional: accesibilidad con axe-core (npm install axe-core) o AXE_PATH=/ruta/axe.min.js
 
@@ -101,7 +101,7 @@ with sync_playwright() as p:
     # 3. Service worker y modo sin conexión
     sw = pg.evaluate("""async () => { const r = await navigator.serviceWorker.ready; return { scope: r.scope, active: !!r.active }; }""")
     check(sw["active"] and sw["scope"] == scope, f"service worker activo en {sw['scope']}")
-    cached = pg.evaluate("""async () => { const ks = await caches.keys(); const c = await caches.open(ks.find(k => k.startsWith('studytimer-'))); return (await c.keys()).length; }""")
+    cached = pg.evaluate("""async () => { const ks = await caches.keys(); const c = await caches.open(ks.find(k => k.startsWith('frostpom-'))); return (await c.keys()).length; }""")
     check(cached >= 40, f"modo sin conexión guardado ({cached} archivos)")
 
     # 5. Todas las vistas sin 404 ni errores

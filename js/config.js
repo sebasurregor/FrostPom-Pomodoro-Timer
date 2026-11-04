@@ -1,13 +1,14 @@
 /*
- * StudyTimer — configuración pública de la app.
+ * FrostPom — configuración pública de la app.
  * Aquí NUNCA van secretos (claves privadas, tokens de servicio). Todo lo que viaja al
  * teléfono o al navegador lo puede leer cualquiera. Ver docs/SEGURIDAD.md.
  */
 export const config = Object.freeze({
-  version: '3.3.0',
+  version: '3.4.0',
   leaderboard: Object.freeze({
-    // 'demo' = rivales simulados en el dispositivo. 'remote' = servidor (aún no conectado).
-    mode: 'demo',
+    // 'local' = primer MVP: solo tu marca y el aviso "llega pronto" (sin rivales simulados).
+    // 'remote' = ranking global con servidor (aún no conectado; ver docs/SEGURIDAD.md).
+    mode: 'local',
   }),
   // Reemplazar la imagen de un compañero (opcional). Ejemplo:
   // companionImages: { 'tiburon-ballena': 'assets/companions/tiburon-ballena.webp' }

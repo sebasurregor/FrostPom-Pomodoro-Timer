@@ -1,18 +1,19 @@
 /*
- * StudyTimer — eventos de recompensa → animaciones.
+ * FrostPom — eventos de recompensa → animaciones.
  * engine.js devuelve eventos (xp, rankup, achievement…); aquí se muestran uno tras otro.
  */
 import * as U from '../util.js';
 import * as G from '../game.js';
 import * as E from '../engine.js';
 import * as FX from './effects.js';
-import { $, h, wait } from './dom.js';
+import { $, h, wait, fmtInt } from './dom.js';
 import { toast, openDialog, focusPrimary } from './feedback.js';
 import { emblem } from './emblems.js';
 import { companion, penguin, say } from './companions.js';
 import { pickVoice } from '../voices.js';
 import { PETS } from '../pet.js';
 import { mutate } from './context.js';
+import { giftCompanionDialog } from './premium.js';
 
 const queue = [];
 let playing = false;
@@ -62,6 +63,7 @@ const SHOW = {
     return wait(100);
   },
   companion: showCompanionUnlock,
+  premiumGift: showPremiumGift,
   season: showNewSeason,
   fed(e) {
     const stage = $('#buddy');
@@ -133,7 +135,7 @@ async function showCompanionUnlock(e) {
       nameClass: 'rankup__name--sm',
       lines: [
         h('p', { class: 'rankup__tagline', text: c.tagline }),
-        h('p', { class: 'rankup__gems', text: `Lo ganaste con el logro ${G.ACHIEVEMENT_BY_ID[c.unlock].name}.` }),
+        h('p', { class: 'rankup__gems', text: e.gift ? 'Tu regalo por ser Premium.' : `Lo ganaste con el logro ${G.ACHIEVEMENT_BY_ID[c.unlock].name}.` }),
       ],
     })],
     actions: [
@@ -143,6 +145,30 @@ async function showCompanionUnlock(e) {
     onOpen: focusPrimary,
   });
   if (res === 'equip') mutate((s) => E.equipCompanion(s, c.id));
+}
+
+/** Bienvenida a Premium: 1000 gemas y, si quedan por ganar, elegir una mascota limitada. */
+async function showPremiumGift(e) {
+  fanfare({ count: 140, colors: ['#FFC531', '#FFE680', '#ffffff', '#93c0ed'] });
+  const res = await openDialog({
+    className: 'dlg--rankup',
+    body: [ceremony({
+      colors: { a: '#FFE680', b: '#E0A100', glow: '#FFC531' },
+      art: h('span', { class: 'gift-art', 'aria-hidden': 'true', text: '🎁' }),
+      mascot: false,
+      kicker: '¡Bienvenido a Premium! 👑',
+      name: 'Tu regalo',
+      lines: [
+        h('p', { class: 'rankup__gems', text: `+${fmtInt(e.gems)} gemas para alimentar a tu mascota` }),
+        e.choosePet ? h('p', { class: 'rankup__tagline', text: 'Y una mascota de edición limitada: elige la que más te guste.' }) : null,
+      ],
+    })],
+    actions: e.choosePet
+      ? [{ label: 'Luego', value: 'later' }, { label: '🎁 Elegir mi mascota', value: 'pick', variant: 'btn--gold', primary: true }]
+      : [{ label: '¡Genial!', value: 'ok', variant: 'btn--gold btn--xl', primary: true }],
+    onOpen: focusPrimary,
+  });
+  if (res === 'pick') await giftCompanionDialog();
 }
 
 /** Cambio de temporada: resumen de la que terminó, premio y rango de vuelta a Bronce III. */

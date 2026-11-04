@@ -1,5 +1,5 @@
 /*
- * StudyTimer — almacenamiento local seguro.
+ * FrostPom — almacenamiento local seguro.
  *  - Todo lo que se lee (localStorage o copia importada) se VALIDA campo por campo:
  *    tipos, rangos, longitudes y claves peligrosas (__proto__). Un archivo manipulado no rompe la app.
  *  - Si el navegador bloquea el almacenamiento (modo privado, cuota llena), la app sigue funcionando en memoria.
@@ -54,10 +54,10 @@ export function defaultState() {
     },
     // Premium: hoy solo existe el modo de prueba (sin cobro). Cuando la app esté en las tiendas,
     // el estado real vendrá de la compra validada en App Store / Google Play, no de este archivo.
-    premium: { active: false, demo: true, since: null },
+    premium: { active: false, demo: true, since: null, bonusClaimed: false, giftPending: false },
     account: null, // { username, hash, salt, iter } — la contraseña nunca se guarda, solo su hash
     progress: {
-      xp: 0, gems: 0, achievements: U.dict(), claimed: U.dict(), owned: ['clasico'],
+      xp: 0, gems: 0, achievements: U.dict(), claimed: U.dict(), owned: ['clasico'], gifted: [],
       bestStreak: 0, combo: 0, bestCombo: 0, longestSessionSec: 0, cycle: 0, breakEarned: false, customized: false,
       totals: { studySec: 0, creditedSec: 0, sessions: 0, partials: 0, breaks: 0, missionsClaimed: 0, fed: 0 },
       season: '', // temporada a la que pertenecen xp y rango ("2026-10"); ver season.js
@@ -164,7 +164,7 @@ export function validateState(raw) {
   out.profile.photo = typeof p.photo === 'string' && p.photo.length <= 300000 && /^data:image\/(webp|jpeg|png);base64,[A-Za-z0-9+/]+=*$/.test(p.photo) ? p.photo : '';
 
   const pm = obj(raw.premium);
-  out.premium = { active: pm.active === true, demo: true, since: pm.active === true && isISO(pm.since) ? pm.since : null };
+  out.premium = { active: pm.active === true, demo: true, since: pm.active === true && isISO(pm.since) ? pm.since : null, bonusClaimed: pm.bonusClaimed === true, giftPending: pm.giftPending === true && pm.bonusClaimed === true };
   out.settings = sanitizeSettings(obj(raw.settings));
 
   const acc = obj(raw.account);
@@ -205,7 +205,8 @@ export function validateState(raw) {
   // El tema elegido solo se conserva si es tuyo o si Premium lo incluye.
   if (!dp.owned.includes(out.settings.skin) && !out.premium.active) out.settings.skin = 'clasico';
   // El compañero solo vale si su logro está desbloqueado.
-  out.profile.companion = typeof p.companion === 'string' && C.companionUnlocked(p.companion, dp.achievements) ? p.companion : null;
+  dp.gifted = [...new Set(arr(pr.gifted).filter((x) => typeof x === 'string' && C.COMPANION_BY_ID[x]))];
+  out.profile.companion = typeof p.companion === 'string' && C.companionUnlocked(p.companion, dp.achievements, dp.gifted) ? p.companion : null;
 
   const dayKeys = Object.keys(obj(raw.daily)).filter(U.isDateKey).sort().slice(-LIMITS.dailyDays);
   for (const k of dayKeys) out.daily[k] = sanitizeDay(raw.daily[k]);
@@ -356,7 +357,7 @@ export function createStore(backendOverride, sessionOverride) {
         try { session.removeItem(PREFIX + name); } catch { /* sin almacenamiento */ }
       },
     },
-    /** Borra TODO lo de StudyTimer en este dispositivo (incluye datos de la v1). */
+    /** Borra TODO lo de FrostPom en este dispositivo (incluye datos de la v1). */
     wipe() {
       const keys = [];
       for (let i = 0; i < backend.length; i++) {
@@ -372,7 +373,7 @@ export function createStore(backendOverride, sessionOverride) {
 
 export function exportBackup(state) {
   const data = { ...state, account: null }; // la copia nunca lleva la contraseña
-  return JSON.stringify({ app: 'studytimer', format: 2, exportedAt: new Date().toISOString(), data }, null, 2);
+  return JSON.stringify({ app: 'frostpom', format: 2, exportedAt: new Date().toISOString(), data }, null, 2);
 }
 
 export function importBackup(text) {
@@ -382,10 +383,10 @@ export function importBackup(text) {
   try {
     parsed = JSON.parse(text);
   } catch {
-    throw new Error('El archivo no es una copia válida de StudyTimer.');
+    throw new Error('El archivo no es una copia válida de FrostPom.');
   }
-  if (!isObj(parsed) || parsed.app !== 'studytimer' || parsed.format !== 2 || !isObj(parsed.data)) {
-    throw new Error('Este archivo no es una copia de StudyTimer.');
+  if (!isObj(parsed) || !['frostpom', 'studytimer'].includes(parsed.app) || parsed.format !== 2 || !isObj(parsed.data)) {
+    throw new Error('Este archivo no es una copia de FrostPom.');
   }
   const state = validateState(parsed.data);
   state.account = null; // la cuenta tampoco: la contraseña se define en este dispositivo

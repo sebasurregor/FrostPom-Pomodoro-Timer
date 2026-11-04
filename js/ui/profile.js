@@ -1,5 +1,5 @@
 /*
- * StudyTimer — vista Perfil: tarjeta, estadísticas, compañeros, temas y logros.
+ * FrostPom — vista Perfil: tarjeta, estadísticas, compañeros, temas y logros.
  */
 import * as U from '../util.js';
 import * as G from '../game.js';
@@ -10,9 +10,9 @@ import { $, h, fmtInt } from './dom.js';
 import { openDialog, confirmDialog } from './feedback.js';
 import { emblem } from './emblems.js';
 import { companion } from './companions.js';
-import { avatarContent, avatarOptions, countryPicker, flagEl } from './widgets.js';
+import { avatarContent, countryPicker, flagEl } from './widgets.js';
 import { pickProfilePhoto } from './photo.js';
-import { premiumDialog } from './premium.js';
+import { premiumDialog, giftCompanionDialog } from './premium.js';
 import { renameFlow } from './account.js';
 import { state, mutate, today } from './context.js';
 import { config } from '../config.js';
@@ -27,6 +27,9 @@ async function changeCountryFlow() {
   });
   if (res === 'ok') mutate((st) => { st.profile.country = pick; });
 }
+
+// La sección de la foto sigue abierta después de guardar o quitar la foto (la tarjeta se vuelve a dibujar).
+let photoOpen = false;
 
 function renderProfileCard() {
   const r = G.rankForXp(state.progress.xp);
@@ -44,18 +47,16 @@ function renderProfileCard() {
         comp ? h('p', { class: 'profile-card__comp', text: `Con ${comp.name}` }) : null,
         h('div', { class: 'btn-row' },
           h('button', { type: 'button', class: 'btn btn--paper btn--sm', onclick: renameFlow }, 'Cambiar nombre'),
-          comp ? h('button', { type: 'button', class: 'btn btn--paper btn--sm', onclick: () => mutate((s) => E.equipCompanion(s, null)) }, 'Usar animal') : null))),
-    h('details', { class: 'avatar-picker' },
-      h('summary', { text: 'Cambiar foto o animal' }),
+          comp ? h('button', { type: 'button', class: 'btn btn--paper btn--sm', onclick: () => mutate((s) => E.equipCompanion(s, null)) }, 'Quitar compañero') : null))),
+    // Solo foto: el animal se asigna al azar al crear la cuenta y no se elige de una lista.
+    h('details', { class: 'avatar-picker', open: photoOpen, ontoggle: (e) => { photoOpen = e.currentTarget.open; } },
+      h('summary', { text: 'Tu foto de perfil' }),
       h('div', { class: 'btn-row photo-row' },
         h('button', { type: 'button', class: 'btn btn--gold btn--sm', id: 'photoBtn', onclick: uploadPhoto }, state.profile.photo ? '📷 Cambiar foto' : '📷 Subir una foto'),
         state.profile.photo ? h('button', { type: 'button', class: 'btn btn--paper btn--sm', id: 'photoRemoveBtn', onclick: () => mutate((st) => { st.profile.photo = ''; }) }, 'Quitar foto') : null),
-      h('p', { class: 'photo-note', text: 'Tu foto se queda solo en este dispositivo. En el ranking, los demás ven tu animal.' }),
-      h('div', { class: 'avatars', role: 'radiogroup', 'aria-label': 'O elige un animal' }, avatarOptions({
-        labelPrefix: 'Animal',
-        isChecked: (a) => !comp && !state.profile.photo && a === state.profile.avatar,
-        onPick: (a) => mutate((st) => { st.profile.avatar = a; st.profile.companion = null; st.profile.photo = ''; }),
-      }))));
+      h('p', { class: 'photo-note', text: state.profile.photo
+        ? 'Tu foto se queda solo en este dispositivo. En el ranking, los demás ven tu animal.'
+        : `Sin foto, te acompaña tu animal (${state.profile.avatar}). La foto se queda solo en este dispositivo.` })));
 }
 
 async function uploadPhoto() {
@@ -81,10 +82,14 @@ function renderStats() {
 }
 
 function renderCompanions() {
-  const owned = C.COMPANIONS.filter((c) => C.companionUnlocked(c.id, state.progress.achievements)).length;
-  $('#compMeta').textContent = `${owned} de ${C.COMPANIONS.length}`;
+  const { achievements, gifted } = state.progress;
+  const owned = C.COMPANIONS.filter((c) => C.companionUnlocked(c.id, achievements, gifted)).length;
+  $('#compMeta').replaceChildren(state.premium.giftPending
+    ? h('button', { type: 'button', class: 'btn btn--crown btn--sm', id: 'giftPetBtn', onclick: giftCompanionDialog }, '🎁 Elige tu mascota')
+    : `${owned} de ${C.COMPANIONS.length}`);
   $('#companionGrid').replaceChildren(...C.COMPANIONS.map((c) => {
-    const unlocked = C.companionUnlocked(c.id, state.progress.achievements);
+    const unlocked = C.companionUnlocked(c.id, achievements, gifted);
+    const isGift = gifted.includes(c.id);
     const using = state.profile.companion === c.id;
     const ach = G.ACHIEVEMENT_BY_ID[c.unlock];
     let action;
@@ -92,7 +97,7 @@ function renderCompanions() {
     else if (unlocked) action = h('button', { type: 'button', class: 'btn btn--gold btn--sm', onclick: () => mutate((s) => E.equipCompanion(s, c.id)) }, 'Elegir');
     else action = h('span', { class: 'companion-card__lock', text: `Logro: ${ach.name}` });
     return h('li', { class: `companion-card companion-card--${ach.rarity}${unlocked ? ' is-unlocked' : ''}${using ? ' is-using' : ''}` },
-      h('span', { class: 'companion-card__tag', text: unlocked ? G.RARITY[ach.rarity].label : 'Limitado' }),
+      h('span', { class: 'companion-card__tag', text: isGift ? 'Regalo Premium' : unlocked ? G.RARITY[ach.rarity].label : 'Limitado' }),
       h('span', { class: 'companion-card__art' }, companion(c.id, { size: 88, locked: !unlocked, title: unlocked ? c.name : `${c.name}, bloqueado` })),
       h('span', { class: 'companion-card__name', text: unlocked ? c.name : '???' }),
       h('span', { class: 'companion-card__how', text: unlocked ? c.tagline : ach.desc }),

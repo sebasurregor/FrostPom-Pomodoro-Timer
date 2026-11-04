@@ -1,5 +1,5 @@
 /*
- * StudyTimer — cuenta: nombre de usuario y contraseña (se guardan en este dispositivo;
+ * FrostPom — cuenta: nombre de usuario y contraseña (se guardan en este dispositivo;
  * la contraseña solo como hash PBKDF2), bienvenida e inicio de sesión.
  * Cuando exista el servidor, esta misma validación se repite allá.
  */
@@ -10,8 +10,8 @@ import * as FX from './effects.js';
 import { $, h, fmtInt } from './dom.js';
 import { toast, openDialog, confirmDialog, dlg } from './feedback.js';
 import { penguin } from './companions.js';
-import { avatarOptions, countryPicker } from './widgets.js';
-import { pickProfilePhoto, photoImg } from './photo.js';
+import { countryPicker } from './widgets.js';
+import { chooseAndLoad, photoCropper } from './photo.js';
 import { skipPaywallToday } from './premium.js';
 import { state, store, mutate, migrated } from './context.js';
 
@@ -58,7 +58,6 @@ const NAME_HINT = '3 a 20 caracteres: letras, números, punto o guion bajo.';
 function accountFields({ withPassword = true, initialName = '' } = {}) {
   const name = h('input', { type: 'text', class: 'acc-input', id: 'accUser', maxlength: '20', autocomplete: 'username', autocapitalize: 'off', spellcheck: 'false', value: initialName, placeholder: 'Ej.: pingu_estudia' });
   const nameHint = h('p', { class: 'acc-hint', 'aria-live': 'polite', text: NAME_HINT });
-  const suggest = h('button', { type: 'button', class: 'btn btn--paper btn--sm', onclick: () => { name.value = makeNickname().nick; check(); } }, 'Sugerir uno');
   const pass1 = h('input', { type: 'password', class: 'acc-input', id: 'accPass1', maxlength: '64', autocomplete: 'new-password' });
   const pass2 = h('input', { type: 'password', class: 'acc-input', id: 'accPass2', maxlength: '64', autocomplete: 'new-password' });
   const err = h('p', { class: 'form-error', role: 'alert' });
@@ -72,7 +71,7 @@ function accountFields({ withPassword = true, initialName = '' } = {}) {
   const nodes = [
     h('label', { class: 'pin-label', for: 'accUser', text: 'Nombre de usuario' }),
     h('p', { class: 'acc-hint acc-hint--privacy', id: 'accPrivacy', text: '🔒 Usa un nombre que no revele quién eres: es lo único que otros verán en el ranking.' }),
-    h('div', { class: 'acc-row' }, name, suggest), nameHint,
+    name, nameHint,
     withPassword ? [
       h('label', { class: 'pin-label', for: 'accPass1', text: 'Contraseña' }), pass1,
       h('p', { class: 'acc-hint', text: 'Mínimo 8 caracteres, con letras y números.' }),
@@ -233,29 +232,20 @@ export async function deleteAccountFlow() {
   location.reload();
 }
 
-/** Primera vez: cuenta, nacionalidad y avatar (la duración se elige después, en Enfocar). */
+/**
+ * Primera vez, en dos pasos:
+ *  1) cuenta (usuario y contraseña) y nacionalidad;
+ *  2) una vista aparte para la foto de perfil (opcional).
+ * El animal del avatar se asigna al azar: no se elige de una lista. Si el usuario quiere
+ * personalizarlo, sube una foto (o, más adelante, equipa un compañero que haya ganado).
+ * La duración de las sesiones se elige después, en Enfocar.
+ */
 export async function onboarding() {
-  let avatar = state.profile.nick ? state.profile.avatar : makeNickname().avatar;
-  let photo = '';
+  // Si viene de la versión anterior conserva su animal; si es nuevo, uno al azar.
+  const avatar = state.profile.nick && state.profile.avatar ? state.profile.avatar : makeNickname().avatar;
   const acc = accountFields({ initialName: '' });
   let accRec = null;
   let country = state.profile.country || '';
-  const avatarBig = h('span', { class: 'avatar avatar--xl', text: avatar });
-  const showAvatar = () => {
-    avatarBig.replaceChildren(photo ? photoImg(photo, 84) : document.createTextNode(avatar));
-    avatarBig.classList.toggle('has-companion', !!photo);
-  };
-  const photoBtn = h('button', { type: 'button', class: 'btn btn--paper btn--sm', id: 'onbPhotoBtn', onclick: async () => {
-    const url = await pickProfilePhoto();
-    if (url) { photo = url; showAvatar(); drawGrid(); photoBtn.textContent = '📷 Cambiar foto'; }
-  } }, '📷 Subir una foto');
-  const grid = h('div', { class: 'avatars avatars--onb', role: 'radiogroup', 'aria-label': 'Elige tu avatar' });
-  const drawGrid = () => grid.replaceChildren(...avatarOptions({
-    labelPrefix: 'Avatar',
-    isChecked: (a) => !photo && a === avatar,
-    onPick: (a) => { avatar = a; photo = ''; showAvatar(); drawGrid(); photoBtn.textContent = '📷 Subir una foto'; },
-  }));
-  drawGrid();
   const r = G.rankForXp(state.progress.xp);
   await openDialog({
     className: 'dlg--onb',
@@ -264,26 +254,74 @@ export async function onboarding() {
     body: [
       h('div', { class: 'onb__mascot' }, penguin('saludo', { size: 104, label: 'Un pingüino te saluda' })),
       migrated ? h('p', { class: 'dlg__text', text: `Trajimos tu progreso de la versión anterior: ya eres ${r.name} con ${fmtInt(state.progress.xp)} XP.` }) : null,
-      h('div', { class: 'onb__who' }, avatarBig, h('div', { class: 'onb__acc' }, ...acc.nodes)),
+      h('div', { class: 'onb__acc' }, ...acc.nodes),
       h('p', { class: 'onb__label', text: 'Tu nacionalidad (opcional)' }),
       countryPicker(country, (v) => { country = v; }),
-      h('p', { class: 'onb__label', text: 'Tu foto o tu animal' }),
-      h('div', { class: 'btn-row photo-row' }, photoBtn),
-      h('p', { class: 'photo-note', text: 'La foto es opcional y se queda solo en este dispositivo.' }),
-      grid,
       h('p', { class: 'dlg__note', text: 'Cada minuto que estudias mantiene limpio tu polo. No te pedimos tu correo, y por ahora la cuenta se guarda en este dispositivo.' }),
     ],
-    actions: [{ label: '¡Listo, a estudiar!', value: 'ok', variant: 'btn--gold btn--xl', primary: true, validate: async () => { accRec = await acc.validate(); return !!accRec; } }],
+    actions: [{ label: 'Crear cuenta', value: 'ok', variant: 'btn--gold btn--xl', primary: true, validate: async () => { accRec = await acc.validate(); return !!accRec; } }],
     onOpen: acc.focus,
   });
   skipPaywallToday();
+  // La cuenta se guarda YA: si la app se cierra en el paso de la foto, no se pierde nada.
   mutate((s) => {
     s.profile.nick = accRec.username;
     s.account = accRec;
     s.profile.avatar = avatar;
-    s.profile.photo = photo;
     s.profile.onboarded = true;
     s.profile.country = country;
   });
   markUnlocked();
+  const photo = await photoStep(accRec.username, avatar);
+  if (photo) {
+    mutate((s) => { s.profile.photo = photo; });
+    toast('¡Foto de perfil lista!', 'good', { icon: '📷' });
+  }
+}
+
+/** Paso 2 del registro: foto de perfil opcional. Devuelve la foto (data URL) o null. */
+function photoStep(username, avatar) {
+  let crop = null;
+  const stage = h('div', { class: 'onb-photo__stage' }, h('span', { class: 'avatar avatar--hero', text: avatar }));
+  const err = h('p', { class: 'form-error', role: 'alert' });
+  const pickBtn = h('button', { type: 'button', class: 'btn btn--paper', id: 'onbPhotoBtn', onclick: async () => {
+    err.textContent = '';
+    const got = await chooseAndLoad();
+    if (!got) return;
+    if (got.error) { err.textContent = got.error; return; }
+    if (crop) crop.close();
+    crop = photoCropper(got.bmp, { id: 'onbZoom' });
+    stage.replaceChildren(crop.el);
+    hint.textContent = 'Arrastra la foto para encuadrarla y usa el zoom si hace falta.';
+    pickBtn.textContent = '📷 Elegir otra foto';
+    crop.focus();
+  } }, '📷 Elegir una foto');
+  const hint = h('p', { class: 'dlg__text onb-photo__hint', text: `Si prefieres no subir una foto, te acompañará este animal. Puedes cambiarla cuando quieras en tu perfil.` });
+  let result = null;
+  return openDialog({
+    className: 'dlg--onb dlg--onb-photo',
+    title: `¡Bienvenido, ${username}! Ponle cara a tu perfil`,
+    body: [
+      stage, hint,
+      h('div', { class: 'btn-row onb-photo__pick' }, pickBtn),
+      err,
+      h('p', { class: 'dlg__note', text: '🔒 La foto es opcional y se queda solo en este dispositivo. En el ranking, los demás verán tu animal.' }),
+    ],
+    actions: [
+      { label: 'Ahora no', value: 'skip' },
+      {
+        label: 'Guardar foto', value: 'ok', variant: 'btn--gold', primary: true,
+        validate: () => {
+          if (!crop) { err.textContent = 'Primero elige una foto, o toca «Ahora no».'; pickBtn.focus(); return false; }
+          result = crop.toDataURL();
+          if (!result) err.textContent = 'No pudimos guardar esa foto. Prueba con otra.';
+          return !!result;
+        },
+      },
+    ],
+    onOpen: () => pickBtn.focus(),
+  }).then((v) => {
+    if (crop) crop.close();
+    return v === 'ok' ? result : null;
+  });
 }
