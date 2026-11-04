@@ -1,0 +1,13 @@
+Imágenes de los compañeros (arte del autor y reemplazos opcionales).
+
+1. Guarda aquí la imagen (PNG, WebP o JPG, ideal cuadrada de 256 x 256 o más).
+   Ejemplo: tiburon-ballena.webp
+2. En js/config.js agrega la ruta:
+   companionImages: { 'tiburon-ballena': 'assets/companions/tiburon-ballena.webp' }
+3. Identificadores: pinguino, zorro-artico, oso-polar, oso-marino, hielo-grunon,
+   tiburon-martillo, pinguino-ninja, tiburon-ballena, tiburon-groenlandia.
+4. Agrega el archivo a PRECACHE en service-worker.js para que funcione sin conexión.
+
+Usa solo imágenes que puedas publicar: fotos tuyas, arte encargado con cesión de derechos
+o imágenes de dominio público / CC0. Portadas de libros, personajes de memes y marcas
+necesitan permiso de sus dueños.

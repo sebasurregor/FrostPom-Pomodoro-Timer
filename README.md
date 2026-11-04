@@ -1,0 +1,133 @@
+# StudyTimer v3: edición polar
+
+Pomodoro gamificado para niños y estudiantes, ambientado en el polo. Mientras más estudias (sin pasarte del límite saludable), más subes de rango, desbloqueas compañeros kawaii de edición limitada y **mantienes limpio tu polo**: si dejas de estudiar, el paisaje se llena de esmog, basura y petróleo.
+
+> Este archivo reemplaza al antiguo `README.txt`.
+
+## Cómo probarla en tu computador (Windows)
+
+1. Descomprime la carpeta, por ejemplo en `C:\Users\DELL\OneDrive\Documentos\planner`.
+2. Abre una terminal en esa carpeta y ejecuta:
+
+   ```
+   cd C:\Users\DELL\OneDrive\Documentos\planner
+   python -m http.server 8000
+   ```
+
+3. Abre en el navegador: **http://localhost:8000/**
+
+   Ojo: ahora el archivo principal es `index.html`, así que la dirección es solo `/`. Ya no existe `study-planner-timer.html`.
+
+Si ya usabas la v2, la v3 **abre tus datos tal cual** (mismo almacenamiento). Si venías de la v1, la app **trae tu historial automáticamente** y calcula tu rango con lo que ya habías estudiado. Los datos de la v1 no se borran.
+
+> Se necesita `http://localhost` (o https) y no abrir el archivo con doble clic, porque el modo sin conexión y la contraseña de la cuenta requieren un "contexto seguro".
+
+## Qué tiene
+
+Diseño: paisaje polar simple (montañas en #2d68bc, #749eda y #93c0ed) con pingüinos, un oso polar, un zorro ártico y una foca que caminan, dan salticos y de vez en cuando dicen algo ("¡Cuac!", "¡Grrr!", "¡Yip yip!"). El cielo sigue la hora real (amanecer, día, atardecer y noche) y de noche el oso polar asa malvaviscos junto a la fogata y a su iglú. El clima cambia cada 3 horas: despejado, nieve ligera, nevando o nevada fuerte. Encima van paneles claros tipo pegatina y botones de videojuego.
+
+| Vista | Para qué sirve |
+|---|---|
+| **Enfocar** | Temporizador con modos (Mini 15+5, Clásico 25+5, Enfoque 45+10, Profundo 50+10, Largo 60+15) y **Mi ritmo**, donde eliges tus minutos de estudio y descanso. El descanso largo llega solo cada 4 pomodoros. Solo registra *cuánto* estudiaste, no *qué*. |
+| **Premium 👑** | Corona en la barra superior. Modo prueba sin cobro: duración libre, todos los temas, sonidos y tonos, y recordatorios de enfoque. |
+| **Progreso** | Salud de tu polo, rango (Bronce → Leyenda), racha, misiones diarias, **Tu estudio** (pestañas: gráfica de los últimos 7 días o calendario del mes con los minutos de cada día) e historial (las 5 últimas sesiones, con "Ver más"). |
+| **Ranking** | Top de la semana y de la temporada. Por ahora en **modo demostración**: rivales simulados y solo tus minutos son reales. |
+| **Tienda (en Enfocar)** | El ícono de la bolsa junto al compañero del reloj abre la bandeja de comida. **Arrastra** la comida hasta tu compañero con el mouse o con el dedo (con el teclado: Tab + Enter). 12 comidas de 2 a 8 gemas; la barriguita baja un poco cada hora y cada animal tiene favoritas. Es solo por cariño: no da XP. |
+| **Perfil** | Tu personaje, resumen de estadísticas, **compañeros de edición limitada** (se ganan con logros), **foto de perfil** (opcional, solo en tu dispositivo), temas del temporizador (con gemas o Premium), **temporadas** (barra con los días que faltan, (i) con la explicación y tus medallas) y logros. Desde aquí se entra a **Ajustes**. |
+| **Ajustes** | Cuenta, región y "Eliminar mi cuenta", Premium, sonidos de concentración y tonos, recordatorios, temporizador ("Menos animaciones"), límite saludable diario, ranking y **guardado automático**. |
+
+### Cómo se gana
+
+- **XP:** 1 XP por minuto, más un bono por sesión completa, uno por la primera sesión del día (crece con la racha) y uno por **descansar completo** después de estudiar.
+- **Límite saludable:** por defecto 4 h al día. Pasado eso, puedes seguir estudiando, pero ya no suma XP ni ranking.
+- **Rangos:** Bronce, Plata, Oro, Platino, Diamante y Maestro (cada uno con III, II, I), y Leyenda con estrellas.
+- **Temporadas:** cada 3 meses (ene–mar, abr–jun, jul–sep, oct–dic) empieza una temporada nueva. Tu rango vuelve a Bronce III, ganas gemas según el rango que alcanzaste (de 10 a 100) y queda una medalla en tu perfil. Logros, compañeros, temas, gemas, racha y calendario se conservan; el historial detallado de sesiones viejas se borra. La duración se cambia en `js/config.js → season.months`.
+- **Guardado automático:** cada minuto se guarda al instante y el total de cada día queda en el calendario. Ya no hay copias manuales.
+- **Gemas:** salen de misiones, logros, subidas de rango y el premio de cada temporada. Solo se ganan estudiando: **no hay compras con dinero real**.
+- **Salud del polo:** cada día que estudias al menos 45 min el paisaje se mantiene limpio. Cuentan hoy y los últimos 3 días, y al empezar el polo arranca casi limpio.
+- **Compañeros de edición limitada:** 5 personajes (Pingüino, Zorro Ártico, Oso Polar, Oso Marino y Tiburón Martillo). Cada uno se desbloquea con un logro y te acompaña en el temporizador, el HUD y el ranking.
+- **Pingüino animado:** te saluda al empezar y al completar una sesión, se enamora cuando subes de rango o reclamas una misión, y camina por el paisaje. Si no tienes otro compañero equipado, se queda contigo junto al temporizador.
+
+### Arte
+
+- `assets/companions/` tiene el arte del autor (Pingüino, Oso Polar, Oso Marino, Tiburón Martillo y Zorro Ártico) en WebP de 384 × 384, ya recortado y sin fondo.
+- `assets/sprites/` tiene las animaciones del autor. Cada archivo es una tira horizontal de cuadros:
+  - pingüino (256 × 256): `pinguino-saludo` y `pinguino-amor` (3 cuadros), `pinguino-camina` (4 cuadros) y `pinguino-quieto` (1 cuadro);
+  - `oso-camina` (4 cuadros de 256 × 256);
+  - `oso-malvavisco` (5 cuadros de 389 × 320, sin la fogata);
+  - `fogata-llama` y `fogata-lenos`: la fogata del mismo dibujo, separada para que la llama titile.
+- `assets/food/` tiene las 12 comidas de la Tienda (WebP sin fondo).
+- Para sumar un compañero nuevo: agrega su arte en `assets/companions/`, su entrada en `js/catalog.js → COMPANIONS` (con el logro que lo desbloquea) y su imagen en `js/ui/companions.js → BUILTIN_IMAGES`.
+
+### Cambiar la imagen de un compañero
+
+1. Guarda la imagen (PNG o WebP con fondo transparente, cuadrada y de 384 × 384 o más) en `assets/companions/`.
+2. En `js/config.js`, agrega la ruta en `companionImages`. Por ejemplo: `companionImages: { 'tiburon-ballena': 'assets/companions/tiburon-ballena.webp' }`.
+3. Agrega el archivo a la lista `PRECACHE` de `service-worker.js` para que funcione sin conexión.
+4. Usa solo imágenes que puedas publicar: hechas por ti, encargadas con cesión de derechos o generadas con una herramienta cuyos términos permitan el uso comercial.
+
+## Estructura
+
+```
+index.html              Estructura de las vistas (carga un solo módulo: js/main.js)
+manifest.webmanifest    Datos para instalarla como app
+service-worker.js       Modo sin conexión
+_headers                Encabezados de seguridad para cuando la publiques en la web
+package.json            Solo para `npm test` (no hay dependencias)
+css/styles.css          Estilos
+js/                     Lógica pura: sin DOM, se prueba en Node
+  config.js             Configuración pública (aquí NUNCA van secretos)
+  util.js               Fechas, formatos, limpieza de texto
+  game.js               Reglas del progreso: rangos, XP, rachas, misiones, logros, salud del polo
+  catalog.js            Lo que se elige o se posee: temas, compañeros, modos, sonidos, regiones, Premium
+                        y effectivePrefs(): qué está EN EFECTO ahora (única fuente de verdad)
+  identity.js           Apodos, avatares, filtro de nombres de usuario, países
+  timer.js              Reloj del bloque (pausas, hora real de fin)
+  session.js            El bloque en curso: reloj + guardado + coordinación entre pestañas
+  engine.js             Aplica sesiones, misiones y compras al estado y devuelve "eventos"
+  storage.js            Única puerta a localStorage: validación y migración desde la v1
+  season.js             Temporadas: fechas, nombre, premio y resumen
+  weather.js            Clima del polo (cambia cada 3 horas, igual para toda la región)
+  voices.js             Onomatopeyas de los animales según el momento
+  pet.js                Tienda: comidas, barriguita de tu mascota y sus favoritas
+  ui/feeding.js         Bandeja de comida en Enfocar: arrastrar y soltar (Pointer Events)
+  ui/photo.js           Foto de perfil: recorte, zoom y sin datos ocultos (EXIF)
+  security.js           Contraseña de la cuenta (PBKDF2 + bloqueo por intentos)
+  leaderboard.js        Ranking (demo hoy; interfaz lista para el servidor)
+  main.js               Arranque, navegación y eventos globales
+  ui/                   Interfaz (un archivo por vista o pieza)
+    context.js          Dueño del estado en pantalla: state, mutate(), session
+    dom.js, feedback.js Ayudantes de DOM; toasts y diálogos
+    widgets.js          Piezas repetidas: avatar, banderas, buscador de país, botones de modo
+    focus.js            Enfocar (temporizador)        progress.js / activity.js  Progreso
+    profile.js          Perfil                        ranking.js                 Ranking
+    settings.js         Ajustes                       account.js                 Cuenta e inicio
+    premium.js, sound.js, reminders.js, hud.js, celebrations.js
+    effects.js, emblems.js, companions.js, scenery.js   Sonidos, emblemas, arte y paisaje
+assets/                 Fuentes (licencia OFL, incluidas) e íconos
+server/supabase/        Base de datos del ranking global + pruebas
+tests/                  Pruebas automáticas
+docs/                   Seguridad, cambios y hoja de ruta
+```
+
+## Pruebas
+
+```
+npm test                                             # 54 pruebas de la lógica (necesita Node 18+)
+python tests/e2e_smoke.py http://localhost:8000/     # recorrido en navegador (opcional, ver el archivo)
+python tests/store_check.py http://localhost:8000/   # lista para Microsoft Store: manifiesto, instalable,
+                                                     # sin conexión, 8 tamaños de ventana y accesibilidad (axe)
+```
+
+Para las pruebas del servidor necesitas PostgreSQL: `server/supabase/test/run_local.sh`.
+
+## Publicar en Microsoft Store
+
+Sigue `docs/MICROSOFT-STORE.md`: GitHub Pages, cuenta individual en Partner Center, reservar el nombre, PWABuilder y envío. El texto de la ficha y las respuestas de clasificación por edad están en `docs/microsoft-store/FICHA.md`.
+
+## Documentación
+
+- [`docs/SEGURIDAD.md`](docs/SEGURIDAD.md): cómo se protegen los datos hoy y qué hacer antes de lanzar.
+- [`docs/CAMBIOS-v3.md`](docs/CAMBIOS-v3.md): reorganización del código y errores corregidos en la v3.
+- [`docs/CAMBIOS-v2.md`](docs/CAMBIOS-v2.md): errores que tenía la v1 y cómo se corrigieron.
+- [`docs/HOJA-DE-RUTA.md`](docs/HOJA-DE-RUTA.md): pasos para llegar a App Store y Play Store, e ideas.

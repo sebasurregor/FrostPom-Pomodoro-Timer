@@ -1,0 +1,16 @@
+/* Páginas legales (política de privacidad): sobrias y fáciles de leer. */
+@font-face { font-family: "Nunito"; src: url("../assets/fonts/nunito-latin-wght.woff2") format("woff2"); font-weight: 200 1000; font-display: swap; }
+@font-face { font-family: "Lilita One"; src: url("../assets/fonts/lilita-one-latin.woff2") format("woff2"); font-display: swap; }
+:root { color-scheme: light; }
+* { box-sizing: border-box; }
+body { margin: 0; background: #E2EEFB; color: #0D2346; font-family: "Nunito", system-ui, sans-serif; line-height: 1.6; }
+.legal { max-width: 760px; margin: 24px auto; padding: 28px 24px 40px; background: #F4F9FF; border: 3px solid #0D2346; border-radius: 22px; box-shadow: 0 6px 0 #0D2346; }
+h1, h2 { font-family: "Lilita One", "Nunito", sans-serif; font-weight: 400; line-height: 1.15; }
+h1 { font-size: clamp(1.8rem, 4vw, 2.3rem); margin: 8px 0 4px; }
+h2 { font-size: 1.3rem; margin: 28px 0 6px; }
+.legal__date { color: #4D6384; font-weight: 700; margin-top: 0; }
+.legal__summary { padding: 14px 16px; border-radius: 14px; background: #DDF7EC; border: 2px solid #0B5D44; }
+.legal__back a, a { color: #1E4F96; font-weight: 800; }
+ul { padding-left: 1.2em; }
+li { margin-bottom: 6px; }
+@media (max-width: 600px) { .legal { margin: 0; border-radius: 0; border-width: 0; box-shadow: none; } }

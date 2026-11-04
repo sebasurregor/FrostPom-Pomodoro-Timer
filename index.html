@@ -1,0 +1,454 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <!-- Política de seguridad: solo se ejecuta y carga código de este mismo sitio. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; media-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'; trusted-types st-sw">
+  <meta name="referrer" content="no-referrer">
+  <title>StudyTimer</title>
+  <meta name="description" content="Pomodoro polar con rangos, misiones y compañeros kawaii: cada minuto que estudias mantiene limpio tu polo.">
+  <meta name="theme-color" content="#2d68bc">
+  <meta name="color-scheme" content="light">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="StudyTimer">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="assets/icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+  <link rel="preload" href="assets/fonts/lilita-one-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/nunito-latin-wght.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="css/styles.css">
+  <script type="module" src="js/main.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Saltar al contenido</a>
+  <div class="scenery" id="scenery" aria-hidden="true"></div>
+
+  <div class="shell">
+    <!-- ============ HUD: quién eres y cómo vas ============ -->
+    <header class="hud">
+      <a class="hud__me" href="#/perfil" aria-label="Ver tu perfil">
+        <span class="avatar" id="hudAvatar">🦊</span>
+        <span class="hud__who">
+          <span class="hud__nick" id="hudNick">Estudiante</span>
+          <span class="hud__rank" id="hudRank">Bronce III</span>
+        </span>
+      </a>
+      <div class="hud__xp">
+        <span class="hud__emblem" id="hudEmblem"></span>
+        <div class="xpbar" id="hudXpBar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Progreso al siguiente rango">
+          <span class="xpbar__fill" id="hudXpFill"></span>
+        </div>
+        <span class="hud__xptext" id="hudXpText">0 XP</span>
+      </div>
+      <div class="hud__stats">
+        <span class="chip-stat chip-stat--streak" id="hudStreak" title="Días seguidos estudiando">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path class="i-flame" d="M12 2.5c.8 3.6 5.8 5.7 5.8 11.2a5.8 5.8 0 0 1-11.6 0c0-2.9 1.6-4.7 2.7-6.5.2 1.9 1 3 2.1 3.2-.3-2.9-.4-5.3 1-7.9z"/></svg>
+          <b id="hudStreakN">0</b><span class="sr-only"> días de racha</span>
+        </span>
+        <button type="button" class="chip-stat chip-stat--crown" id="hudCrown" aria-label="StudyTimer Premium">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path class="i-crown" d="M3 8.5l4.2 3.6L12 5l4.8 7.1L21 8.5l-2 10H5z"/><circle class="i-crown-gem" cx="12" cy="15" r="1.6"/></svg><b class="crown-label" id="hudCrownLabel">Premium</b>
+        </button>
+        <a class="chip-stat chip-stat--gems" id="hudGems" href="#/tienda" title="Gemas: úsalas en la tienda de Enfocar">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path class="i-gem" d="M7 3.5h10l4.5 5.6L12 21 2.5 9.1z"/><path class="i-gem-line" d="M2.8 9.2h18.4M9 3.8l3 17M15 3.8l-3 17"/></svg>
+          <b id="hudGemsN">0</b><span class="sr-only"> gemas</span>
+        </a>
+      </div>
+    </header>
+
+    <!-- ============ Navegación ============ -->
+    <nav class="tabs" aria-label="Secciones">
+      <a class="tab" href="#/enfocar" data-route="enfocar">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13.5" r="7.5"/><path d="M12 13.5V9.5M9.5 2.5h5M18.5 6.5l1.5-1.5"/></svg>
+        <span>Enfocar</span>
+      </a>
+      <a class="tab" href="#/progreso" data-route="progreso">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h8v5.5a4 4 0 0 1-8 0zM8 6H4.5v1a3.5 3.5 0 0 0 3.6 3.4M16 6h3.5v1a3.5 3.5 0 0 1-3.6 3.4M12 13.5v4M8 20.5h8M9.5 17.5h5"/></svg>
+        <span>Progreso</span>
+      </a>
+      <a class="tab" href="#/ranking" data-route="ranking">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 20.5V8h6v12.5M3.5 20.5V12.5H9M15 14.5h5.5v6M2.5 20.5h19"/></svg>
+        <span>Ranking</span>
+      </a>
+      <a class="tab" href="#/perfil" data-route="perfil">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="4"/><path d="M4.5 20.5c.8-4 3.8-6.2 7.5-6.2s6.7 2.2 7.5 6.2"/></svg>
+        <span>Perfil</span>
+      </a>
+    </nav>
+
+    <main id="main" class="views" tabindex="-1">
+
+      <!-- ============ ENFOCAR ============ -->
+      <section class="view view--focus" id="view-enfocar" data-view="enfocar" aria-labelledby="h-enfocar">
+        <h1 class="sr-only" id="h-enfocar">Enfocar</h1>
+
+        <div class="focus-main">
+          <div class="ring" id="ring" data-mode="study" data-status="idle">
+            <svg class="ring__svg" viewBox="0 0 300 300" aria-hidden="true">
+              <defs>
+                <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0" class="ring__stop-a"/>
+                  <stop offset="1" class="ring__stop-b"/>
+                </linearGradient>
+              </defs>
+              <circle class="ring__edge" cx="150" cy="150" r="138"/>
+              <circle class="ring__face" cx="150" cy="150" r="104"/>
+              <circle class="ring__track" cx="150" cy="150" r="120"/>
+              <g id="ringTicks"></g>
+              <circle class="ring__arc" id="ringArc" cx="150" cy="150" r="120" transform="rotate(-90 150 150)"/>
+              <circle class="ring__edge" cx="150" cy="150" r="102"/>
+              <circle class="ring__knob" id="ringKnob" cx="150" cy="30" r="10"/>
+            </svg>
+            <div class="ring__center">
+              <span class="ring__mode" id="modeLabel">Estudio</span>
+              <span class="ring__clock" id="clock" role="timer">25:00</span>
+              <span class="ring__breath" aria-hidden="true"><span class="b-in">Inhala</span><span class="b-out">Exhala</span></span>
+              <span class="ring__cycle" id="cycleDots"></span>
+            </div>
+            <span class="buddy" id="buddy" hidden></span>
+            <button type="button" class="shop-btn" id="shopBtn" aria-expanded="false" aria-controls="foodTray" aria-label="Tienda: dale de comer a tu compañero" title="Tienda: dale de comer a tu compañero">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8.5h14l-1.3 11.5H6.3zM9 8.5V7a3 3 0 0 1 6 0v1.5"/></svg>
+              <span class="shop-btn__hungry" id="shopHungry" hidden aria-hidden="true">!</span>
+            </button>
+          </div>
+
+          <div class="controls">
+            <button class="btn btn--gold btn--xl" id="mainBtn" type="button">Empezar</button>
+            <div class="controls__row">
+              <button class="btn btn--paper btn--sm" id="finishBtn" type="button">Terminar y guardar</button>
+              <button class="btn btn--paper btn--sm" id="skipBtn" type="button">Saltar</button>
+              <button class="btn btn--paper btn--sm" id="resetBtn" type="button">Reiniciar</button>
+            </div>
+            <p class="xp-hint" id="xpHint" aria-live="polite"></p>
+            <button type="button" class="ambient-btn" id="ambientBtn" aria-pressed="false"></button>
+            <p class="weather-line" id="weatherLine"></p>
+            <p class="today-line">Hoy llevas <b id="todayMin">0 min</b> de estudio en <b id="todaySessions">0 sesiones</b>.</p>
+            <a class="pole-pill" href="#/progreso" id="polePill">
+              <span class="pole-pill__label">Tu polo</span>
+              <span class="meter meter--pole" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-label="Salud de tu polo"><span class="meter__fill" id="poleFill"></span></span>
+              <b id="polePct">70 %</b>
+            </a>
+          </div>
+        </div>
+
+        <div class="focus-side">
+          <section class="panel food-tray" id="foodTray" aria-labelledby="h-tray" hidden>
+            <div class="food-tray__head">
+              <h2 class="panel__title" id="h-tray">Dale de comer a <span id="trayPetName">tu pingüino</span></h2>
+              <button type="button" class="icon-btn" id="trayClose" aria-label="Cerrar la tienda">×</button>
+            </div>
+            <div class="food-tray__status">
+              <span id="trayBellyLbl">Barriguita</span>
+              <div class="meter meter--belly" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-labelledby="trayBellyLbl" id="trayMeter"><span class="meter__fill" id="trayFill"></span></div>
+              <b id="trayPct">60 %</b>
+              <span class="tray-gems" title="Tus gemas"><span aria-hidden="true">💎</span> <b id="trayGems">0</b><span class="sr-only"> gemas</span></span>
+            </div>
+            <p class="food-tray__hint" id="trayHint">Arrastra una comida hasta tu compañero (con el mouse o con el dedo). ★ = su favorita.</p>
+            <ul class="tray-foods" id="trayFoods" aria-label="Comida"></ul>
+          </section>
+
+          <section class="panel" aria-labelledby="h-duracion">
+            <div class="panel__head">
+              <h2 class="panel__title" id="h-duracion">Duración</h2>
+              <button class="btn btn--paper btn--sm btn--icon" type="button" id="customizeBtn" aria-controls="customPanel">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6.5h16M4 12h16M4 17.5h16"/><circle cx="9" cy="6.5" r="2.2"/><circle cx="15.5" cy="12" r="2.2"/><circle cx="7.5" cy="17.5" r="2.2"/></svg>
+                Personalizar
+              </button>
+            </div>
+            <div class="presets" id="presets" role="radiogroup" aria-labelledby="h-duracion"></div>
+
+            <div class="custom" id="customPanel" hidden>
+              <h3 class="custom__title">Tu pomodoro a la medida</h3>
+              <p class="custom__text">Elige cuánto estudias y cuánto descansas. Se guarda aunque pruebes otros modos.</p>
+              <p class="custom__limits" id="customLimits"></p>
+              <div class="stepper" data-key="customStudyMin" data-min="1" data-max="180" data-step="5">
+                <span class="stepper__label" id="lbl-customStudyMin">Estudiar</span>
+                <div class="stepper__ctl">
+                  <button type="button" class="stepper__btn" data-delta="-1" aria-label="Menos minutos de estudio">−</button>
+                  <input class="stepper__input" type="number" inputmode="numeric" min="1" max="180" aria-labelledby="lbl-customStudyMin">
+                  <button type="button" class="stepper__btn" data-delta="1" aria-label="Más minutos de estudio">+</button>
+                </div>
+                <span class="stepper__unit">min</span>
+              </div>
+              <div class="stepper" data-key="customBreakMin" data-min="1" data-max="60" data-step="5">
+                <span class="stepper__label" id="lbl-customBreakMin">Descansar</span>
+                <div class="stepper__ctl">
+                  <button type="button" class="stepper__btn" data-delta="-1" aria-label="Menos minutos de descanso">−</button>
+                  <input class="stepper__input" type="number" inputmode="numeric" min="1" max="60" aria-labelledby="lbl-customBreakMin">
+                  <button type="button" class="stepper__btn" data-delta="1" aria-label="Más minutos de descanso">+</button>
+                </div>
+                <span class="stepper__unit">min</span>
+              </div>
+            </div>
+
+            <p class="long-note" id="longBreakText">Cada 4 sesiones descansas más.</p>
+          </section>
+        </div>
+      </section>
+
+      <!-- ============ PROGRESO ============ -->
+      <section class="view" id="view-progreso" data-view="progreso" aria-labelledby="h-progreso" hidden>
+        <h1 class="sr-only" id="h-progreso">Progreso</h1>
+        <div class="progress-grid">
+          <section class="showcase" id="showcase" aria-label="Tu rango"></section>
+
+          <!-- En escritorio cada .col es una columna independiente: si un panel crece, solo
+               se mueven los de abajo en esa misma columna (sin huecos entre paneles). -->
+          <div class="col">
+          <section class="panel panel--pole ord-1" aria-labelledby="h-polo">
+            <div class="panel__head">
+              <h2 class="panel__title" id="h-polo">Tu polo
+                <button type="button" class="info-btn" id="poleInfoBtn" aria-expanded="false" aria-controls="poleInfo" aria-label="Cómo funciona tu polo">i</button>
+              </h2>
+              <span class="panel__meta" id="poleLevel"></span>
+            </div>
+            <div class="meter meter--pole meter--lg" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-label="Salud de tu polo" id="poleMeter"><span class="meter__fill" id="poleFill2"></span></div>
+            <div class="info-pop" id="poleInfo" hidden>
+              <p class="pole-text" id="poleText"></p>
+              <p>Estudia al menos <b id="poleGoal">45 min</b> al día para mantenerlo limpio. Si dejas de estudiar, llegan el esmog, la basura y el petróleo. Cuentan hoy y los últimos tres días.</p>
+              <p><b>Dato curioso:</b> los pingüinos viven en el Polo Sur y los osos polares en el Polo Norte: nunca se encuentran. ¡Aquí sí son amigos!</p>
+            </div>
+          </section>
+
+          <section class="panel panel--activity ord-3" aria-labelledby="h-semana">
+            <div class="panel__head">
+              <h2 class="panel__title" id="h-semana">Tu estudio</h2>
+              <div class="mini-seg" role="tablist" aria-label="Ver tu estudio por">
+                <button class="mini-seg__btn" role="tab" type="button" id="tabWeek" aria-controls="weekPane" aria-selected="true">Últimos 7 días</button>
+                <button class="mini-seg__btn" role="tab" type="button" id="tabCal" aria-controls="calPane" aria-selected="false" tabindex="-1">Calendario</button>
+              </div>
+            </div>
+            <div id="weekPane" role="tabpanel" aria-labelledby="tabWeek">
+              <p class="panel__meta act-meta" id="weekMeta"></p>
+              <div class="bars" id="weekBars" role="list" aria-label="Minutos estudiados por día"></div>
+            </div>
+            <div id="calPane" role="tabpanel" aria-labelledby="tabCal" hidden>
+              <div class="cal__nav">
+                <button type="button" class="cal__arrow" id="calPrev" aria-label="Mes anterior"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg></button>
+                <div class="cal__heading">
+                  <h3 class="cal__title" id="calTitle" aria-live="polite"></h3>
+                  <p class="panel__meta" id="calMeta"></p>
+                </div>
+                <button type="button" class="cal__arrow" id="calNext" aria-label="Mes siguiente"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 5.5 16 12l-6.5 6.5"/></svg></button>
+              </div>
+              <div class="cal__week" aria-hidden="true"><span>Lu</span><span>Ma</span><span>Mi</span><span>Ju</span><span>Vi</span><span>Sá</span><span>Do</span></div>
+              <div class="cal__grid" id="calGrid" role="group" aria-labelledby="calTitle"></div>
+              <p class="cal__detail" id="calDetail" aria-live="polite"></p>
+              <div class="cal__legend" aria-hidden="true">
+                <span>Menos</span><i class="lv-1"></i><i class="lv-2"></i><i class="lv-3"></i><i class="lv-4"></i><span>Más</span>
+                <span class="cal__goal" id="calGoal"></span>
+              </div>
+            </div>
+          </section>
+          </div>
+
+          <div class="col">
+          <section class="panel ord-2" aria-labelledby="h-misiones">
+            <div class="panel__head">
+              <h2 class="panel__title" id="h-misiones">Misiones de hoy</h2>
+              <span class="panel__meta" id="missionsMeta"></span>
+            </div>
+            <ul class="missions" id="missionList"></ul>
+          </section>
+
+          <section class="panel ord-4" aria-labelledby="h-historial">
+            <div class="panel__head">
+              <h2 class="panel__title" id="h-historial">Historial</h2>
+              <span class="panel__meta" id="historyMeta"></span>
+            </div>
+            <ul class="history" id="historyList"></ul>
+            <button type="button" class="link-btn history__more" id="historyMore" aria-controls="historyList" hidden></button>
+          </section>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ RANKING ============ -->
+      <section class="view" id="view-ranking" data-view="ranking" aria-labelledby="h-ranking" hidden>
+        <h1 class="view__title" id="h-ranking">Ranking</h1>
+        <div class="seg" role="tablist" aria-label="Periodo del ranking">
+          <button class="seg__btn" role="tab" type="button" data-period="week" aria-selected="true">Esta semana</button>
+          <button class="seg__btn" role="tab" type="button" data-period="season" id="seasonTab" aria-selected="false">Esta temporada</button>
+        </div>
+        <p class="notice" id="boardNotice"></p>
+        <div class="podium" id="podium"></div>
+        <ol class="board" id="board"></ol>
+      </section>
+
+      <!-- ============ PERFIL ============ -->
+      <section class="view" id="view-perfil" data-view="perfil" aria-labelledby="h-perfil" hidden>
+        <div class="view__head">
+          <h1 class="view__title" id="h-perfil">Tu perfil</h1>
+          <a class="btn btn--paper btn--sm btn--icon" href="#/ajustes">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.6M12 18.6v2.6M21.2 12h-2.6M5.4 12H2.8M18.5 5.5l-1.8 1.8M7.3 16.7l-1.8 1.8M18.5 18.5l-1.8-1.8M7.3 7.3 5.5 5.5"/></svg>
+            Ajustes
+          </a>
+        </div>
+        <div class="profile-grid">
+          <div class="col">
+          <section class="profile-card ord-1" id="profileCard" aria-label="Tu personaje"></section>
+
+          <section class="panel ord-3" aria-labelledby="h-companeros">
+            <div class="panel__head">
+              <h2 class="panel__title" id="h-companeros">Compañeros</h2>
+              <span class="panel__meta" id="compMeta"></span>
+            </div>
+            <p class="panel__text">Skins de edición limitada: cada una se gana con un logro y te acompaña en el temporizador y en el ranking.</p>
+            <ul class="companions" id="companionGrid"></ul>
+          </section>
+
+          <section class="panel ord-5" aria-labelledby="h-temporadas">
+            <div class="panel__head">
+              <h2 class="panel__title" id="h-temporadas">Temporadas
+                <button type="button" class="info-btn" id="seasonInfoBtn" aria-expanded="false" aria-controls="seasonInfo" aria-label="Cómo funcionan las temporadas">i</button>
+              </h2>
+              <span class="panel__meta" id="seasonMeta"></span>
+            </div>
+            <div class="season-bar">
+              <p class="season-bar__top"><b id="seasonName"></b><span id="seasonLeft"></span></p>
+              <div class="meter meter--season meter--lg" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-labelledby="seasonName" id="seasonMeter"><span class="meter__fill" id="seasonFill"></span></div>
+              <p class="season-bar__ends" aria-hidden="true"><span id="seasonStart"></span><span>🏁 <span id="seasonEnd"></span></span></p>
+            </div>
+            <div class="info-pop" id="seasonInfo" hidden>
+              <p id="seasonNow"></p>
+              <p>Tus logros, compañeros, temas, gemas, racha y calendario se conservan. El historial detallado de sesiones se borra.</p>
+            </div>
+            <ul class="seasons" id="seasonList"></ul>
+          </section>
+          </div>
+
+          <div class="col">
+          <section class="panel ord-2" aria-labelledby="h-resumen">
+            <h2 class="panel__title" id="h-resumen">Resumen</h2>
+            <dl class="stats" id="statsGrid"></dl>
+          </section>
+
+          <section class="panel ord-4" aria-labelledby="h-tienda">
+            <div class="panel__head">
+              <h2 class="panel__title" id="h-tienda">Temas del temporizador</h2>
+              <span class="panel__meta" id="shopMeta"></span>
+            </div>
+            <ul class="skins" id="skinGrid"></ul>
+          </section>
+          </div>
+
+          <section class="panel panel--wide ord-9" aria-labelledby="h-logros">
+            <div class="panel__head">
+              <h2 class="panel__title" id="h-logros">Logros</h2>
+              <span class="panel__meta" id="achMeta"></span>
+            </div>
+            <ul class="badges" id="badgeGrid"></ul>
+            <p class="badges__caption" id="badgeCaption" aria-live="polite"></p>
+          </section>
+        </div>
+      </section>
+
+      <!-- ============ AJUSTES ============ -->
+      <section class="view" id="view-ajustes" data-view="ajustes" aria-labelledby="h-ajustes" hidden>
+        <div class="view__head">
+          <h1 class="view__title" id="h-ajustes">Ajustes</h1>
+          <a class="btn btn--paper btn--sm" href="#/perfil">Volver al perfil</a>
+        </div>
+        <div class="settings-grid">
+          <div class="col">
+          <section class="panel ord-1" aria-labelledby="h-cuenta">
+            <h2 class="panel__title" id="h-cuenta">Tu cuenta</h2>
+            <p class="panel__text" id="accStatus"></p>
+            <div class="btn-row">
+              <button class="btn btn--gold btn--sm" type="button" id="accPassBtn">Cambiar contraseña</button>
+              <button class="btn btn--paper btn--sm" type="button" id="accLogoutBtn">Cerrar sesión</button>
+            </div>
+            <div class="field field--spaced">
+              <label for="setRegion">Tu país o región</label>
+              <select id="setRegion"></select>
+            </div>
+            <p class="panel__text">Define cuándo es de día o de noche en tu polo, el clima y la fogata (solo se enciende de noche en tu región).</p>
+            <p class="acc-delete"><button class="link-btn link-btn--danger" type="button" id="accDeleteBtn">Eliminar mi cuenta</button></p>
+          </section>
+
+          <section class="panel ord-3" aria-labelledby="h-sonido">
+            <h2 class="panel__title" id="h-sonido">Sonido</h2>
+            <h3 class="panel__sub">Sonido de concentración</h3>
+            <p class="panel__text">Suena mientras estudias. Elige "Silencio" para no escuchar nada.</p>
+            <div class="sound-grid" id="ambientGrid" role="radiogroup" aria-label="Sonido de concentración"></div>
+            <div class="volume">
+              <label for="ambientVol">Volumen</label>
+              <input type="range" id="ambientVol" min="0" max="100" step="5">
+            </div>
+            <h3 class="panel__sub">Tono de los avisos</h3>
+            <div class="sound-grid sound-grid--tones" id="toneGrid" role="radiogroup" aria-label="Tono de los avisos"></div>
+          </section>
+
+          <section class="panel ord-7" aria-labelledby="h-datos">
+            <h2 class="panel__title" id="h-datos">Guardado automático</h2>
+            <p class="save-status" id="saveStatus"></p>
+            <p class="panel__text" id="storageNote"></p>
+            <p class="panel__text" id="seasonNote"></p>
+          </section>
+
+          <section class="panel ord-9 panel--quiet" aria-labelledby="h-acerca">
+            <h2 class="panel__title" id="h-acerca">Acerca de</h2>
+            <p class="panel__text">StudyTimer <span id="appVersion"></span>. Esta app ayuda a organizarte y a descansar a tiempo, pero no reemplaza a un profesional. Si el estrés o el cansancio no se van, habla con un adulto de confianza o con bienestar de tu colegio o universidad.</p>
+            <p class="panel__text"><a class="link-btn" href="privacidad.html">Política de privacidad</a></p>
+            <p class="panel__text credits">Banderas: Twemoji (CC BY 4.0), mediante la fuente Twemoji Country Flags.</p>
+          </section>
+          </div>
+
+          <div class="col">
+          <section class="panel ord-2 panel--premium" aria-labelledby="h-premium">
+            <h2 class="panel__title" id="h-premium"><span class="crown-inline"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="i-crown" d="M3 8.5l4.2 3.6L12 5l4.8 7.1L21 8.5l-2 10H5z"/><circle class="i-crown-gem" cx="12" cy="15" r="1.6"/></svg></span> StudyTimer Premium</h2>
+            <p class="panel__text" id="premiumStatus"></p>
+            <div class="btn-row" id="premiumActions"></div>
+          </section>
+
+          <section class="panel ord-4" aria-labelledby="h-recordatorios">
+            <h2 class="panel__title" id="h-recordatorios"><span class="crown-inline"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="i-crown" d="M3 8.5l4.2 3.6L12 5l4.8 7.1L21 8.5l-2 10H5z"/><circle class="i-crown-gem" cx="12" cy="15" r="1.6"/></svg></span> Recordatorios de enfoque</h2>
+            <p class="panel__text">Te avisamos a la hora de tu horario de estudio.</p>
+            <label class="switch"><input type="checkbox" id="remOn"><span class="switch__ui" aria-hidden="true"></span><span class="switch__text"><b>Recordarme estudiar</b><small id="remNote">Funciona mientras la app está abierta o instalada.</small></span></label>
+            <div class="rem-row">
+              <label for="remTime">Hora</label>
+              <input type="time" id="remTime">
+            </div>
+            <div class="rem-days" id="remDays" role="group" aria-label="Días del recordatorio"></div>
+          </section>
+
+          <section class="panel ord-5" aria-labelledby="h-temp">
+            <h2 class="panel__title" id="h-temp">Temporizador</h2>
+            <label class="switch"><input type="checkbox" id="setAuto"><span class="switch__ui" aria-hidden="true"></span><span class="switch__text"><b>Seguir solo</b><small>Al terminar un bloque empieza el siguiente.</small></span></label>
+            <label class="switch"><input type="checkbox" id="setSound"><span class="switch__ui" aria-hidden="true"></span><span class="switch__text"><b>Sonidos</b><small>Avisos al empezar, terminar y ganar premios.</small></span></label>
+            <label class="switch"><input type="checkbox" id="setVibrate"><span class="switch__ui" aria-hidden="true"></span><span class="switch__text"><b>Vibración</b><small>En teléfonos que la permiten.</small></span></label>
+            <label class="switch"><input type="checkbox" id="setAwake"><span class="switch__ui" aria-hidden="true"></span><span class="switch__text"><b>Pantalla encendida</b><small>Evita que el teléfono se apague mientras estudias.</small></span></label>
+            <label class="switch"><input type="checkbox" id="setMotion"><span class="switch__ui" aria-hidden="true"></span><span class="switch__text"><b>Menos animaciones</b><small>Animales quietos, sin nieve que cae ni confeti.</small></span></label>
+            <div class="btn-row">
+              <button class="btn btn--paper btn--sm" type="button" id="notifBtn">Activar notificaciones</button>
+            </div>
+          </section>
+
+          <section class="panel ord-6" aria-labelledby="h-bienestar">
+            <h2 class="panel__title" id="h-bienestar">Bienestar y ranking</h2>
+            <p class="panel__text">El límite saludable es el máximo de minutos al día que suman XP y cuentan en el ranking. Puedes seguir estudiando, pero estudiar sin parar no te hará subir más.</p>
+            <div class="stepper stepper--wide" id="capStepper">
+              <span class="stepper__label" id="lbl-cap">Límite saludable diario</span>
+              <div class="stepper__ctl">
+                <button type="button" class="stepper__btn" data-cap="-30" aria-label="Bajar el límite 30 minutos">−</button>
+                <output class="stepper__out" id="capValue" aria-labelledby="lbl-cap">4 h</output>
+                <button type="button" class="stepper__btn" data-cap="30" aria-label="Subir el límite 30 minutos">+</button>
+              </div>
+            </div>
+            <label class="switch"><input type="checkbox" id="setBoard"><span class="switch__ui" aria-hidden="true"></span><span class="switch__text"><b>Aparecer en el ranking</b><small>Solo se muestran tu apodo, tu avatar y tus minutos.</small></span></label>
+          </section>
+          </div>
+
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="toasts" id="toasts" aria-live="polite" aria-atomic="false"></div>
+  <dialog class="dlg" id="dlg" aria-labelledby="dlgTitle"></dialog>
+  <canvas class="fx" id="fx" aria-hidden="true"></canvas>
+  <noscript><p class="noscript">StudyTimer necesita JavaScript para funcionar.</p></noscript>
+</body>
+</html>

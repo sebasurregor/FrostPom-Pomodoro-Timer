@@ -1,0 +1,38 @@
+{
+  "id": "./",
+  "name": "StudyTimer",
+  "short_name": "StudyTimer",
+  "description": "Pomodoro polar con rangos, misiones, temporadas y compañeros kawaii: cada minuto que estudias mantiene limpio tu polo.",
+  "lang": "es",
+  "dir": "ltr",
+  "start_url": "./#/enfocar",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#2d68bc",
+  "theme_color": "#2d68bc",
+  "categories": ["education", "productivity"],
+  "prefer_related_applications": false,
+  "launch_handler": { "client_mode": "focus-existing" },
+  "edge_side_panel": { "preferred_width": 420 },
+  "icons": [
+    { "src": "assets/icons/icon-48.png", "sizes": "48x48", "type": "image/png", "purpose": "any" },
+    { "src": "assets/icons/icon-96.png", "sizes": "96x96", "type": "image/png", "purpose": "any" },
+    { "src": "assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "assets/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "assets/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Empezar a estudiar", "short_name": "Estudiar", "description": "Abre el temporizador", "url": "./#/enfocar", "icons": [{ "src": "assets/icons/icon-96.png", "sizes": "96x96", "type": "image/png" }] },
+    { "name": "Dar de comer a mi compañero", "short_name": "Tienda", "description": "Abre la tienda de comida", "url": "./#/tienda", "icons": [{ "src": "assets/icons/icon-96.png", "sizes": "96x96", "type": "image/png" }] },
+    { "name": "Ver mi progreso", "short_name": "Progreso", "description": "Rango, misiones y calendario", "url": "./#/progreso", "icons": [{ "src": "assets/icons/icon-96.png", "sizes": "96x96", "type": "image/png" }] }
+  ],
+  "screenshots": [
+    { "src": "assets/screenshots/escritorio-enfocar.webp", "sizes": "1366x768", "type": "image/webp", "form_factor": "wide", "label": "El temporizador con tu compañero y el paisaje polar" },
+    { "src": "assets/screenshots/escritorio-noche.webp", "sizes": "1366x768", "type": "image/webp", "form_factor": "wide", "label": "De noche, el oso asa malvaviscos junto a la fogata" },
+    { "src": "assets/screenshots/escritorio-progreso.webp", "sizes": "1366x768", "type": "image/webp", "form_factor": "wide", "label": "Tu rango, misiones y calendario de estudio" },
+    { "src": "assets/screenshots/celular-enfocar.webp", "sizes": "780x1688", "type": "image/webp", "form_factor": "narrow", "label": "StudyTimer en el celular" },
+    { "src": "assets/screenshots/celular-tienda.webp", "sizes": "780x1688", "type": "image/webp", "form_factor": "narrow", "label": "Arrastra la comida hasta tu compañero" }
+  ]
+}
