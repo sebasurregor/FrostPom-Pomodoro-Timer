@@ -14,6 +14,8 @@ import { state, mutate, today } from './context.js';
 import { config } from '../config.js';
 import { seasonFor, daysLeft } from '../season.js';
 import { renderActivity } from './activity.js';
+import { pic } from './pics.js';
+import { t, tr } from '../i18n.js';
 
 function renderShowcase() {
   const r = G.rankForXp(state.progress.xp);
@@ -22,22 +24,25 @@ function renderShowcase() {
   const pct = Math.round(r.progress * 100);
   const season = seasonFor(new Date(), config.season.months);
   const left = daysLeft(season, today());
+  const goStudy = () => { location.hash = '#/enfocar'; };
   $('#showcase').replaceChildren(
-    h('div', { class: 'showcase__rank', vars: { '--rank-a': r.colors.a, '--rank-b': r.colors.b, '--rank-glow': r.colors.glow } },
-      h('div', { class: 'showcase__emblem' }, emblem(r, { size: 150 })),
-      h('div', { class: 'showcase__info' },
-        h('p', { class: 'showcase__label', text: 'Tu rango esta temporada' }),
-        h('h2', { class: 'showcase__name', text: r.name }),
-        h('p', { class: 'showcase__xp', text: `${fmtInt(state.progress.xp)} XP esta temporada` }),
-        h('div', { class: 'xpbar xpbar--lg', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(pct), 'aria-label': `Progreso hacia ${r.nextName}` },
+    // Banda de color del rango (como la racha de Duolingo): nombre grande a la izquierda, escudo nevado a la derecha
+    h('div', { class: 'hero', vars: { '--rank-a': r.colors.a, '--rank-b': r.colors.b } },
+      h('div', { class: 'hero__info' },
+        h('h2', { class: 'hero__name', text: r.name }),
+        h('p', { class: 'hero__xp', text: t('{n} XP esta temporada', { n: fmtInt(state.progress.xp) }) }),
+        h('div', { class: 'xpbar xpbar--hero', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(pct), 'aria-label': t('Progreso hacia {rank}', { rank: r.nextName }) },
           h('span', { class: 'xpbar__fill', vars: { '--p': `${pct}%` } })),
-        h('p', { class: 'showcase__next', text: `Te faltan ${fmtInt(r.xpToNext)} XP para ${r.nextName}.` }),
-        h('p', { class: 'showcase__season' }, h('span', { 'aria-hidden': 'true', text: '🏁 ' }), `${season.name} · ${left === 1 ? 'último día' : `quedan ${left} días`}`))),
-    h('div', { class: `streak${streak.activeToday ? ' is-hot' : ''}` },
-      h('span', { class: 'streak__flame', 'aria-hidden': 'true' }),
-      h('div', {},
-        h('p', { class: 'streak__n', text: U.plural(streak.current, 'día seguido', 'días seguidos') }),
-        h('p', { class: 'streak__sub', text: streak.activeToday ? `Hoy ya cuenta. Tu mejor racha: ${best}.` : `Estudia 10 minutos hoy para mantenerla. Mejor racha: ${best}.` }))),
+        h('p', { class: 'hero__next', text: t('Te faltan {n} XP para {rank}', { n: fmtInt(r.xpToNext), rank: r.nextName }) }),
+        h('p', { class: 'hero__season' }, pic('copo', 18), `${season.name}: ${left === 1 ? tr('último día') : t('quedan {n} días', { n: left })}`)),
+      h('div', { class: 'hero__emblem' }, emblem(r, { size: 132, snow: true }))),
+    // Tarjeta blanca de la racha
+    h('div', { class: `streak-card${streak.activeToday ? ' is-hot' : ''}` },
+      h('span', { class: 'streak-card__icon' }, pic('fuego', 44)),
+      h('div', { class: 'streak-card__body' },
+        h('p', { class: 'streak-card__n', text: U.plural(streak.current, 'día seguido', 'días seguidos') }),
+        h('p', { class: 'streak-card__sub', text: streak.activeToday ? t('Hoy ya cuenta. Mejor racha: {n}.', { n: best }) : 'Estudia 10 minutos hoy para mantenerla.' }),
+        streak.activeToday ? null : h('button', { type: 'button', class: 'link-btn streak-card__go', onclick: goStudy }, 'Estudiar ahora'))),
     h('details', { class: 'ladder' },
       h('summary', { text: 'Ver todos los rangos' }),
       h('ol', { class: 'ladder__list' }, G.rankLadder().map((step) => {
@@ -55,22 +60,22 @@ function renderMissions() {
   const day = state.daily[t0] || G.emptyDay();
   const missions = G.dailyMissions(t0);
   const claimedCount = missions.filter((m) => state.progress.claimed[m.id]).length;
-  $('#missionsMeta').textContent = `${claimedCount} de ${missions.length}, se renuevan a medianoche`;
+  $('#missionsMeta').textContent = t('{a} de {b}', { a: claimedCount, b: missions.length });
   $('#missionList').replaceChildren(...missions.map((m) => {
     const prog = G.missionProgress(m, day);
     const claimed = !!state.progress.claimed[m.id];
     const pct = Math.round((prog.current / prog.target) * 100);
     let action;
-    if (claimed) action = h('span', { class: 'mission__done', text: 'Reclamada' });
+    if (claimed) action = h('span', { class: 'mission__done' }, pic('check', 22), 'Reclamada');
     else if (prog.done) action = h('button', { type: 'button', class: 'btn btn--gold btn--sm mission__claim', onclick: (e) => claimMission(m.id, e.currentTarget) }, 'Reclamar');
     else action = h('span', { class: 'mission__count', text: `${prog.current}/${prog.target}` });
     return h('li', { class: `mission${claimed ? ' is-claimed' : prog.done ? ' is-ready' : ''}` },
-      h('span', { class: 'mission__icon', 'aria-hidden': 'true', text: m.icon }),
+      h('span', { class: 'mission__icon', 'aria-hidden': 'true' }, m.icon === '⏱️' ? pic('reloj', 30) : m.icon),
       h('div', { class: 'mission__body' },
         h('p', { class: 'mission__text', text: m.text }),
         h('div', { class: 'meter', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': String(prog.target), 'aria-valuenow': String(prog.current), 'aria-label': m.text },
           h('span', { class: 'meter__fill', vars: { '--p': `${pct}%` } })),
-        h('p', { class: 'mission__reward', text: `Premio: +${m.reward.xp} XP y +${m.reward.gems} gemas` })),
+        h('p', { class: 'mission__reward', text: t('Premio: +{xp} XP y +{gems} gemas', { xp: m.reward.xp, gems: m.reward.gems }) })),
       action);
   }));
 }
@@ -92,7 +97,7 @@ function renderHistory() {
   const all = state.sessions.slice(0, 30);
   $('#historyMeta').textContent = all.length > HISTORY_SHORT ? U.plural(all.length, 'sesión reciente', 'sesiones recientes') : '';
   more.hidden = all.length <= HISTORY_SHORT;
-  more.textContent = historyOpen ? 'Ver menos' : `Ver más (${all.length - HISTORY_SHORT})`;
+  more.textContent = historyOpen ? tr('Ver menos') : t('Ver más ({n})', { n: all.length - HISTORY_SHORT });
   more.setAttribute('aria-expanded', String(historyOpen));
   const items = historyOpen ? all : all.slice(0, HISTORY_SHORT);
   if (!items.length) {
@@ -101,15 +106,15 @@ function renderHistory() {
   }
   list.replaceChildren(...items.map((s) => h('li', { class: 'hist' },
     h('div', { class: 'hist__main' },
-      h('b', { text: `${U.formatMinutes(s.actualSec / 60)} de estudio` }),
+      h('b', { text: t('{time} de estudio', { time: U.formatMinutes(s.actualSec / 60) }) }),
       h('span', { class: 'hist__meta', text: U.formatDateTime(s.startedAt) })),
     h('span', { class: `hist__tag${s.completed ? ' is-full' : ''}`, text: s.completed ? 'Completa' : 'Guardada antes' }),
     h('span', { class: 'hist__xp', text: `+${s.xp} XP` }),
-    h('button', { type: 'button', class: 'icon-btn', 'aria-label': `Eliminar la sesión del ${U.formatDateTime(s.startedAt)}`, onclick: () => deleteSession(s) }, '×'))));
+    h('button', { type: 'button', class: 'icon-btn', 'aria-label': t('Eliminar la sesión del {date}', { date: U.formatDateTime(s.startedAt) }), onclick: () => deleteSession(s) }, pic('quitar', 22)))));
 }
 
 async function deleteSession(s) {
-  const ok = await confirmDialog('¿Eliminar esta sesión?', `Se descuentan ${U.formatMinutes(s.actualSec / 60)} y ${s.xp} XP. Úsalo si el temporizador se quedó corriendo por error.`, 'Eliminar');
+  const ok = await confirmDialog('¿Eliminar esta sesión?', t('Se descuentan {time} y {xp} XP. Úsalo si el temporizador se quedó corriendo por error.', { time: U.formatMinutes(s.actualSec / 60), xp: s.xp }), 'Eliminar');
   if (ok) mutate((st) => E.removeSession(st, s.id));
 }
 

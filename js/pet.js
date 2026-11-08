@@ -8,6 +8,7 @@
  * Módulo puro: sin DOM ni almacenamiento.
  */
 import * as U from './util.js';
+import { tr } from './i18n.js';
 
 export const DECAY_PER_HOUR = 3;
 export const START_FULLNESS = 60;
@@ -16,28 +17,28 @@ export const FAVORITE_BONUS = 1.5;
 
 // Arte del autor en assets/food. cost = gemas, fill = cuánto llena la barriguita.
 export const FOODS = Object.freeze([
-  { id: 'pescado', name: 'Pescado', cost: 2, fill: 12 },
-  { id: 'camaron', name: 'Camarón', cost: 2, fill: 12 },
-  { id: 'arandanos', name: 'Arándanos', cost: 2, fill: 10 },
-  { id: 'galleta', name: 'Galleta estrella', cost: 3, fill: 15 },
-  { id: 'cangrejo', name: 'Cangrejo', cost: 3, fill: 16 },
-  { id: 'calamar', name: 'Calamar', cost: 3, fill: 16 },
-  { id: 'pescado-helado', name: 'Pescado congelado', cost: 3, fill: 18 },
-  { id: 'sardinas', name: 'Frasco de sardinas', cost: 4, fill: 20 },
-  { id: 'sopa', name: 'Sopa de pescado', cost: 4, fill: 22 },
-  { id: 'pollo', name: 'Pollo asado', cost: 5, fill: 28 },
-  { id: 'jamon', name: 'Jamón asado', cost: 5, fill: 28 },
-  { id: 'almeja', name: 'Almeja de lujo', cost: 8, fill: 40 },
+  { id: 'pescado', name: tr('Pescado'), cost: 2, fill: 12 },
+  { id: 'camaron', name: tr('Camarón'), cost: 2, fill: 12 },
+  { id: 'arandanos', name: tr('Arándanos'), cost: 2, fill: 10 },
+  { id: 'galleta', name: tr('Galleta estrella'), cost: 3, fill: 15 },
+  { id: 'cangrejo', name: tr('Cangrejo'), cost: 3, fill: 16 },
+  { id: 'calamar', name: tr('Calamar'), cost: 3, fill: 16 },
+  { id: 'pescado-helado', name: tr('Pescado congelado'), cost: 3, fill: 18 },
+  { id: 'sardinas', name: tr('Frasco de sardinas'), cost: 4, fill: 20 },
+  { id: 'sopa', name: tr('Sopa de pescado'), cost: 4, fill: 22 },
+  { id: 'pollo', name: tr('Pollo asado'), cost: 5, fill: 28 },
+  { id: 'jamon', name: tr('Jamón asado'), cost: 5, fill: 28 },
+  { id: 'almeja', name: tr('Almeja de lujo'), cost: 8, fill: 40 },
 ].map((f) => Object.freeze({ ...f, img: `assets/food/${f.id}.webp` })));
 export const FOOD_BY_ID = U.byId(FOODS);
 
 /** Qué animal es cada mascota y sus comidas favoritas. */
 export const PETS = Object.freeze({
-  pinguino: { kind: 'penguin', name: 'Pingüino', favorites: ['pescado', 'camaron', 'calamar', 'pescado-helado'] },
-  'oso-polar': { kind: 'bear', name: 'Oso Polar', favorites: ['jamon', 'pollo', 'arandanos', 'sardinas'] },
-  'oso-marino': { kind: 'seal', name: 'Oso Marino', favorites: ['pescado', 'calamar', 'cangrejo', 'camaron'] },
-  'tiburon-martillo': { kind: 'shark', name: 'Tiburón Martillo', favorites: ['pescado', 'calamar', 'jamon', 'pescado-helado'] },
-  'zorro-artico': { kind: 'fox', name: 'Zorro Ártico', favorites: ['pollo', 'arandanos', 'galleta', 'cangrejo'] },
+  pinguino: { kind: 'penguin', name: tr('Pingüino'), favorites: ['pescado', 'camaron', 'calamar', 'pescado-helado'] },
+  'oso-polar': { kind: 'bear', name: tr('Oso Polar'), favorites: ['jamon', 'pollo', 'arandanos', 'sardinas'] },
+  'oso-marino': { kind: 'seal', name: tr('Oso Marino'), favorites: ['pescado', 'calamar', 'cangrejo', 'camaron'] },
+  'tiburon-martillo': { kind: 'shark', name: tr('Tiburón Martillo'), favorites: ['pescado', 'calamar', 'jamon', 'pescado-helado'] },
+  'zorro-artico': { kind: 'fox', name: tr('Zorro Ártico'), favorites: ['pollo', 'arandanos', 'galleta', 'cangrejo'] },
 });
 export const isPetId = (id) => typeof id === 'string' && Object.hasOwn(PETS, id);
 
@@ -57,10 +58,10 @@ export function fullness(state, petId, now = new Date()) {
 
 /** Cómo se siente según su barriguita. */
 export function mood(value) {
-  if (value >= 80) return { id: 'lleno', label: '¡Lleno y feliz!', emoji: '😊' };
-  if (value >= 50) return { id: 'contento', label: 'Contento', emoji: '🙂' };
-  if (value >= 25) return { id: 'hambre', label: 'Con hambre', emoji: '😋' };
-  return { id: 'mucha-hambre', label: '¡Tiene mucha hambre!', emoji: '🥺' };
+  if (value >= 80) return { id: 'lleno', label: tr('¡Lleno y feliz!'), emoji: '😊' };
+  if (value >= 50) return { id: 'contento', label: tr('Contento'), emoji: '🙂' };
+  if (value >= 25) return { id: 'hambre', label: tr('Con hambre'), emoji: '😋' };
+  return { id: 'mucha-hambre', label: tr('¡Tiene mucha hambre!'), emoji: '🥺' };
 }
 
 /** Cuánto llena una comida a esa mascota (sus favoritas llenan más). */

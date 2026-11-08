@@ -18,6 +18,7 @@ export const KEY = 'st2_state';
 export const TIMER_KEY = 'st2_timer';
 const PREFIX = 'st2_';
 const GUARD_KEY = 'st2_login_guard'; // intentos fallidos al iniciar sesión
+const REMEMBER_KEY = 'st2_remember'; // "mantener sesión iniciada" en este dispositivo
 const BACKUP_MAX_BYTES = 2 * 1024 * 1024;
 const LIMITS = { sessions: MAX_SESSIONS, dailyDays: 800, claimedDays: 14 };
 
@@ -47,7 +48,9 @@ export function defaultState() {
     settings: {
       // Solo se guarda lo ELEGIDO: los minutos en efecto se derivan con catalog.sessionDurations().
       preset: 'clasico', customStudyMin: 40, customBreakMin: 10,
-      autoContinue: true, sound: true, vibrate: true, reduceMotion: false, keepAwake: false,
+      // autoBreak: al terminar el estudio, el descanso empieza solo (si no, el reloj espera).
+      // autoContinue: al terminar el descanso, la siguiente sesión de estudio empieza sola.
+      autoBreak: true, autoContinue: true, sound: true, vibrate: true, reduceMotion: false, keepAwake: false, theme: 'auto',
       dailyCapMin: 240, leaderboardOn: true, skin: 'clasico', timeZone: '',
       tonePack: 'clasico', ambient: '', lastAmbient: C.DEFAULT_AMBIENT, ambientVolume: 50,
       reminders: { on: false, time: '18:00', days: [1, 2, 3, 4, 5] },
@@ -55,7 +58,7 @@ export function defaultState() {
     // Premium: hoy solo existe el modo de prueba (sin cobro). Cuando la app esté en las tiendas,
     // el estado real vendrá de la compra validada en App Store / Google Play, no de este archivo.
     premium: { active: false, demo: true, since: null, bonusClaimed: false, giftPending: false },
-    account: null, // { username, hash, salt, iter } — la contraseña nunca se guarda, solo su hash
+    account: null, // { username, hash, salt, iter, remember?, email?, emailLinked?, birth? } — la contraseña nunca se guarda, solo su hash
     progress: {
       xp: 0, gems: 0, achievements: U.dict(), claimed: U.dict(), owned: ['clasico'], gifted: [],
       bestStreak: 0, combo: 0, bestCombo: 0, longestSessionSec: 0, cycle: 0, breakEarned: false, customized: false,
@@ -134,10 +137,13 @@ function sanitizeSettings(s) {
   ds.customStudyMin = int(s.customStudyMin, ...limits.study, ds.customStudyMin);
   ds.customBreakMin = int(s.customBreakMin, ...limits.brk, ds.customBreakMin);
   for (const k of ['autoContinue', 'sound', 'vibrate', 'reduceMotion', 'keepAwake', 'leaderboardOn']) ds[k] = bool(s[k], ds[k]);
+  // Antes un solo ajuste ("Seguir solo") decidía las dos cosas: si no hay uno propio, se hereda.
+  ds.autoBreak = bool(s.autoBreak, ds.autoContinue);
   ds.dailyCapMin = int(s.dailyCapMin, 30, 720, ds.dailyCapMin);
   ds.skin = oneOf(C.SKIN_BY_ID, s.skin, ds.skin);
   ds.timeZone = oneOf(C.REGION_BY_ID, s.timeZone, '');
   ds.tonePack = oneOf(C.TONE_BY_ID, s.tonePack, ds.tonePack);
+  ds.theme = ['auto', 'light', 'dark'].includes(s.theme) ? s.theme : 'auto'; // modo oscuro (v3.8)
   ds.ambient = oneOf(C.AMBIENT_BY_ID, s.ambient, '');
   ds.lastAmbient = oneOf(C.AMBIENT_BY_ID, s.lastAmbient, ds.lastAmbient);
   ds.ambientVolume = int(s.ambientVolume, 0, 100, ds.ambientVolume);
@@ -170,6 +176,17 @@ export function validateState(raw) {
   const acc = obj(raw.account);
   if (checkUsername(acc.username).ok && /^[0-9a-f]{64}$/.test(acc.hash || '') && /^[0-9a-f]{32}$/.test(acc.salt || '')) {
     out.account = { username: acc.username, hash: acc.hash, salt: acc.salt, iter: int(acc.iter, 100000, 2000000, 210000) };
+    // Huella del "mantener sesión iniciada" (el token vive aparte, en st2_remember).
+    if (/^[0-9a-f]{64}$/.test(acc.remember || '')) out.account.remember = acc.remember;
+    // Correo de recuperación (opcional). emailLinked = ya quedó registrado en Supabase.
+    const mail = typeof acc.email === 'string' ? acc.email.trim().toLowerCase() : '';
+    if (mail.length <= 254 && /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/.test(mail)) {
+      out.account.email = mail;
+      if (acc.emailLinked === true) out.account.emailLinked = true;
+    }
+    // Mes y año de nacimiento (v3.9): solo para saber si puede estar en el ranking global.
+    // Se queda en el dispositivo (la copia de seguridad no lleva la cuenta).
+    if (typeof acc.birth === 'string' && /^(19|20)\d{2}-(0[1-9]|1[0-2])$/.test(acc.birth)) out.account.birth = acc.birth;
     out.profile.nick = acc.username;
   }
 
@@ -241,6 +258,7 @@ export function migrateV1(backend) {
       st.settings.customBreakMin = breakMin;
     }
     st.settings.autoContinue = bool(set.autoContinue, true);
+    st.settings.autoBreak = st.settings.autoContinue;
     st.settings.sound = bool(set.soundOn, true);
   }
   if (Array.isArray(log)) {
@@ -336,6 +354,16 @@ export function createStore(backendOverride, sessionOverride) {
       return { fails: int(g.fails, 0, 1000, 0), lockedUntil: int(g.lockedUntil, 0, 1e14, 0) };
     },
     saveGuard: (g) => writeJSON(GUARD_KEY, g),
+    /** "Mantener sesión iniciada": { u: usuario en minúsculas, t: token, exp: vencimiento }. */
+    loadRemember() {
+      const r = obj(readJSON(REMEMBER_KEY));
+      if (typeof r.t !== 'string' || !/^[0-9a-f]{64}$/.test(r.t) || typeof r.u !== 'string' || !/^[a-z0-9._]{3,20}$/.test(r.u)) return null;
+      return { u: r.u, t: r.t, exp: int(r.exp, 0, 1e14, 0) };
+    },
+    saveRemember: (r) => writeJSON(REMEMBER_KEY, r),
+    clearRemember() {
+      try { backend.removeItem(REMEMBER_KEY); } catch { /* sin almacenamiento */ }
+    },
     /** Preferencias pequeñas de este dispositivo (pestaña elegida, último aviso…). Nunca fallan. */
     pref: {
       get(name) {

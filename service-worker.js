@@ -7,7 +7,7 @@
  *  - Solo se guarda en caché lo de este mismo sitio y respuestas correctas. Nunca respuestas de APIs
  *    ni de otros dominios (podrían contener datos personales).
  */
-const VERSION = '3.4.0';
+const VERSION = '3.9.0';
 const CACHE = `frostpom-${VERSION}`;
 const PRECACHE = [
   './',
@@ -19,6 +19,14 @@ const PRECACHE = [
   './assets/icons/icon-48.png',
   './assets/icons/icon-96.png',
   './js/config.js',
+  './js/i18n.js',
+  './js/i18n-en.js',
+  './js/cloud.js',
+  './js/billing.js',
+  './js/ui/theme.js',
+  './js/ui/gate-snow.js',
+  './js/ui/board-ui.js',
+  './js/board.js',
   './js/util.js',
   './js/game.js',
   './js/catalog.js',
@@ -35,6 +43,23 @@ const PRECACHE = [
   './js/pet.js',
   './js/main.js',
   './js/ui/dom.js',
+  './js/ui/pics.js',
+  './assets/icons/fuego.png',
+  './assets/icons/copo.png',
+  './assets/icons/corona.png',
+  './assets/icons/cofre.png',
+  './assets/icons/candado.png',
+  './assets/icons/check.png',
+  './assets/icons/info.png',
+  './assets/icons/reloj.png',
+  './assets/icons/musica.png',
+  './assets/icons/llave.png',
+  './assets/icons/quitar.png',
+  './assets/icons/gema.png',
+  './assets/icons/foto.png',
+  './assets/scenes/artico-amigos.webp',
+  './assets/icons/globo.webp',
+  './assets/icons/globo-quieto.webp',
   './js/ui/feedback.js',
   './js/ui/context.js',
   './js/ui/widgets.js',

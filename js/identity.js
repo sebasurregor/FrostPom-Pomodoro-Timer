@@ -4,6 +4,7 @@
  * pasan por un filtro de groserías y suplantación. Funciones puras.
  */
 import { fold } from './util.js';
+import { lang, tr } from './i18n.js';
 
 // =========================================================
 // Apodos y avatares
@@ -43,10 +44,12 @@ const USER_RE = /^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9_.]{3,20}$/u;
 // Lista base en español e inglés. Se compara sin tildes, sin símbolos y con
 // sustituciones típicas (0→o, 1→i, 3→e, 4→a, 5→s, 7→t, @→a, $→s).
 // Antes de lanzar conviene ampliarla y revisarla con más idiomas y regionalismos.
-const BLOCKED = [
+// IMPORTANTE: el servidor del ranking (server/supabase/schema.sql) usa esta MISMA lista y las
+// mismas reglas; si la cambias, actualiza también private.blocked_words() (una prueba lo revisa).
+export const BLOCKED = [
   // groserías y ofensas generales
   'puta', 'puto', 'putit', 'mierda', 'pendej', 'marica', 'maric', 'malparid', 'gonorrea', 'hijueputa', 'hdp', 'carajo',
-  'verga', 'chingad', 'culero', 'coño', 'joder', 'gilipoll', 'idiota', 'imbecil', 'estupid',
+  'verga', 'chingad', 'culero', 'joder', 'gilipoll', 'idiota', 'imbecil', 'estupid',
   'retrasad', 'mogolic', 'subnormal', 'zorra', 'perra', 'cabron', 'pajero',
   'fuck', 'shit', 'bitch', 'bastard', 'asshole', 'dick', 'pussy', 'cunt', 'whore', 'slut', 'retard', 'stupid',
   // sexual
@@ -58,25 +61,39 @@ const BLOCKED = [
   'admin', 'moderador', 'soporte', 'studytimer', 'frostpom', 'oficial',
 ];
 const LEET = { 0: 'o', 1: 'i', 3: 'e', 4: 'a', 5: 's', 7: 't', 8: 'b', '@': 'a', $: 's' };
-function normalizeName(value) {
-  return fold(value)
-    .replace(/[0134578@$]/g, (c) => LEET[c] || c)
-    .replace(/[^a-zñ]/g, '')
-    .replace(/(.)\1+/g, '$1');
+// Palabras comunes que contienen un pedazo de una grosería ("computadora" tiene "puta").
+// Se quitan antes de comparar para no bloquear nombres inocentes.
+export const ALLOWED_PARTS = ['computa', 'computo', 'disputa', 'reputa', 'imputa', 'diputa'];
+const ALLOWED_RE = new RegExp(ALLOWED_PARTS.join('|'), 'g');
+/**
+ * El nombre se compara en su forma "plana": sin tildes, con 0→o, 4→a…, solo letras
+ * ("Pu7a_1" → "putai") y sin las palabras inocentes de ALLOWED_PARTS.
+ */
+export function plainName(value) {
+  return fold(value).replace(/[0134578@$]/g, (c) => LEET[c] || c).replace(/[^a-z]/g, '').replace(ALLOWED_RE, '');
 }
-const BLOCKED_NORMALIZED = BLOCKED.map(normalizeName);
+/**
+ * Cada palabra de la lista se busca dejando que sus letras se repitan: "puta" → /p+u+t+a+/
+ * atrapa "puuuta", y "perra" → /p+e+r+r+a+/ exige las dos erres (no bloquea "esperanza").
+ * (v3.9) Antes se quitaban las letras repetidas también de la lista: "kkk" quedaba como "k"
+ * y bloqueaba cualquier nombre con k ("kevin"), y "perra" quedaba como "pera".
+ */
+export const BLOCKED_PATTERNS = BLOCKED.map((w) => plainName(w).replace(/(.)/g, '$1+'));
+const BLOCKED_RES = BLOCKED_PATTERNS.map((p) => new RegExp(p));
+export const isBlockedName = (value) => {
+  const n = plainName(value);
+  return BLOCKED_RES.some((re) => re.test(n));
+};
 
 export function checkUsername(value) {
-  if (typeof value !== 'string') return { ok: false, reason: 'Escribe un nombre de usuario.' };
+  if (typeof value !== 'string') return { ok: false, reason: tr('Escribe un nombre de usuario.') };
   const v = value.trim();
-  if (v.length < 3) return { ok: false, reason: 'Usa al menos 3 caracteres.' };
-  if (v.length > 20) return { ok: false, reason: 'Usa máximo 20 caracteres.' };
-  if (!USER_RE.test(v)) return { ok: false, reason: 'Solo letras, números, punto (.) o guion bajo (_). Sin espacios.' };
-  if (/^[0-9_.]+$/.test(v)) return { ok: false, reason: 'Incluye al menos una letra.' };
-  const n = normalizeName(v);
-  const raw = fold(v).replace(/[^a-z]/g, '');
-  if (BLOCKED.some((w, i) => n.includes(BLOCKED_NORMALIZED[i]) || raw.includes(w))) {
-    return { ok: false, reason: 'Ese nombre no está permitido. Elige uno respetuoso para todos.' };
+  if (v.length < 3) return { ok: false, reason: tr('Usa al menos 3 caracteres.') };
+  if (v.length > 20) return { ok: false, reason: tr('Usa máximo 20 caracteres.') };
+  if (!USER_RE.test(v)) return { ok: false, reason: tr('Solo letras, números, punto (.) o guion bajo (_). Sin espacios.') };
+  if (/^[0-9_.]+$/.test(v)) return { ok: false, reason: tr('Incluye al menos una letra.') };
+  if (isBlockedName(v)) {
+    return { ok: false, reason: tr('Ese nombre no está permitido. Elige uno respetuoso para todos.') };
   }
   return { ok: true, value: v };
 }
@@ -99,7 +116,7 @@ export function flagEmoji(code) {
 let countryNames = null;
 export function countryName(code) {
   try {
-    countryNames = countryNames || new Intl.DisplayNames(['es'], { type: 'region' });
+    countryNames = countryNames || new Intl.DisplayNames([lang], { type: 'region' });
     return countryNames.of(code) || code;
   } catch {
     return code;
@@ -107,5 +124,5 @@ export function countryName(code) {
 }
 export function countryList() {
   return COUNTRY_CODES.map((code) => ({ code, name: countryName(code), flag: flagEmoji(code) }))
-    .sort((a, b) => a.name.localeCompare(b.name, 'es'));
+    .sort((a, b) => a.name.localeCompare(b.name, lang));
 }

@@ -5,14 +5,14 @@ import * as U from '../util.js';
 import * as G from '../game.js';
 import { $, $$, h } from './dom.js';
 import { state, store, today } from './context.js';
+import { pic } from './pics.js';
+import { t, tr, isEnglish } from '../i18n.js';
 
-let tab = store.pref.get('activity_tab') === 'cal' ? 'cal' : 'week'; // recuerda la última pestaña vista
+let tab = store.pref.get('activity_tab') === 'week' ? 'week' : 'cal'; // el calendario va primero; recuerda la última pestaña vista
 let calView = null; // { y, m } del mes que se está viendo; null = el mes actual
 let calSelected = null; // día elegido en el calendario
 
 const dayMinutes = (key) => Math.round(((state.daily[key] || {}).studySec || 0) / 60);
-/** Formato corto para las casillas: "45m", "1h 05", "2h". */
-const shortMinutes = (min) => (min < 60 ? `${min}m` : `${Math.floor(min / 60)}h${min % 60 ? ` ${U.pad2(min % 60)}` : ''}`);
 const monthIndex = (o) => o.y * 12 + o.m;
 
 export function renderActivity() {
@@ -38,7 +38,7 @@ function renderWeek() {
   const mins = days.map(dayMinutes);
   const max = Math.max(60, ...mins);
   const total = mins.reduce((a, b) => a + b, 0);
-  $('#weekMeta').textContent = `${U.formatMinutes(total)} en total`;
+  $('#weekMeta').textContent = t('{time} en total', { time: U.formatMinutes(total) });
   $('#weekBars').replaceChildren(...days.map((k, i) => {
     const d = U.parseDateKey(k);
     const isToday = i === 6;
@@ -79,29 +79,34 @@ function renderCalendar(focusKey) {
   const sum = G.monthSummary(state.daily, view.y, view.m);
   $('#calTitle').textContent = `${monthName[0].toUpperCase()}${monthName.slice(1)} ${view.y}`;
   $('#calMeta').textContent = sum.activeDays
-    ? `${U.formatMinutes(sum.totalMin)} en ${U.plural(sum.activeDays, 'día', 'días')}`
-    : 'Sin estudio este mes';
+    ? t('{time} en {days}', { time: U.formatMinutes(sum.totalMin), days: U.plural(sum.activeDays, 'día', 'días') })
+    : tr('Sin estudio este mes');
   $('#calPrev').disabled = monthIndex(view) <= monthIndex(first);
   $('#calNext').disabled = monthIndex(view) >= monthIndex(cur);
-  $('#calGoal').textContent = `Meta del polo: ${G.POLE_GOAL_MIN} min`;
 
   // Solo un día recibe Tab (el elegido o el primero con datos); las flechas mueven entre días.
   const tabKey = calSelected || cells.find((k) => k && k <= todayKey);
-  $('#calGrid').replaceChildren(...cells.map((k) => {
+  // Días con estudio seguidos en la misma fila se unen con una banda (como la racha de Duolingo)
+  const studied = (k) => !!k && k <= todayKey && dayMinutes(k) > 0;
+  $('#calGrid').replaceChildren(...cells.map((k, i) => {
     if (!k) return h('span', { class: 'cal__pad', 'aria-hidden': 'true' });
     const day = Number(k.slice(8));
     if (k > todayKey) return h('span', { class: 'cal__day is-future', 'aria-hidden': 'true' }, h('span', { class: 'cal__num', text: String(day) }));
     const min = dayMinutes(k);
     const isToday = k === todayKey;
     const sel = k === calSelected;
+    const col = i % 7;
+    const on = min > 0;
+    const joinL = on && col > 0 && studied(cells[i - 1]);
+    const joinR = on && col < 6 && studied(cells[i + 1]);
     return h('button', {
       type: 'button', 'data-key': k, tabindex: k === tabKey ? '0' : '-1', 'aria-pressed': String(sel),
-      class: `cal__day lv-${G.studyLevel(min)}${isToday ? ' is-today' : ''}${sel ? ' is-sel' : ''}`,
-      'aria-label': `${U.formatDayLong(k)}${isToday ? ' (hoy)' : ''}: ${min ? U.formatMinutes(min) : 'sin estudio'}`,
+      class: `cal__day lv-${G.studyLevel(min)}${isToday ? ' is-today' : ''}${sel ? ' is-sel' : ''}${joinL ? ' join-l' : ''}${joinR ? ' join-r' : ''}`,
+      'aria-label': `${U.formatDayLong(k)}${isToday ? tr(' (hoy)') : ''}: ${min ? U.formatMinutes(min) : tr('sin estudio')}`,
       onclick: () => { calSelected = k; renderCalendar(k); },
     },
     h('span', { class: 'cal__num', text: String(day) }),
-    h('span', { class: 'cal__min', 'aria-hidden': 'true', text: min ? shortMinutes(min) : '' }));
+    min >= G.POLE_GOAL_MIN ? h('span', { class: 'cal__goal' }, pic('copo', 18)) : null);
   }));
   $('#calDetail').textContent = calendarDetail(calSelected, sum);
   if (focusKey) {
@@ -112,17 +117,17 @@ function renderCalendar(focusKey) {
 
 function calendarDetail(key, sum) {
   if (!key) {
-    if (!sum.best) return 'Este mes no hay sesiones guardadas.';
-    return `Tu mejor día fue el ${U.formatDayLong(sum.best.key).toLowerCase()}, con ${U.formatMinutes(sum.best.min)}. Cumpliste la meta del polo ${U.plural(sum.goalDays, 'día', 'días')}.`;
+    if (!sum.best) return tr('Este mes no hay sesiones guardadas.');
+    return t('Tu mejor día fue el {day}, con {time}. Cumpliste la meta del polo {days}.', { day: isEnglish ? U.formatDayLong(sum.best.key) : U.formatDayLong(sum.best.key).toLowerCase(), time: U.formatMinutes(sum.best.min), days: U.plural(sum.goalDays, 'día', 'días') });
   }
   const d = state.daily[key] || G.emptyDay();
   const min = dayMinutes(key);
   const label = U.formatDayLong(key);
-  if (!min) return `${label}: no estudiaste.`;
+  if (!min) return t('{day}: no estudiaste.', { day: label });
   const blocks = d.sessions + d.partials;
   const parts = [`${label}: ${U.formatMinutes(min)}`];
-  if (blocks) parts[0] += ` en ${U.plural(blocks, 'sesión', 'sesiones')}`;
-  if (min >= G.POLE_GOAL_MIN) parts.push('¡meta del polo cumplida! ❄️');
+  if (blocks) parts[0] += t(' en {n}', { n: U.plural(blocks, 'sesión', 'sesiones') });
+  if (min >= G.POLE_GOAL_MIN) parts.push(tr('¡meta del polo cumplida!'));
   return parts.join(' · ');
 }
 
@@ -155,6 +160,8 @@ function calendarKeys(e) {
 }
 
 export function bindActivity() {
+  // Iniciales de los días (el calendario empieza el lunes)
+  if (isEnglish) $('.cal__week').replaceChildren(...['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d) => h('span', { text: d })));
   $('#tabWeek').addEventListener('click', () => setTab('week'));
   $('#tabCal').addEventListener('click', () => setTab('cal'));
   for (const id of ['#tabWeek', '#tabCal']) {

@@ -9,11 +9,13 @@ import * as FX from './effects.js';
 import { $, h, wait, fmtInt } from './dom.js';
 import { toast, openDialog, focusPrimary } from './feedback.js';
 import { emblem } from './emblems.js';
-import { companion, penguin, say } from './companions.js';
+import { companion, penguin, say, artOffset } from './companions.js';
 import { pickVoice } from '../voices.js';
 import { PETS } from '../pet.js';
 import { mutate } from './context.js';
 import { giftCompanionDialog } from './premium.js';
+import { pic } from './pics.js';
+import { t, tr } from '../i18n.js';
 
 const queue = [];
 let playing = false;
@@ -39,14 +41,14 @@ const SHOW = {
     return wait(250);
   },
   gems(e) {
-    FX.floatText(`+${e.amount} gemas`, $('#hudGems'), 'gem');
+    FX.floatText(t('+{n} gemas', { n: e.amount }), $('#hudGems'), 'gem');
     return wait(200);
   },
   rankup: showRankUp,
   achievement(e) {
     const a = G.ACHIEVEMENT_BY_ID[e.id];
     FX.sfx.achievement();
-    toast(`Logro: ${a.name}. ${G.RARITY[a.rarity].label}, +${e.gems} gemas.`, `ach toast--${a.rarity}`, { icon: a.icon, ms: 4600 });
+    toast(t('Logro: {name}. {rarity}, +{n} gemas.', { name: a.name, rarity: G.RARITY[a.rarity].label, n: e.gems }), `ach toast--${a.rarity}`, { icon: a.icon, ms: 4600 });
     if (a.rarity === 'epico' || a.rarity === 'legendario') FX.confetti({ y: 90, count: 60 });
     return wait(700);
   },
@@ -55,7 +57,7 @@ const SHOW = {
     return wait(150);
   },
   capped(e) {
-    toast(`Llegaste a tu límite saludable de hoy (${U.formatMinutes(e.capMin)}). Lo que sigas estudiando ya no suma XP: buen momento para descansar.`, 'warn', { ms: 6000 });
+    toast(t('Llegaste a tu límite saludable de hoy ({time}). Lo que sigas estudiando ya no suma XP: buen momento para descansar.', { time: U.formatMinutes(e.capMin) }), 'warn', { ms: 6000 });
     return wait(300);
   },
   tooShort() {
@@ -71,14 +73,14 @@ const SHOW = {
     FX.buzz(30);
     if (stage) {
       say(stage, pickVoice(PETS[e.petId].kind, { ate: e.favorite ? 'favorite' : 'yum' }), { ms: 2200 });
-      FX.floatText(`+${e.gained} barriguita`, stage, 'gem');
+      FX.floatText(t('+{n} barriguita', { n: e.gained }), stage, 'gem');
       const r = stage.getBoundingClientRect();
       FX.confetti({ x: r.left + r.width / 2, y: r.top + r.height / 3, count: e.favorite ? 40 : 22, spread: 0.45, colors: ['#FF5E7E', '#FFC531', '#ffffff'] });
     }
     return wait(150);
   },
   skin(e) {
-    toast(`Nuevo estilo para tu anillo: ${e.skin.name}.`, 'good');
+    toast(t('Nuevo estilo para tu anillo: {name}.', { name: e.skin.name }), 'good');
     return wait(100);
   },
 };
@@ -88,10 +90,10 @@ function showEvent(e) {
 }
 
 /** Tarjeta de celebración con rayos, imagen grande y textos. */
-function ceremony({ colors, art, mascot = true, kicker, name, nameClass = '', lines }) {
+function ceremony({ colors, art, artDy = 0, mascot = true, kicker, name, nameClass = '', lines }) {
   return h('div', { class: 'rankup', vars: { '--rank-a': colors.a, '--rank-b': colors.b, '--rank-glow': colors.glow } },
     h('div', { class: 'rankup__rays', 'aria-hidden': 'true' }),
-    h('div', { class: 'rankup__emblem' }, art),
+    h('div', { class: 'rankup__emblem rankup__stage', vars: { '--art-dy': `${artDy}%` } }, art),
     mascot ? h('div', { class: 'rankup__mascot' }, penguin('amor', { size: 92 })) : null,
     h('p', { class: 'rankup__kicker', text: kicker }),
     h('h2', { class: `rankup__name ${nameClass}`.trim(), id: 'dlgTitle', text: name }),
@@ -114,7 +116,7 @@ async function showRankUp(e) {
       art: emblem(to, { size: 168 }),
       kicker: e.from.tierIndex !== to.tierIndex ? '¡Nuevo rango!' : '¡Subiste de división!',
       name: to.name,
-      lines: h('p', { class: 'rankup__gems', text: `+${e.gems} gemas de premio` }),
+      lines: h('p', { class: 'rankup__gems', text: t('+{n} gemas de premio', { n: e.gems }) }),
     })],
     actions: [{ label: '¡Vamos!', value: 'ok', variant: 'btn--gold btn--xl', primary: true }],
     onOpen: focusPrimary,
@@ -128,14 +130,15 @@ async function showCompanionUnlock(e) {
     className: 'dlg--rankup',
     body: [ceremony({
       colors: { a: '#FFC531', b: '#FF5E7E', glow: '#FFC531' },
-      art: companion(c.id, { size: 170 }),
-      mascot: c.id !== 'pinguino',
+      art: companion(c.id, { size: 200 }),
+      artDy: artOffset(c.id),
+      mascot: false, // el compañero nuevo es el único protagonista, bien centrado
       kicker: '¡Compañero de edición limitada!',
       name: c.name,
       nameClass: 'rankup__name--sm',
       lines: [
         h('p', { class: 'rankup__tagline', text: c.tagline }),
-        h('p', { class: 'rankup__gems', text: e.gift ? 'Tu regalo por ser Premium.' : `Lo ganaste con el logro ${G.ACHIEVEMENT_BY_ID[c.unlock].name}.` }),
+        h('p', { class: 'rankup__gems', text: e.gift || !c.unlock ? 'Tu regalo por ser Premium.' : t('Lo ganaste con el logro {name}.', { name: G.ACHIEVEMENT_BY_ID[c.unlock].name }) }),
       ],
     })],
     actions: [
@@ -154,17 +157,17 @@ async function showPremiumGift(e) {
     className: 'dlg--rankup',
     body: [ceremony({
       colors: { a: '#FFE680', b: '#E0A100', glow: '#FFC531' },
-      art: h('span', { class: 'gift-art', 'aria-hidden': 'true', text: '🎁' }),
+      art: h('span', { class: 'gift-art', 'aria-hidden': 'true' }, pic('cofre', 168)),
       mascot: false,
-      kicker: '¡Bienvenido a Premium! 👑',
+      kicker: '¡Bienvenido a Premium!',
       name: 'Tu regalo',
       lines: [
-        h('p', { class: 'rankup__gems', text: `+${fmtInt(e.gems)} gemas para alimentar a tu mascota` }),
+        h('p', { class: 'rankup__gems', text: t('+{n} gemas para alimentar a tu mascota', { n: fmtInt(e.gems) }) }),
         e.choosePet ? h('p', { class: 'rankup__tagline', text: 'Y una mascota de edición limitada: elige la que más te guste.' }) : null,
       ],
     })],
     actions: e.choosePet
-      ? [{ label: 'Luego', value: 'later' }, { label: '🎁 Elegir mi mascota', value: 'pick', variant: 'btn--gold', primary: true }]
+      ? [{ label: 'Luego', value: 'later' }, { label: [pic('cofre', 26), 'Elegir mi mascota'], value: 'pick', variant: 'btn--gold', primary: true }]
       : [{ label: '¡Genial!', value: 'ok', variant: 'btn--gold btn--xl', primary: true }],
     onOpen: focusPrimary,
   });
@@ -174,9 +177,9 @@ async function showPremiumGift(e) {
 /** Cambio de temporada: resumen de la que terminó, premio y rango de vuelta a Bronce III. */
 async function showNewSeason(e) {
   const end = e.ended;
-  const newName = e.season.name.replace('Temporada ', '');
+  const newName = e.season.label;
   fanfare({ count: 120, colors: [e.rank.colors.a, e.rank.colors.b, '#FFC531', '#ffffff'] });
-  const studied = end.studyMin ? `${U.formatMinutes(end.studyMin)} en ${U.plural(end.activeDays, 'día', 'días')}` : 'sin sesiones';
+  const studied = end.studyMin ? t('{time} en {days}', { time: U.formatMinutes(end.studyMin), days: U.plural(end.activeDays, 'día', 'días') }) : tr('sin sesiones');
   await openDialog({
     className: 'dlg--rankup',
     body: [ceremony({
@@ -186,8 +189,8 @@ async function showNewSeason(e) {
       name: newName,
       nameClass: 'rankup__name--sm',
       lines: [
-        h('p', { class: 'rankup__tagline', text: `La temporada pasada terminaste en ${end.rank} (${studied}).` }),
-        end.gems ? h('p', { class: 'rankup__gems', text: `+${end.gems} gemas de premio` }) : null,
+        h('p', { class: 'rankup__tagline', text: t('La temporada pasada terminaste en {rank} ({studied}).', { rank: end.rank, studied }) }),
+        end.gems ? h('p', { class: 'rankup__gems', text: t('+{n} gemas de premio', { n: end.gems }) }) : null,
         h('p', { class: 'rankup__tagline', text: 'Tu rango vuelve a Bronce III. Tus logros, compañeros, temas, gemas y calendario se quedan contigo. ¡A subir otra vez!' }),
       ],
     })],

@@ -127,7 +127,7 @@ export async function pickProfilePhoto() {
     className: 'dlg--photo',
     body: [
       crop.el,
-      h('p', { class: 'dlg__note', text: 'Arrastra la foto para encuadrarla. Se guarda solo en este dispositivo: en el ranking, los demás verán tu animal.' }),
+      h('p', { class: 'dlg__note', text: 'Arrastra la foto para encuadrarla.' }),
     ],
     actions: [
       { label: 'Cancelar', value: 'cancel' },

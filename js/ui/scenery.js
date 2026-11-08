@@ -19,9 +19,20 @@ const lg = (id, stops, x2 = 0, y2 = 1) => s('linearGradient', { id, x1: 0, y1: 0
 function ridge(points, baseY) {
   return `0,${baseY} ` + points.map(([x, y]) => `${x},${y}`).join(' ') + ` 1440,${baseY} 1440,900 0,900`;
 }
-function caps(peaks, minHeight, depth = 26) {
-  return peaks.filter(([, y]) => y <= minHeight).map(([x, y]) =>
-    s('polygon', { class: 'sc-snowcap', points: `${x},${y} ${x + depth * 0.95},${y + depth} ${x + depth * 0.45},${y + depth * 0.75} ${x},${y + depth * 1.05} ${x - depth * 0.5},${y + depth * 0.7} ${x - depth},${y + depth}`, fill: '#F4F9FF' }));
+function caps(peaks, minHeight, depth = 26, baseY = 900) {
+  // El casquete sigue las dos laderas reales de cada cima (antes era un triángulo fijo que
+  // sobresalía en las cimas empinadas y quedaba corto en las suaves).
+  return peaks.map(([x, y], i) => {
+    if (y > minHeight) return null;
+    const [lx, ly] = peaks[i - 1] || [0, baseY];
+    const [rx, ry] = peaks[i + 1] || [1440, baseY];
+    const d = Math.min(depth, (ly - y) * 0.6, (ry - y) * 0.6);
+    const left = x + (lx - x) * (d / (ly - y));
+    const right = x + (rx - x) * (d / (ry - y));
+    const yb = y + d;
+    const pts = [[x, y], [right, yb], [x + (right - x) * 0.45, yb - d * 0.28], [x, yb + d * 0.05], [x + (left - x) * 0.5, yb - d * 0.3], [left, yb]];
+    return s('polygon', { class: 'sc-snowcap', points: pts.map(([a, b]) => `${a.toFixed(1)},${b.toFixed(1)}`).join(' '), fill: '#F4F9FF' });
+  }).filter(Boolean);
 }
 
 function buildSvg() {
@@ -62,9 +73,9 @@ function buildSvg() {
       s('circle', { cx: 1070, cy: 162, r: 6, fill: '#DDD8C4' }),
       s('circle', { cx: 1090, cy: 182, r: 4, fill: '#DDD8C4' })),
     s('polygon', { points: ridge(far, 600), fill: '#93c0ed' }),
-    ...caps(far, 500),
+    ...caps(far, 500, 26, 600),
     s('polygon', { points: ridge(mid, 660), fill: '#749eda' }),
-    ...caps(mid, 600, 22),
+    ...caps(mid, 600, 22, 660),
     // Fábrica (aparece con la contaminación)
     s('g', { class: 'sc-factory' },
       s('rect', { x: 770, y: 640, width: 120, height: 70, fill: '#4D5563' }),

@@ -2,7 +2,7 @@
 
 Lista en orden. Cada paso dice **qué hacer**, **dónde** y **cómo saber que quedó bien**. Cuando termines uno, sigue con el siguiente.
 
-Estado actual: **v3.4 lista en tu computador** (todavía no está en GitHub ni en la tienda).
+Estado actual: **v3.8 lista en tu computador**. 👉 **La guía completa y actualizada para publicar es `docs/DESPLIEGUE.md`** (de tu PC a Microsoft Store, con Supabase y Brevo). Este archivo queda como referencia (incluye el paso 0 de la tarjeta de la cuenta de trabajo). El cobro de Premium está en `docs/COBRO-PREMIUM.md`.
 
 ---
 
@@ -30,11 +30,11 @@ Si aun así no se puede, pide ayuda a soporte desde el mismo centro de administr
 
 ---
 
-## Paso 1. Subir la v3.4 a tu repositorio de GitHub
+## Paso 1. Subir la v3.8 a tu repositorio de GitHub
 
 Tú haces el commit con tu cuenta. Así el único autor del repositorio eres tú.
 
-1. Descomprime `frostpom-v3.4.zip`.
+1. Descomprime `frostpom-v3.8.zip`.
 2. Abre la carpeta donde tienes clonado `FrostPom-Pomodoro-Timer`. Copia **el contenido** de la carpeta descomprimida encima y acepta reemplazar los archivos. **No borres la carpeta oculta `.git`.**
 3. Borra el archivo viejo **`README.txt`**: son instrucciones de la v1 y ya las reemplaza `README.md`.
 4. Antes de subir, prueba en tu PC:
@@ -48,7 +48,7 @@ Tú haces el commit con tu cuenta. Así el único autor del repositorio eres tú
 
    ```
    git add -A
-   git commit -m "v3.4: FrostPom, registro en dos pasos, ranking sin bots y regalo Premium"
+   git commit -m "v3.8: modo oscuro, fogata animada, pingüino incluido, globo animado y cobro de Premium listo"
    git push
    ```
 
@@ -142,12 +142,37 @@ En Partner Center pulsa **Start your submission**. Todos los textos están en `d
 4. **Packages:** sube el `.msixbundle` y el `.classic.appxbundle`.
 5. **Store listings (Español):**
    - descripción, características y palabras clave;
-   - las 5 capturas de `frostpom-kit-microsoft-store/capturas`;
-   - el `logo-300.png`.
+   - las capturas de `docs/microsoft-store/capturas-es/`;
+   - el `docs/microsoft-store/logo-300.png`.
 6. **Submission options:** pega las notas para certificación.
 7. Pulsa **Submit for certification**.
 
 ✅ **Quedó bien si** el estado cambia a **In certification**. Tarda hasta 3 días hábiles. Si te rechazan algo, Microsoft dice exactamente qué arreglar: tráelo y lo corregimos.
+
+---
+
+## Publicar una versión nueva (por ejemplo, la v3.7)
+
+FrostPom en la tienda es una PWA: el paquete de PWABuilder abre tu página de GitHub Pages. Por eso **el código nuevo les llega solo a los usuarios** en cuanto lo subes a GitHub; no hace falta un paquete nuevo para la v3.7.
+
+1. Configura Supabase (`docs/RECUPERAR-CONTRASENA.md`, pasos 1 a 3) y sube la v3.7 a GitHub (paso 1) y espera uno o dos minutos a que Pages se actualice.
+2. Comprueba la versión publicada:
+
+   ```
+   python tests/store_check.py https://sebasurregor.github.io/FrostPom-Pomodoro-Timer/
+   ```
+
+   Debe terminar en "Lista para la tienda".
+3. Abre FrostPom instalado desde la tienda, ciérralo y vuelve a abrirlo. El service worker (`frostpom-3.7.0`) descarga lo nuevo; al final de Ajustes debe decir **versión 3.7.0** (o **version 3.7.0** si tu Windows está en inglés).
+4. **Ficha de la tienda** en [Partner Center](https://partner.microsoft.com/dashboard) → tu app → **Actualizar**:
+   - *Store listings* → **Español**: cambia las capturas por las nuevas (`assets/screenshots/`, conviértelas a PNG si la página no acepta WebP) y pega la descripción de `docs/microsoft-store/FICHA.md` (ahora dice que hay inglés y que el correo es opcional).
+   - **Manage additional languages** → agrega **English (United States)** y copia la sección *English listing* de `FICHA.md` con las capturas de `docs/microsoft-store/capturas-en/`. Microsoft permite fichas en idiomas extra sin paquete nuevo.
+   - *Age ratings*: vuelve a responder el cuestionario y declara que la app pide un **correo opcional**.
+   - Revisa que la URL de privacidad siga siendo `…/privacidad.html` (ya tiene la versión en inglés).
+   - Guarda y pulsa **Submit to the Store**.
+5. Si algún día cambias el `manifest.webmanifest` (nombre, ícono, atajos), ahí sí: paquete nuevo en PWABuilder con número mayor (`1.0.1`, `1.0.2`…) y se sube en la misma actualización.
+
+✅ **Quedó bien si** la app de la tienda muestra las tarjetas claras, Ajustes tiene **Idioma · Language**, y Partner Center dice **In certification** (o **In the Store** si solo subiste el código).
 
 ---
 
@@ -158,4 +183,5 @@ En Partner Center pulsa **Start your submission**. Todos los textos están en `d
 | Arreglos y funciones (HTML, CSS, JavaScript) | Subir a GitHub y aumentar `VERSION` en `service-worker.js`. Les llega solo a los usuarios. |
 | Nombre, íconos o atajos (`manifest.webmanifest`) | Paquete nuevo en PWABuilder con versión mayor (`1.0.1`…) y enviarlo otra vez. |
 | Cobrar Premium | Conectar el pago y después `premium.chargesEnabled: true`. Rehacer el cuestionario de edad: las 1000 gemas de regalo cuentan como moneda virtual. |
+| Recuperar contraseña por correo | Seguir `docs/RECUPERAR-CONTRASENA.md` (Supabase Auth + SMTP propio), actualizar `privacidad.html` y la ficha. |
 | Ranking global | Montar el servidor (`server/supabase/`), luego `leaderboard.mode: 'remote'`, actualizar `privacidad.html` y rehacer el cuestionario de edad. |

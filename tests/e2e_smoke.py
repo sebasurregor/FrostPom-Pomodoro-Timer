@@ -10,7 +10,7 @@ Uso (con la app servida en otra terminal: python -m http.server 8000):
 
 Recorre: bienvenida en dos pasos (1: nombre, contraseña y país en lista emergente; 2: foto de perfil opcional,
 con animal al azar si no hay foto), duración personalizada (60 + 15),
-una sesión con reloj simulado (y el anillo que avanza junto a la bola), compañero desbloqueado y su onomatopeya,
+una sesión con reloj simulado (y el anillo que avanza junto a la bola), pingüino incluido desde el inicio y su onomatopeya,
 subida de rango, misiones, calendario del mes, perfil, Premium (con su regalo: 1000 gemas y una mascota limitada)
 y sonidos, ranking sin rivales simulados, ajustes en modo oscuro del
 sistema, guardado automático del día, cambio de temporada, modo sin conexión, eliminar la cuenta y animaciones
@@ -72,6 +72,8 @@ with sync_playwright() as p:
     check(pg.evaluate("document.querySelector('#dlg .country-list').hidden"), "la lista de países empieza cerrada")
     check(pg.evaluate("!document.querySelector('#dlg button') || ![...document.querySelectorAll('#dlg button')].some(b => b.textContent.includes('Sugerir'))"), "ya no está el botón 'Sugerir uno'")
     check(pg.evaluate("!document.querySelector('#dlg .avatar-opt, #dlg .avatars')"), "el registro no tiene lista de emojis para elegir")
+    check(pg.evaluate("document.querySelectorAll('#gateScene .gate-flake').length >= 30 && getComputedStyle(document.querySelector('.gate-snow')).display !== 'none'"), "en la entrada cae una nevada suave")
+    check(pg.evaluate("document.querySelector('#gateScene').lastElementChild.classList.contains('gate-snow') && getComputedStyle(document.querySelector('.gate-scene__art'), '::after').content !== 'none'"), "la nieve va encima de la capa oscura de la entrada")
     pg.fill("#accUser", "putito99"); pg.fill("#accPass1", "Pingu2026"); pg.fill("#accPass2", "Pingu2026")
     pg.click("#dlg button:has-text('Crear cuenta')"); pg.wait_for_timeout(400)
     check(pg.evaluate("document.getElementById('dlg').open"), "un nombre ofensivo no se acepta")
@@ -125,9 +127,8 @@ with sync_playwright() as p:
     check(ring["cx"] > 150 and abs(ring["off"] + ring["C"] * 0.2) < 3, "el arco se vacía detrás de la bola, en el mismo sentido")
     pg.clock.fast_forward("20:00")
     pg.clock.run_for(2500)
-    check(pg.evaluate("document.querySelector('#dlgTitle')?.textContent") == "Pingüino", "se desbloquea el primer compañero")
-    pg.click("text=¡Que me acompañe!"); pg.clock.run_for(1500)
-    check(state(pg)["profile"]["companion"] == "pinguino", "el compañero queda equipado")
+    check(pg.evaluate("document.querySelector('#dlgTitle')?.textContent") != "Pingüino", "el primer pomodoro ya no desbloquea al pingüino (viene con la cuenta)")
+    check("primer-paso" in state(pg)["progress"]["achievements"], "el logro Primer paso se sigue ganando")
     check(state(pg)["progress"]["xp"] == 33, "1.ª sesión: 33 XP")
     check(not any(("focus" in x or "notes" in x) for x in state(pg)["sessions"]), "solo se guarda el tiempo, no en qué se estudió")
     check(pg.get_attribute("#ring", "data-mode") == "break", "arranca solo el descanso")
@@ -147,23 +148,32 @@ with sync_playwright() as p:
         check(state(pg)["progress"]["xp"] > xp, "reclamar misión da XP")
 
     # Tu estudio: pestaña de calendario
-    check(pg.evaluate("!document.getElementById('weekPane').hidden && document.getElementById('calPane').hidden"), "por defecto se ven los últimos 7 días")
+    check(pg.evaluate("document.getElementById('weekPane').hidden && !document.getElementById('calPane').hidden"), "por defecto se ve el calendario")
+    check(pg.evaluate("getComputedStyle(document.getElementById('scenery')).visibility !== 'hidden'"), "Progreso deja ver el paisaje (sin pantalla blanca)")
+    check(pg.evaluate("parseFloat(getComputedStyle(document.querySelector('.hud')).borderTopLeftRadius) >= 16"), "la barra de arriba es una tarjeta redondeada")
+    check(pg.evaluate("!document.getElementById('poleFill2') && !document.getElementById('h-polo')"), "Progreso ya no repite 'Tu polo'")
+    check(pg.evaluate("!!document.querySelector('.hero .emblem') && !!document.querySelector('.streak-card .pic--fuego')"), "Progreso muestra la banda del rango con el escudo y la racha con fuego")
+    pg.click("#tabWeek"); pg.clock.run_for(200)
+    check(pg.evaluate("!document.getElementById('weekPane').hidden && document.getElementById('calPane').hidden"), "la pestaña 7 días muestra las barras")
     pg.click("#tabCal"); pg.clock.run_for(200)
     check(pg.evaluate("document.getElementById('weekPane').hidden && !document.getElementById('calPane').hidden"), "la pestaña Calendario muestra el mes")
     check(pg.inner_text("#calTitle") == "Noviembre 2026", "el calendario abre en el mes actual")
     check(pg.evaluate("document.querySelectorAll('#calGrid .cal__day').length") == 30, "noviembre tiene 30 días")
     day = pg.query_selector('#calGrid .cal__day[data-key="2026-11-02"]')
-    check(day is not None and "50m" in day.inner_text() and "lv-3" in (day.get_attribute("class") or ""), "el día de hoy muestra 50 min y nivel de meta cumplida")
+    check(day is not None and "50 min" in (day.get_attribute("aria-label") or "") and "lv-3" in (day.get_attribute("class") or "") and day.query_selector(".pic--copo") is not None, "el día muestra 50 min, meta cumplida y su copo de nieve")
     pg.click('#calGrid .cal__day[data-key="2026-11-02"]'); pg.clock.run_for(100)
     check("Lunes 2 de noviembre: 50 min en 2 sesiones" in pg.inner_text("#calDetail"), "al tocar un día se ve cuánto estudiaste")
     check(pg.evaluate("document.getElementById('calNext').disabled && document.getElementById('calPrev').disabled"), "no se puede ir a meses sin datos ni al futuro")
+    pg.click("#tabWeek"); pg.clock.run_for(200)
     pg.reload(); pg.clock.run_for(800)
-    check(pg.evaluate("!document.getElementById('calPane').hidden"), "la app recuerda la pestaña elegida")
+    check(pg.evaluate("!document.getElementById('weekPane').hidden"), "la app recuerda la pestaña elegida")
+    pg.click("#tabCal"); pg.clock.run_for(200)
 
     # Perfil
     pg.goto(URL + "#/perfil"); pg.clock.run_for(300)
     check(pg.evaluate("!document.querySelector('.profile-card__note') && !document.body.innerText.includes('no revele quién eres')"), "el perfil ya no repite el consejo del nombre")
     check(pg.evaluate("document.querySelectorAll('.companion-card').length") == 5, "perfil muestra los 5 compañeros")
+    check(pg.evaluate("document.querySelector('.companion-card.is-unlocked .companion-card__name')?.textContent") == "Pingüino", "el Pingüino ya está desbloqueado en Perfil")
     check(pg.evaluate("!document.querySelector('#view-progreso .badge')"), "Progreso ya no muestra logros")
     check(pg.evaluate("!document.querySelector('#view-perfil .avatar-opt') && !document.body.innerText.includes('O elige un animal')"), "el perfil ya no deja elegir emoji (solo foto)")
 
@@ -242,8 +252,11 @@ with sync_playwright() as p:
     check(sp["progress"]["gifted"] == [pick] and sp["profile"]["companion"] == pick and not sp["premium"]["giftPending"], "la mascota regalada queda tuya y te acompaña")
     pg.click("#ambientGrid .sound-chip:has-text('Olas')"); pg.clock.run_for(300)
     check(state(pg)["settings"]["ambient"] == "olas", "con Premium se puede elegir un sonido Premium")
-    bg = pg.evaluate("getComputedStyle(document.getElementById('remTime')).backgroundColor")
-    check(bg == "rgb(255, 255, 255)", f"con el sistema en modo oscuro, el campo de la hora es blanco ({bg})")
+    # El sistema está en modo oscuro y la apariencia en "Automática": la app se ve oscura y el
+    # campo de la hora queda oscuro con letra clara (antes salía letra clara sobre blanco).
+    check(pg.evaluate("document.documentElement.dataset.theme") == "dark", "con el sistema en modo oscuro, la app usa el modo oscuro")
+    bg, fg = pg.evaluate("(() => { const c = getComputedStyle(document.getElementById('remTime')); return [c.backgroundColor, c.color]; })()")
+    check(bg == "rgb(28, 42, 71)" and fg == "rgb(231, 238, 249)", f"en modo oscuro el campo de la hora se lee bien ({bg} / {fg})")
     pg.goto(URL + "#/enfocar"); pg.clock.run_for(300)
     pg.click("#ambientBtn"); pg.clock.run_for(200)
     check(state(pg)["settings"]["ambient"] == "", "el botón de silencio apaga el sonido")
@@ -297,7 +310,7 @@ with sync_playwright() as p:
     check(not errors, "sin errores en consola" + (": " + " | ".join(errors) if errors else ""))
 
     # Registro saltando la foto: queda el animal al azar
-    ctx3 = browser.new_context(viewport={"width": 1280, "height": 800}, color_scheme="light")
+    ctx3 = browser.new_context(viewport={"width": 1280, "height": 800}, color_scheme="light", locale="es-CO")
     pg3 = ctx3.new_page(); errs3 = []
     pg3.on("pageerror", lambda e: errs3.append(str(e)))
     pg3.goto(URL); pg3.wait_for_timeout(800)
@@ -307,10 +320,41 @@ with sync_playwright() as p:
     s3 = pg3.evaluate("JSON.parse(localStorage.getItem('st2_state'))")
     check(s3["profile"]["onboarded"] and s3["profile"]["photo"] == "" and bool(s3["profile"]["avatar"]) and not pg3.evaluate("document.getElementById('dlg').open"), "con 'Ahora no' se entra con el animal al azar y sin foto")
     check(not errs3, "sin errores al saltar la foto" + (": " + " | ".join(errs3) if errs3 else ""))
+
+    # v3.5: "Mantener mi sesión iniciada" (marcada por defecto al registrarse)
+    check(pg3.evaluate("!!localStorage.getItem('st2_remember') && !!JSON.parse(localStorage.getItem('st2_state')).account.remember"), "al registrarse queda activado 'mantener mi sesión iniciada'")
+    check("contrase" not in pg3.evaluate("localStorage.getItem('st2_remember')").lower(), "el recuerdo de sesión no guarda la contraseña")
+    pg4 = ctx3.new_page(); pg4.on("pageerror", lambda e: errs3.append(str(e)))
+    pg4.clock.install()
+    pg4.goto(URL); pg4.wait_for_timeout(1500); pg4.clock.run_for(500)
+    check(not pg4.evaluate("document.getElementById('dlg').open") and pg4.inner_text("#hudNick") == "zorrito.lector", "al volver a abrir la app no pide la contraseña")
+    # v3.5: "El reloj me espera": al terminar el estudio, el descanso NO empieza solo
+    pg4.goto(URL + "#/ajustes"); pg4.clock.run_for(400)
+    check(pg4.evaluate("document.getElementById('afterStudyAuto').checked"), "por defecto el descanso empieza solo")
+    pg4.click("label:has(#afterStudyWait)"); pg4.clock.run_for(300)
+    check(pg4.evaluate("JSON.parse(localStorage.getItem('st2_state')).settings.autoBreak") is False, "se puede elegir que el reloj espere")
+    pg4.goto(URL + "#/enfocar"); pg4.clock.run_for(400)
+    pg4.click('.preset[data-preset="mini"]'); pg4.clock.run_for(200)
+    pg4.click("#mainBtn"); pg4.clock.run_for(300)
+    pg4.clock.fast_forward("15:00"); pg4.clock.run_for(4000)
+    check(pg4.get_attribute("#ring", "data-mode") == "break" and pg4.get_attribute("#ring", "data-status") == "idle", "al terminar de estudiar, el descanso espera a que lo empieces")
+    check(pg4.inner_text("#mainBtn") == "Empezar descanso", "el botón invita a empezar el descanso")
+    # Apagar "mantener sesión" vuelve a pedir la contraseña
+    if pg4.evaluate("document.getElementById('dlg').open"):
+        pg4.keyboard.press("Escape"); pg4.clock.run_for(300)
+    pg4.goto(URL + "#/ajustes"); pg4.clock.run_for(400)
+    check(pg4.evaluate("document.getElementById('setRemember').checked"), "Ajustes muestra 'mantener mi sesión iniciada' activado")
+    pg4.click("label:has(#setRemember)"); pg4.clock.run_for(400); pg4.wait_for_timeout(300)
+    check(pg4.evaluate("!localStorage.getItem('st2_remember') && !JSON.parse(localStorage.getItem('st2_state')).account.remember"), "al apagarlo se borra el recuerdo de sesión")
+    pg5 = ctx3.new_page(); pg5.goto(URL); pg5.wait_for_timeout(1200)
+    check(pg5.evaluate("document.getElementById('dlg').open && !!document.getElementById('loginPass')"), "sin 'mantener sesión', al abrir pide la contraseña")
+    pg5.fill("#loginPass", "Zorro2026"); pg5.click("#dlg button:has-text('Entrar')"); pg5.wait_for_timeout(1500)
+    check(not pg5.evaluate("document.getElementById('dlg').open") and pg5.evaluate("!!localStorage.getItem('st2_remember')"), "al entrar con la casilla marcada, se vuelve a recordar la sesión")
+    check(not errs3, "sin errores en mantener sesión y descanso en espera" + (": " + " | ".join(errs3) if errs3 else ""))
     ctx3.close()
 
     # Paisaje animado aunque el sistema pida "reducir movimiento" (y quieto con el ajuste de la app)
-    ctx2 = browser.new_context(viewport={"width": 1280, "height": 800}, reduced_motion="reduce")
+    ctx2 = browser.new_context(viewport={"width": 1280, "height": 800}, reduced_motion="reduce", locale="es-CO")
     pg2 = ctx2.new_page()
     pg2.goto(URL); pg2.wait_for_timeout(1200)
     pos = lambda: pg2.evaluate("[...document.querySelectorAll('.walker')].map(w => Math.round(w.getBoundingClientRect().left))")
@@ -319,6 +363,7 @@ with sync_playwright() as p:
     pg2.evaluate("document.documentElement.classList.add('reduce-motion')"); pg2.wait_for_timeout(300)
     a = pos(); pg2.wait_for_timeout(1000); b = pos()
     check(a == b, "con 'Menos animaciones' de la app, se quedan quietos")
+    check(pg2.evaluate("getComputedStyle(document.querySelector('.gate-snow')).display === 'none'"), "con 'Menos animaciones', la nevada de la entrada no aparece")
     ctx2.close()
     browser.close()
 

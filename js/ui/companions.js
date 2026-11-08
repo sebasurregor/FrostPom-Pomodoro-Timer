@@ -6,6 +6,7 @@
  * Para cambiar una imagen sin tocar el código: js/config.js → companionImages.
  */
 import { config } from '../config.js';
+import { tr } from '../i18n.js';
 
 // Arte del autor incluido en la app
 const BUILTIN_IMAGES = Object.freeze({
@@ -38,6 +39,11 @@ function img(src, size, className, title) {
 }
 
 /** Devuelve la imagen del compañero. locked = silueta (aún no desbloqueado). */
+// Cuánto hay que subir cada dibujo para que el animal (no el cuadro) quede centrado.
+// Se midió el contorno de cada imagen: el tiburón asoma del agua en la mitad de abajo.
+const ART_DY = Object.freeze({ 'tiburon-martillo': -22, 'zorro-artico': -8, pinguino: -2, 'oso-marino': -1 });
+export const artOffset = (id) => (config.companionImages && config.companionImages[id] ? 0 : ART_DY[id] || 0);
+
 export function companion(id, { size = 96, locked = false, title } = {}) {
   return img(imageFor(id) || '', size, `companion companion--img${locked ? ' is-locked' : ''}`, title);
 }
@@ -91,7 +97,7 @@ export function say(anchor, text, { ms = 2600 } = {}) {
   const bubble = document.createElement('span');
   bubble.className = 'say';
   bubble.setAttribute('aria-hidden', 'true');
-  bubble.textContent = text;
+  bubble.textContent = tr(text);
   anchor.append(bubble);
   setTimeout(() => {
     bubble.classList.add('is-leaving');

@@ -7,12 +7,13 @@
  * Módulo puro: sin DOM.
  */
 import * as U from './util.js';
+import { t, tr } from './i18n.js';
 
 export const WEATHER = Object.freeze({
-  clear: Object.freeze({ id: 'clear', label: 'Despejado', icon: '☀️', nightIcon: '🌙' }),
-  light: Object.freeze({ id: 'light', label: 'Nieve ligera', icon: '🌨️' }),
-  medium: Object.freeze({ id: 'medium', label: 'Nevando', icon: '❄️' }),
-  heavy: Object.freeze({ id: 'heavy', label: 'Nevada fuerte', icon: '🌬️' }),
+  clear: Object.freeze({ id: 'clear', label: tr('Despejado'), icon: '☀️', nightIcon: '🌙' }),
+  light: Object.freeze({ id: 'light', label: tr('Nieve ligera'), icon: '🌨️' }),
+  medium: Object.freeze({ id: 'medium', label: tr('Nevando'), icon: '❄️' }),
+  heavy: Object.freeze({ id: 'heavy', label: tr('Nevada fuerte'), icon: '🌬️' }),
 });
 export const WEATHER_IDS = Object.freeze(Object.keys(WEATHER));
 
@@ -36,6 +37,6 @@ export function weatherFor(date = new Date(), timeZone) {
 /** Texto para mostrar. De noche despejado es luna; con el polo contaminado la nieve sale gris. */
 export function weatherLabel(id, { night = false, dirty = false } = {}) {
   const w = WEATHER[id] || WEATHER.clear;
-  if (w.id === 'clear') return { icon: night ? w.nightIcon : w.icon, text: night ? 'Noche despejada' : w.label };
-  return { icon: w.icon, text: dirty ? `${w.label} (gris por el esmog)` : w.label };
+  if (w.id === 'clear') return { icon: night ? w.nightIcon : w.icon, text: night ? tr('Noche despejada') : w.label };
+  return { icon: w.icon, text: dirty ? t('{w} (gris por el esmog)', { w: w.label }) : w.label };
 }

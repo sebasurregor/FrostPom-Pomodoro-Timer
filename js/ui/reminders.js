@@ -8,8 +8,11 @@ import { $, h } from './dom.js';
 import { toast, notify } from './feedback.js';
 import { state, store, mutate, today, session, isPremium } from './context.js';
 import { premiumDialog } from './premium.js';
+import { t, tr, isEnglish } from '../i18n.js';
 
-const DAYS = [['L', 1, 'lunes'], ['M', 2, 'martes'], ['X', 3, 'miércoles'], ['J', 4, 'jueves'], ['V', 5, 'viernes'], ['S', 6, 'sábado'], ['D', 0, 'domingo']];
+const DAYS = isEnglish
+  ? [['M', 1, 'Monday'], ['T', 2, 'Tuesday'], ['W', 3, 'Wednesday'], ['T', 4, 'Thursday'], ['F', 5, 'Friday'], ['S', 6, 'Saturday'], ['S', 0, 'Sunday']]
+  : [['L', 1, 'lunes'], ['M', 2, 'martes'], ['X', 3, 'miércoles'], ['J', 4, 'jueves'], ['V', 5, 'viernes'], ['S', 6, 'sábado'], ['D', 0, 'domingo']];
 
 function toggleDay(d) {
   mutate((st) => {
@@ -25,7 +28,7 @@ export function renderReminders() {
   $('#remOn').checked = prem && r.on;
   $('#remTime').value = r.time;
   $('#remTime').disabled = !prem;
-  $('#remNote').textContent = prem ? 'Suena con la app abierta o instalada. En la app del teléfono llegará como notificación.' : 'Función Premium 👑. Toca para conocerla.';
+  $('#remNote').textContent = prem ? '' : tr('Función Premium');
   $('#remDays').replaceChildren(...DAYS.map(([lab, d, name]) => h('button', {
     type: 'button', class: `day-chip${r.days.includes(d) ? ' is-on' : ''}`, 'aria-pressed': String(r.days.includes(d)), 'aria-label': name, disabled: !prem,
     onclick: () => toggleDay(d),
@@ -39,7 +42,7 @@ async function toggleReminders(e) {
     try { await Notification.requestPermission(); } catch { /* sin permiso */ }
   }
   mutate((st) => { st.settings.reminders.on = want; });
-  if (want) toast(`Te recordaremos a las ${state.settings.reminders.time}.`, 'good', { icon: '⏰' });
+  if (want) toast(t('Te recordaremos a las {time}.', { time: state.settings.reminders.time }), 'good', { icon: '⏰' });
 }
 
 /** Se llama cada 20 s: avisa una sola vez en el minuto elegido (aunque haya varias pestañas). */

@@ -9,6 +9,7 @@
  */
 import * as U from './util.js';
 import { TIERS, rankForXp } from './game.js';
+import { t, tr } from './i18n.js';
 
 // =========================================================
 // Premium
@@ -25,14 +26,14 @@ export function canUse(item, premium) {
 // Gratis: con gemas o por rango. Premium (👑): todos se pueden usar mientras dure la suscripción.
 // =========================================================
 export const SKINS = [
-  { id: 'clasico',   name: 'Clásico',   a: '#5B8CFF', b: '#A9C6FF', cost: 0 },
-  { id: 'menta',     name: 'Menta',     a: '#21C995', b: '#B8FFE6', cost: 30 },
-  { id: 'hielo',     name: 'Hielo',     a: '#7FD3FF', b: '#E8F7FF', cost: 60 },
-  { id: 'dorado',    name: 'Dorado',    a: '#E9A300', b: '#FFF1A6', cost: 0, requireTier: 2 },
-  { id: 'aurora',    name: 'Aurora',    a: '#2EE6B6', b: '#B98CFF', cost: 0, premium: true },
-  { id: 'atardecer', name: 'Atardecer', a: '#FF5E7E', b: '#FFC531', cost: 0, premium: true },
-  { id: 'galaxia',   name: 'Galaxia',   a: '#7A2CF0', b: '#4CC9FF', cost: 0, premium: true },
-  { id: 'leyenda',   name: 'Leyenda',   a: '#F2522F', b: '#FFE680', cost: 0, requireTier: 6 },
+  { id: 'clasico',   name: tr('Clásico'),   a: '#5B8CFF', b: '#A9C6FF', cost: 0 },
+  { id: 'menta',     name: tr('Menta'),     a: '#21C995', b: '#B8FFE6', cost: 30 },
+  { id: 'hielo',     name: tr('Hielo'),     a: '#7FD3FF', b: '#E8F7FF', cost: 60 },
+  { id: 'dorado',    name: tr('Dorado'),    a: '#E9A300', b: '#FFF1A6', cost: 0, requireTier: 2 },
+  { id: 'aurora',    name: tr('Aurora'),    a: '#2EE6B6', b: '#B98CFF', cost: 0, premium: true },
+  { id: 'atardecer', name: tr('Atardecer'), a: '#FF5E7E', b: '#FFC531', cost: 0, premium: true },
+  { id: 'galaxia',   name: tr('Galaxia'),   a: '#7A2CF0', b: '#4CC9FF', cost: 0, premium: true },
+  { id: 'leyenda',   name: tr('Leyenda'),   a: '#F2522F', b: '#FFE680', cost: 0, requireTier: 6 },
 ];
 export const SKIN_BY_ID = U.byId(SKINS);
 
@@ -48,9 +49,9 @@ export function skinStatus(skin, { gems = 0, owned = [], tierIndex = 0, premium 
   if (owned.includes(skin.id)) return { state: 'owned' };
   if (skin.requireTier != null && tierIndex >= skin.requireTier) return { state: 'unlockable' };
   if (premium) return { state: 'included' };
-  if (skin.premium) return { state: 'premium', reason: 'Incluido en Premium' };
-  if (skin.requireTier != null) return { state: 'locked', reason: `Llega a ${TIERS[skin.requireTier].name}` };
-  return gems >= skin.cost ? { state: 'buyable' } : { state: 'expensive', reason: `Te faltan ${skin.cost - gems} gemas` };
+  if (skin.premium) return { state: 'premium', reason: tr('Incluido en Premium') };
+  if (skin.requireTier != null) return { state: 'locked', reason: t('Llega a {rank}', { rank: tr(TIERS[skin.requireTier].name) }) };
+  return gems >= skin.cost ? { state: 'buyable' } : { state: 'expensive', reason: t('Te faltan {n} gemas', { n: skin.cost - gems }) };
 }
 
 export function skinStatusFor(state, skin) {
@@ -63,24 +64,25 @@ export function skinStatusFor(state, skin) {
 }
 
 // =========================================================
-// Compañeros: skins limitadas que SOLO se desbloquean con logros.
+// Compañeros: el Pingüino viene con la cuenta (starter); los demás son skins limitadas
+// que SOLO se desbloquean con logros (o con el regalo de Premium).
 // Personajes originales de FrostPom (no usan memes ni personajes de terceros).
 // =========================================================
 export const COMPANIONS = [
-  { id: 'pinguino',         name: 'Pingüino',         unlock: 'primer-paso', tagline: 'Tu primer amigo del polo. Se emociona con cada sesión.' },
-  { id: 'zorro-artico',     name: 'Zorro Ártico',     unlock: 'chispa',      tagline: 'Su pelaje cambia con las estaciones; tú, con cada racha.' },
-  { id: 'oso-polar',        name: 'Oso Polar',        unlock: 'combo',       tagline: 'Abrazos tibios para sesiones frías.' },
-  { id: 'oso-marino',       name: 'Oso Marino',       unlock: 'en-llamas',   tagline: 'Nada miles de kilómetros: la constancia es lo suyo.' },
-  { id: 'tiburon-martillo', name: 'Tiburón Martillo', unlock: 'maraton',     tagline: 'Ve el mundo de lado a lado, como tu plan de estudio.' },
+  { id: 'pinguino',         name: tr('Pingüino'),         unlock: null, starter: true, tagline: tr('Tu primer amigo del polo. Se emociona con cada sesión.') },
+  { id: 'zorro-artico',     name: tr('Zorro Ártico'),     unlock: 'chispa',      tagline: tr('Su pelaje cambia con las estaciones; tú, con cada racha.') },
+  { id: 'oso-polar',        name: tr('Oso Polar'),        unlock: 'combo',       tagline: tr('Abrazos tibios para sesiones frías.') },
+  { id: 'oso-marino',       name: tr('Oso Marino'),       unlock: 'en-llamas',   tagline: tr('Nada miles de kilómetros: la constancia es lo suyo.') },
+  { id: 'tiburon-martillo', name: tr('Tiburón Martillo'), unlock: 'maraton',     tagline: tr('Ve el mundo de lado a lado, como tu plan de estudio.') },
 ];
 export const COMPANION_BY_ID = U.byId(COMPANIONS);
-export const COMPANION_BY_ACHIEVEMENT = U.byId(COMPANIONS, 'unlock');
-/** Un compañero está desbloqueado si ganaste su logro o te lo regalaron (regalo de Premium). */
+export const COMPANION_BY_ACHIEVEMENT = U.byId(COMPANIONS.filter((c) => c.unlock), 'unlock');
+/** Un compañero está desbloqueado si viene con la cuenta, si ganaste su logro o si te lo regalaron (Premium). */
 export function companionUnlocked(id, achievements, gifted = []) {
   const c = COMPANION_BY_ID[id];
-  return !!c && (!!(achievements && achievements[c.unlock]) || (Array.isArray(gifted) && gifted.includes(id)));
+  return !!c && (!!c.starter || !!(c.unlock && achievements && achievements[c.unlock]) || (Array.isArray(gifted) && gifted.includes(id)));
 }
-/** Compañeros que todavía no tienes (los que se pueden elegir como regalo). */
+/** Compañeros que todavía no tienes (los que se pueden elegir como regalo). El Pingüino nunca sale aquí. */
 export function lockedCompanions(progress) {
   return COMPANIONS.filter((c) => !companionUnlocked(c.id, progress.achievements, progress.gifted));
 }
@@ -89,12 +91,12 @@ export function lockedCompanions(progress) {
 // Modos del pomodoro y "Mi ritmo"
 // =========================================================
 export const PRESETS = [
-  { id: 'mini',     name: 'Mini',     study: 15, brk: 5,  long: 15 },
-  { id: 'clasico',  name: 'Clásico',  study: 25, brk: 5,  long: 15 },
-  { id: 'enfoque',  name: 'Enfoque',  study: 45, brk: 10, long: 20 },
-  { id: 'profundo', name: 'Profundo', study: 50, brk: 10, long: 25 },
-  { id: 'largo',    name: 'Largo',    study: 60, brk: 15, long: 30 },
-  { id: 'personalizado', name: 'Mi ritmo' },
+  { id: 'mini',     name: tr('Mini'),     study: 15, brk: 5,  long: 15 },
+  { id: 'clasico',  name: tr('Clásico'),  study: 25, brk: 5,  long: 15 },
+  { id: 'enfoque',  name: tr('Enfoque'),  study: 45, brk: 10, long: 20 },
+  { id: 'profundo', name: tr('Profundo'), study: 50, brk: 10, long: 25 },
+  { id: 'largo',    name: tr('Largo'),    study: 60, brk: 15, long: 30 },
+  { id: 'personalizado', name: tr('Mi ritmo') },
 ];
 export const PRESET_BY_ID = U.byId(PRESETS);
 export const CUSTOM_PRESET = 'personalizado';
@@ -142,21 +144,21 @@ export function nextModeAfter(rec, cycle) {
 // Sonido: tonos de aviso y sonidos de concentración
 // =========================================================
 export const TONE_PACKS = [
-  { id: 'clasico',    name: 'Clásico' },
-  { id: 'campanitas', name: 'Campanitas' },
-  { id: 'suave',      name: 'Suave' },
-  { id: 'burbujas',   name: 'Burbujas', premium: true },
-  { id: 'arcade',     name: 'Arcade',   premium: true },
+  { id: 'clasico',    name: tr('Clásico') },
+  { id: 'campanitas', name: tr('Campanitas') },
+  { id: 'suave',      name: tr('Suave') },
+  { id: 'burbujas',   name: tr('Burbujas'), premium: true },
+  { id: 'arcade',     name: tr('Arcade'),   premium: true },
 ];
 export const TONE_BY_ID = U.byId(TONE_PACKS);
 export const AMBIENTS = [
-  { id: 'blanco', name: 'Ruido blanco', icon: '🌫️' },
-  { id: 'lluvia', name: 'Lluvia',       icon: '🌧️' },
-  { id: 'viento', name: 'Viento polar', icon: '🌬️' },
-  { id: 'marron', name: 'Ruido marrón', icon: '🟤', premium: true },
-  { id: 'rosa',   name: 'Ruido rosa',   icon: '🌸', premium: true },
-  { id: 'olas',   name: 'Olas del mar', icon: '🌊', premium: true },
-  { id: 'fogata', name: 'Fogata',       icon: '🔥', premium: true },
+  { id: 'blanco', name: tr('Ruido blanco'), icon: '🌫️' },
+  { id: 'lluvia', name: tr('Lluvia'),       icon: '🌧️' },
+  { id: 'viento', name: tr('Viento polar'), icon: '🌬️' },
+  { id: 'marron', name: tr('Ruido marrón'), icon: '🟤', premium: true },
+  { id: 'rosa',   name: tr('Ruido rosa'),   icon: '🌸', premium: true },
+  { id: 'olas',   name: tr('Olas del mar'), icon: '🌊', premium: true },
+  { id: 'fogata', name: tr('Fogata'),       icon: '🔥', premium: true },
 ];
 export const AMBIENT_BY_ID = U.byId(AMBIENTS);
 export const DEFAULT_AMBIENT = 'lluvia';
@@ -165,32 +167,32 @@ export const DEFAULT_AMBIENT = 'lluvia';
 // Región: define cuándo es de día o de noche en el paisaje (y la fogata)
 // =========================================================
 export const REGIONS = [
-  { id: '', name: 'Automática (este dispositivo)' },
-  { id: 'America/Bogota', name: 'Colombia' },
-  { id: 'America/Mexico_City', name: 'México' },
-  { id: 'America/Lima', name: 'Perú' },
-  { id: 'America/Guayaquil', name: 'Ecuador' },
-  { id: 'America/Caracas', name: 'Venezuela' },
-  { id: 'America/Panama', name: 'Panamá' },
-  { id: 'America/Costa_Rica', name: 'Costa Rica' },
-  { id: 'America/Guatemala', name: 'Guatemala' },
-  { id: 'America/Santo_Domingo', name: 'República Dominicana' },
-  { id: 'America/Puerto_Rico', name: 'Puerto Rico' },
-  { id: 'America/Santiago', name: 'Chile' },
-  { id: 'America/Argentina/Buenos_Aires', name: 'Argentina' },
-  { id: 'America/Montevideo', name: 'Uruguay' },
-  { id: 'America/Asuncion', name: 'Paraguay' },
-  { id: 'America/La_Paz', name: 'Bolivia' },
-  { id: 'America/Sao_Paulo', name: 'Brasil (São Paulo)' },
-  { id: 'America/New_York', name: 'Estados Unidos (Este)' },
-  { id: 'America/Chicago', name: 'Estados Unidos (Centro)' },
-  { id: 'America/Los_Angeles', name: 'Estados Unidos (Pacífico)' },
-  { id: 'America/Toronto', name: 'Canadá (Toronto)' },
-  { id: 'Europe/Madrid', name: 'España' },
-  { id: 'Europe/London', name: 'Reino Unido' },
-  { id: 'Europe/Berlin', name: 'Alemania' },
-  { id: 'Asia/Tokyo', name: 'Japón' },
-  { id: 'Australia/Sydney', name: 'Australia (Sídney)' },
+  { id: '', name: tr('Automática (este dispositivo)') },
+  { id: 'America/Bogota', name: tr('Colombia') },
+  { id: 'America/Mexico_City', name: tr('México') },
+  { id: 'America/Lima', name: tr('Perú') },
+  { id: 'America/Guayaquil', name: tr('Ecuador') },
+  { id: 'America/Caracas', name: tr('Venezuela') },
+  { id: 'America/Panama', name: tr('Panamá') },
+  { id: 'America/Costa_Rica', name: tr('Costa Rica') },
+  { id: 'America/Guatemala', name: tr('Guatemala') },
+  { id: 'America/Santo_Domingo', name: tr('República Dominicana') },
+  { id: 'America/Puerto_Rico', name: tr('Puerto Rico') },
+  { id: 'America/Santiago', name: tr('Chile') },
+  { id: 'America/Argentina/Buenos_Aires', name: tr('Argentina') },
+  { id: 'America/Montevideo', name: tr('Uruguay') },
+  { id: 'America/Asuncion', name: tr('Paraguay') },
+  { id: 'America/La_Paz', name: tr('Bolivia') },
+  { id: 'America/Sao_Paulo', name: tr('Brasil (São Paulo)') },
+  { id: 'America/New_York', name: tr('Estados Unidos (Este)') },
+  { id: 'America/Chicago', name: tr('Estados Unidos (Centro)') },
+  { id: 'America/Los_Angeles', name: tr('Estados Unidos (Pacífico)') },
+  { id: 'America/Toronto', name: tr('Canadá (Toronto)') },
+  { id: 'Europe/Madrid', name: tr('España') },
+  { id: 'Europe/London', name: tr('Reino Unido') },
+  { id: 'Europe/Berlin', name: tr('Alemania') },
+  { id: 'Asia/Tokyo', name: tr('Japón') },
+  { id: 'Australia/Sydney', name: tr('Australia (Sídney)') },
 ];
 export const REGION_BY_ID = U.byId(REGIONS);
 

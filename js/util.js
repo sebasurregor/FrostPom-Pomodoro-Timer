@@ -1,7 +1,8 @@
 /*
  * FrostPom — utilidades compartidas.
- * Sin dependencias. Módulo ES: lo usan el navegador y las pruebas de Node por igual.
+ * Módulo ES: lo usan el navegador y las pruebas de Node por igual (en Node, siempre en español).
  */
+import { lang, tr } from './i18n.js';
 
 export const pad2 = (n) => String(n).padStart(2, '0');
 export const clamp = (n, min, max) => Math.min(max, Math.max(min, n));
@@ -63,10 +64,11 @@ export function localParts(date = new Date(), timeZone) {
   return { key: dateKey(date), hour: date.getHours() + date.getMinutes() / 60 };
 }
 
-export const WEEKDAY_SHORT = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-export const WEEKDAY_LONG = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-export const MONTHS_SHORT = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
-export const MONTHS_LONG = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+const EN = lang === 'en';
+export const WEEKDAY_SHORT = EN ? ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] : ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+export const WEEKDAY_LONG = EN ? ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] : ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+export const MONTHS_SHORT = EN ? ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] : ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+export const MONTHS_LONG = EN ? ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'] : ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
 /**
  * Celdas de un mes para un calendario que empieza el lunes. Cada celda es la clave del día
@@ -82,14 +84,20 @@ export function monthCells(year, month) {
   return cells;
 }
 
-/** "2026-11-01" → "Domingo 1 de noviembre". */
+/** "2026-11-01" → "Domingo 1 de noviembre" (en inglés: "Sunday, November 1"). */
 export function formatDayLong(key) {
   const d = parseDateKey(key);
+  if (EN) return `${WEEKDAY_LONG[d.getDay()]}, ${MONTHS_LONG[d.getMonth()]} ${d.getDate()}`;
   return `${WEEKDAY_LONG[d.getDay()]} ${d.getDate()} de ${MONTHS_LONG[d.getMonth()]}`;
+}
+/** "1 de noviembre" / "November 1" */
+export function formatDayMonth(d) {
+  return EN ? `${MONTHS_LONG[d.getMonth()]} ${d.getDate()}` : `${d.getDate()} de ${MONTHS_LONG[d.getMonth()]}`;
 }
 export function formatDateTime(iso) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
+  if (EN) return `${MONTHS_SHORT[d.getMonth()]} ${d.getDate()}, ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
   return `${d.getDate()} ${MONTHS_SHORT[d.getMonth()]}, ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 }
 
@@ -109,7 +117,7 @@ export function formatMinutes(min) {
   return m ? `${h} h ${m} min` : `${h} h`;
 }
 export function plural(n, one, many) {
-  return `${n} ${n === 1 ? one : many}`;
+  return `${n} ${tr(n === 1 ? one : many)}`;
 }
 /** Minúsculas y sin tildes, para comparar textos ("Perú" → "peru"). */
 export function fold(text) {

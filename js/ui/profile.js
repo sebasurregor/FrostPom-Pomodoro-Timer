@@ -14,18 +14,25 @@ import { avatarContent, countryPicker, flagEl } from './widgets.js';
 import { pickProfilePhoto } from './photo.js';
 import { premiumDialog, giftCompanionDialog } from './premium.js';
 import { renameFlow } from './account.js';
+import * as BOARD from '../board.js';
+import { pic } from './pics.js';
 import { state, mutate, today } from './context.js';
 import { config } from '../config.js';
 import { seasonFor, seasonById, daysLeft } from '../season.js';
+import { t, tr, isEnglish } from '../i18n.js';
 
 async function changeCountryFlow() {
   let pick = state.profile.country;
   const res = await openDialog({
     title: 'Tu nacionalidad',
-    body: [h('p', { class: 'dlg__text', text: 'Es opcional. Se muestra como bandera junto a tu nombre en el ranking.' }), countryPicker(pick, (v) => { pick = v; })],
+    body: [countryPicker(pick, (v) => { pick = v; })],
     actions: [{ label: 'Cancelar', value: 'cancel' }, { label: 'Guardar', value: 'ok', variant: 'btn--gold', primary: true }],
   });
-  if (res === 'ok') mutate((st) => { st.profile.country = pick; });
+  if (res === 'ok') {
+    mutate((st) => { st.profile.country = pick; });
+    // Ranking global: la bandera también cambia allá (si no hay internet, al volver a unirte)
+    BOARD.update({ username: state.profile.nick, country: pick, avatar: state.profile.avatar, show: state.settings.leaderboardOn }).catch(() => {});
+  }
 }
 
 // La sección de la foto sigue abierta después de guardar o quitar la foto (la tarjeta se vuelve a dibujar).
@@ -52,11 +59,11 @@ function renderProfileCard() {
     h('details', { class: 'avatar-picker', open: photoOpen, ontoggle: (e) => { photoOpen = e.currentTarget.open; } },
       h('summary', { text: 'Tu foto de perfil' }),
       h('div', { class: 'btn-row photo-row' },
-        h('button', { type: 'button', class: 'btn btn--gold btn--sm', id: 'photoBtn', onclick: uploadPhoto }, state.profile.photo ? '📷 Cambiar foto' : '📷 Subir una foto'),
+        h('button', { type: 'button', class: 'btn btn--gold btn--sm', id: 'photoBtn', onclick: uploadPhoto }, pic('foto', 22), state.profile.photo ? 'Cambiar foto' : 'Subir una foto'),
         state.profile.photo ? h('button', { type: 'button', class: 'btn btn--paper btn--sm', id: 'photoRemoveBtn', onclick: () => mutate((st) => { st.profile.photo = ''; }) }, 'Quitar foto') : null),
       h('p', { class: 'photo-note', text: state.profile.photo
         ? 'Tu foto se queda solo en este dispositivo. En el ranking, los demás ven tu animal.'
-        : `Sin foto, te acompaña tu animal (${state.profile.avatar}). La foto se queda solo en este dispositivo.` })));
+        : t('Sin foto, te acompaña tu animal ({animal}). La foto se queda solo en este dispositivo.', { animal: state.profile.avatar }) })));
 }
 
 async function uploadPhoto() {
@@ -65,18 +72,18 @@ async function uploadPhoto() {
 }
 
 function renderStats() {
-  const t = state.progress.totals;
+  const tot = state.progress.totals;
   const streak = G.computeStreak(state.daily, today());
   const got = G.ACHIEVEMENTS.filter((a) => state.progress.achievements[a.id]).length;
   const tiles = [
-    ['Tiempo estudiado', U.formatMinutes(t.studySec / 60)],
-    ['Sesiones completas', fmtInt(t.sessions)],
+    ['Tiempo estudiado', U.formatMinutes(tot.studySec / 60)],
+    ['Sesiones completas', fmtInt(tot.sessions)],
     ['Racha actual', U.plural(streak.current, 'día', 'días')],
     ['Mejor racha', U.plural(Math.max(state.progress.bestStreak, streak.current), 'día', 'días')],
-    ['Descansos tomados', fmtInt(t.breaks)],
+    ['Descansos tomados', fmtInt(tot.breaks)],
     ['Mejor combo', U.plural(state.progress.bestCombo, 'sesión', 'sesiones')],
-    ['Logros', `${got} de ${G.ACHIEVEMENTS.length}`],
-    ['Misiones reclamadas', fmtInt(t.missionsClaimed)],
+    ['Logros', t('{a} de {b}', { a: got, b: G.ACHIEVEMENTS.length })],
+    ['Misiones reclamadas', fmtInt(tot.missionsClaimed)],
   ];
   $('#statsGrid').replaceChildren(...tiles.map(([k, v]) => h('div', { class: 'stat' }, h('dt', { text: k }), h('dd', { text: v }))));
 }
@@ -85,29 +92,31 @@ function renderCompanions() {
   const { achievements, gifted } = state.progress;
   const owned = C.COMPANIONS.filter((c) => C.companionUnlocked(c.id, achievements, gifted)).length;
   $('#compMeta').replaceChildren(state.premium.giftPending
-    ? h('button', { type: 'button', class: 'btn btn--crown btn--sm', id: 'giftPetBtn', onclick: giftCompanionDialog }, '🎁 Elige tu mascota')
-    : `${owned} de ${C.COMPANIONS.length}`);
+    ? h('button', { type: 'button', class: 'btn btn--crown btn--sm', id: 'giftPetBtn', onclick: giftCompanionDialog }, pic('cofre', 22), 'Elige tu mascota')
+    : t('{a} de {b}', { a: owned, b: C.COMPANIONS.length }));
   $('#companionGrid').replaceChildren(...C.COMPANIONS.map((c) => {
     const unlocked = C.companionUnlocked(c.id, achievements, gifted);
     const isGift = gifted.includes(c.id);
-    const using = state.profile.companion === c.id;
-    const ach = G.ACHIEVEMENT_BY_ID[c.unlock];
+    // Sin compañero elegido, el que te acompaña en Enfocar es el Pingüino
+    const using = state.profile.companion === c.id || (!state.profile.companion && c.starter);
+    const ach = c.unlock ? G.ACHIEVEMENT_BY_ID[c.unlock] : null;
+    const rarity = ach ? ach.rarity : 'comun';
     let action;
     if (using) action = h('span', { class: 'skin__using', text: 'Contigo' });
     else if (unlocked) action = h('button', { type: 'button', class: 'btn btn--gold btn--sm', onclick: () => mutate((s) => E.equipCompanion(s, c.id)) }, 'Elegir');
-    else action = h('span', { class: 'companion-card__lock', text: `Logro: ${ach.name}` });
-    return h('li', { class: `companion-card companion-card--${ach.rarity}${unlocked ? ' is-unlocked' : ''}${using ? ' is-using' : ''}` },
-      h('span', { class: 'companion-card__tag', text: isGift ? 'Regalo Premium' : unlocked ? G.RARITY[ach.rarity].label : 'Limitado' }),
+    else action = h('span', { class: 'companion-card__lock' }, pic('candado', 18), t('Logro: {name}', { name: ach.name }));
+    return h('li', { class: `companion-card companion-card--${rarity}${unlocked ? ' is-unlocked' : ''}${using ? ' is-using' : ''}` },
+      h('span', { class: 'companion-card__tag', text: c.starter ? 'Incluido' : isGift ? 'Regalo Premium' : unlocked ? G.RARITY[rarity].label : 'Limitado' }),
       h('span', { class: 'companion-card__art' }, companion(c.id, { size: 88, locked: !unlocked, title: unlocked ? c.name : `${c.name}, bloqueado` })),
       h('span', { class: 'companion-card__name', text: unlocked ? c.name : '???' }),
-      h('span', { class: 'companion-card__how', text: unlocked ? c.tagline : ach.desc }),
+      h('span', { class: 'companion-card__how', text: unlocked || !ach ? c.tagline : ach.desc }),
       action);
   }));
 }
 
 const chooseSkin = (skin) => mutate((s) => E.chooseSkin(s, skin.id, today()));
 async function buySkin(skin) {
-  const ok = await confirmDialog(`¿Comprar ${skin.name}?`, `Cuesta ${skin.cost} gemas y te quedarían ${state.progress.gems - skin.cost}. Las gemas solo se ganan estudiando.`, 'Comprar', 'btn--gold');
+  const ok = await confirmDialog(t('¿Comprar {name}?', { name: skin.name }), t('Cuesta {cost} gemas y te quedarían {left}. Las gemas solo se ganan estudiando.', { cost: skin.cost, left: state.progress.gems - skin.cost }), 'Comprar', 'btn--gold');
   if (ok) chooseSkin(skin);
 }
 
@@ -116,12 +125,12 @@ const SKIN_ACTIONS = {
   owned: (skin) => h('button', { type: 'button', class: 'btn btn--paper btn--sm', onclick: () => chooseSkin(skin) }, 'Usar'),
   included: (skin) => h('button', { type: 'button', class: 'btn btn--mint btn--sm', onclick: () => chooseSkin(skin) }, 'Usar'),
   unlockable: (skin) => h('button', { type: 'button', class: 'btn btn--mint btn--sm', onclick: () => chooseSkin(skin) }, 'Desbloquear'),
-  buyable: (skin) => h('button', { type: 'button', class: 'btn btn--gold btn--sm', 'aria-label': `Comprar ${skin.name} por ${skin.cost} gemas`, onclick: () => buySkin(skin) }, `${skin.cost} gemas`),
-  premium: () => h('button', { type: 'button', class: 'btn btn--crown btn--sm', onclick: premiumDialog }, '👑 Premium'),
+  buyable: (skin) => h('button', { type: 'button', class: 'btn btn--gold btn--sm', 'aria-label': t('Comprar {name} por {cost} gemas', { name: skin.name, cost: skin.cost }), onclick: () => buySkin(skin) }, t('{n} gemas', { n: skin.cost })),
+  premium: () => h('button', { type: 'button', class: 'btn btn--crown btn--sm', onclick: premiumDialog }, pic('corona', 20), 'Premium'),
 };
 
 function renderSkins() {
-  $('#shopMeta').textContent = `Tienes ${fmtInt(state.progress.gems)} gemas`;
+  $('#shopMeta').textContent = t('Tienes {n} gemas', { n: fmtInt(state.progress.gems) });
   $('#skinGrid').replaceChildren(...C.SKINS.map((skin) => {
     const st = C.skinStatusFor(state, skin);
     const using = state.settings.skin === skin.id;
@@ -129,7 +138,7 @@ function renderSkins() {
       ? h('span', { class: 'skin__using', text: 'Usando' })
       : SKIN_ACTIONS[st.state] ? SKIN_ACTIONS[st.state](skin) : h('span', { class: 'skin__locked', text: st.reason });
     return h('li', { class: `skin${using ? ' is-using' : ''}${skin.premium ? ' is-premium' : ''}` },
-      skin.premium ? h('span', { class: 'skin__crown', 'aria-label': 'Tema Premium', text: '👑' }) : null,
+      skin.premium ? h('span', { class: 'skin__crown' }, pic('corona', 22, 'Tema Premium')) : null,
       h('span', { class: 'skin__preview', vars: { '--a': skin.a, '--b': skin.b }, 'aria-hidden': 'true' }),
       h('span', { class: 'skin__name', text: skin.name }),
       action);
@@ -140,14 +149,14 @@ let selectedBadge = null;
 function renderBadges() {
   const unlocked = state.progress.achievements;
   const count = G.ACHIEVEMENTS.filter((a) => unlocked[a.id]).length;
-  $('#achMeta').textContent = `${count} de ${G.ACHIEVEMENTS.length}`;
+  $('#achMeta').textContent = t('{a} de {b}', { a: count, b: G.ACHIEVEMENTS.length });
   const select = (id) => { selectedBadge = id; showBadgeCaption(); };
   $('#badgeGrid').replaceChildren(...G.ACHIEVEMENTS.map((a) => {
     const got = !!unlocked[a.id];
     return h('li', {},
       h('button', {
         type: 'button', class: `badge badge--${a.rarity}${got ? ' is-got' : ''}`, 'aria-describedby': 'badgeCaption',
-        'aria-label': `${a.name}, ${got ? 'desbloqueado' : 'bloqueado'}`,
+        'aria-label': `${a.name}, ${tr(got ? 'desbloqueado' : 'bloqueado')}`,
         onclick: () => select(a.id),
         onfocus: () => select(a.id),
       },
@@ -161,11 +170,11 @@ function showBadgeCaption() {
   if (!cap) return;
   const a = G.ACHIEVEMENT_BY_ID[selectedBadge];
   if (!a) {
-    cap.textContent = 'Toca un logro para ver cómo conseguirlo.';
+    cap.textContent = tr('Toca un logro para ver cómo conseguirlo.');
     return;
   }
   const got = state.progress.achievements[a.id];
-  cap.textContent = `${a.name}: ${a.desc} ${G.RARITY[a.rarity].label}, +${G.RARITY[a.rarity].gems} gemas.${got ? ` Conseguido el ${U.formatDateTime(got)}.` : ''}`;
+  cap.textContent = t('{name}: {desc} {rarity}, +{n} gemas.', { name: a.name, desc: a.desc, rarity: G.RARITY[a.rarity].label, n: G.RARITY[a.rarity].gems }) + (got ? t(' Conseguido el {date}.', { date: U.formatDateTime(got) }) : '');
 }
 
 /** Barra de la temporada actual (se llena con los días) y medallas de las pasadas. */
@@ -177,16 +186,16 @@ function renderSeasons() {
   const day = total - left + 1; // hoy cuenta como día jugado
   const pct = Math.round((day / total) * 100);
   const last = new Date(cur.end.getTime() - 86400000);
-  const short = (d) => `${d.getDate()} ${U.MONTHS_SHORT[d.getMonth()]}`;
+  const short = (d) => (isEnglish ? `${U.MONTHS_SHORT[d.getMonth()]} ${d.getDate()}` : `${d.getDate()} ${U.MONTHS_SHORT[d.getMonth()]}`);
   $('#seasonMeta').textContent = U.plural(state.seasons.length, 'terminada', 'terminadas');
   $('#seasonName').textContent = cur.name;
-  $('#seasonLeft').textContent = left === 1 ? '¡Último día!' : `Quedan ${left} días`;
+  $('#seasonLeft').textContent = left === 1 ? tr('¡Último día!') : t('Quedan {n} días', { n: left });
   $('#seasonFill').style.setProperty('--p', `${pct}%`);
   $('#seasonMeter').setAttribute('aria-valuenow', String(pct));
-  $('#seasonMeter').setAttribute('aria-valuetext', `Día ${day} de ${total}, quedan ${left} días`);
+  $('#seasonMeter').setAttribute('aria-valuetext', t('Día {day} de {total}, quedan {left} días', { day, total, left }));
   $('#seasonStart').textContent = short(cur.start);
   $('#seasonEnd').textContent = short(last);
-  $('#seasonNow').textContent = `Cada temporada dura ${U.plural(months, 'mes', 'meses')}. Esta termina el ${last.getDate()} de ${U.MONTHS_LONG[last.getMonth()]}. Al terminar recibes de 10 a 100 gemas según tu rango, queda una medalla aquí abajo y empiezas otra vez desde Bronce III.`;
+  $('#seasonNow').textContent = t('Cada temporada dura {months}. Esta termina el {date}. Al terminar recibes de 10 a 100 gemas según tu rango, queda una medalla aquí abajo y empiezas otra vez desde Bronce III.', { months: U.plural(months, 'mes', 'meses'), date: U.formatDayMonth(last) });
   if (!state.seasons.length) {
     $('#seasonList').replaceChildren(h('li', { class: 'empty', text: 'Aquí aparecerán tus medallas cuando termine tu primera temporada.' }));
     return;
@@ -197,9 +206,9 @@ function renderSeasons() {
     return h('li', { class: 'season-row' },
       h('span', { class: 'season-row__emblem' }, emblem(r, { size: 40, label: false })),
       h('span', { class: 'season-row__main' },
-        h('b', { text: sea ? sea.name.replace('Temporada ', '') : x.id }),
-        h('small', { text: `${r.name} · ${U.formatMinutes(x.studyMin)} en ${U.plural(x.activeDays, 'día', 'días')}` })),
-      x.gems ? h('span', { class: 'season-row__gems', text: `+${x.gems} gemas` }) : null);
+        h('b', { text: sea ? sea.label : x.id }),
+        h('small', { text: `${r.name} · ${t('{time} en {days}', { time: U.formatMinutes(x.studyMin), days: U.plural(x.activeDays, 'día', 'días') })}` })),
+      x.gems ? h('span', { class: 'season-row__gems', text: t('+{n} gemas', { n: x.gems }) }) : null);
   }));
 }
 

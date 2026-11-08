@@ -15,7 +15,7 @@ import { state, store, session, prefs, configure, reloadFromStore, mutate, today
 import { play } from './ui/celebrations.js';
 import { renderHUD, renderPole, updatePhase, bindHUD } from './ui/hud.js';
 import { startChatter } from './ui/scenery.js';
-import { renderPremium, maybePaywall, bindPremium } from './ui/premium.js';
+import { renderPremium, maybePaywall, bindPremium, syncStorePremium } from './ui/premium.js';
 import { bindSound } from './ui/sound.js';
 import { checkReminder, bindReminders } from './ui/reminders.js';
 import { renderTimer, renderPresets, renderToday, startOrToggle, tick, onDue, wakeLock, bindFocus } from './ui/focus.js';
@@ -26,6 +26,10 @@ import { renderRanking, bindRanking } from './ui/ranking.js';
 import { bindFeeding, renderShopBtn, openTray } from './ui/feeding.js';
 import { renderSettings, bindSettings } from './ui/settings.js';
 import { onboarding, loginGate, createAccountFlow } from './ui/account.js';
+import { t, translateDom, isEnglish } from './i18n.js';
+import { applyTheme } from './ui/theme.js';
+import { mountGateSnow } from './ui/gate-snow.js';
+import { bootBoard } from './ui/board-ui.js';
 
 // =====================================================================
 // Pintar
@@ -44,6 +48,7 @@ function renderAll() {
   FX.setPrefs({ sound: state.settings.sound, vibrate: state.settings.vibrate, reduceMotion: state.settings.reduceMotion, tonePack: p.tonePack });
   // Las animaciones las decide el ajuste "Menos animaciones" de la app (ver hintReducedMotion).
   document.documentElement.classList.toggle('reduce-motion', state.settings.reduceMotion);
+  applyTheme(state.settings.theme);
   renderPremium();
   renderHUD();
   renderPole();
@@ -145,13 +150,13 @@ function checkSeason() {
  * el día, avisamos que el total de ayer quedó guardado en el calendario.
  */
 function checkNewDay() {
-  const t = today();
+  const now = today();
   const last = store.pref.get('last_day');
-  if (last === t) return;
-  store.pref.set('last_day', t);
+  if (last === now) return;
+  store.pref.set('last_day', now);
   const d = last && U.isDateKey(last) ? state.daily[last] : null;
   if (d && d.studySec >= 60) {
-    toast(`Guardado automático: el ${U.formatDayLong(last).toLowerCase()} estudiaste ${U.formatMinutes(d.studySec / 60)}. Ya está en tu calendario.`, 'good', { icon: '📒', ms: 6500 });
+    toast(t('Guardado automático: el {day} estudiaste {time}. Ya está en tu calendario.', { day: isEnglish ? U.formatDayLong(last) : U.formatDayLong(last).toLowerCase(), time: U.formatMinutes(d.studySec / 60) }), 'good', { icon: '📒', ms: 6500 });
   }
 }
 
@@ -177,6 +182,8 @@ async function greet() {
 }
 
 function boot() {
+  translateDom(); // textos fijos del HTML en el idioma elegido (antes de pintar)
+  mountGateSnow(); // nevada suave de la pantalla de entrada
   configure({ render: renderAll, play });
   bindHUD();
   updatePhase();
@@ -189,7 +196,8 @@ function boot() {
   setInterval(checkReminder, 20 * 1000);
   if (session.isDue()) onDue();
   checkNewDay();
-  Promise.resolve(greet()).finally(checkSeason);
+  Promise.resolve(greet()).then(bootBoard).catch(() => {}).finally(checkSeason); // ranking global (v3.9)
+  syncStorePremium(); // con cobro real: Premium sigue a la suscripción de Microsoft Store
   hintReducedMotion();
   registerServiceWorker();
   document.documentElement.classList.add('is-ready');

@@ -8,6 +8,8 @@ import * as FX from './effects.js';
 import { $, h } from './dom.js';
 import { state, mutate, prefs, session, isPremium } from './context.js';
 import { requirePremium } from './premium.js';
+import { pic } from './pics.js';
+import { t, tr } from '../i18n.js';
 
 let previewTimer = 0;
 
@@ -23,9 +25,9 @@ export function syncAmbient() {
 export function renderAmbientBtn() {
   const a = prefs().ambient;
   const btn = $('#ambientBtn');
-  btn.textContent = a ? `🔊 ${a.name}` : '🔇 Silencio';
+  btn.textContent = a ? `🔊 ${a.name}` : tr('🔇 Silencio');
   btn.setAttribute('aria-pressed', String(!!a));
-  btn.setAttribute('aria-label', a ? `Sonido de concentración: ${a.name}. Toca para silenciar.` : 'Sonido de concentración apagado. Toca para activarlo.');
+  btn.setAttribute('aria-label', a ? t('Sonido de concentración: {name}. Toca para silenciar.', { name: a.name }) : tr('Sonido de concentración apagado. Toca para activarlo.'));
 }
 
 function toggleSilence() {
@@ -72,14 +74,13 @@ export function renderSound() {
       type: 'button', role: 'radio', class: `sound-chip${selected ? ' is-on' : ''}${locked ? ' is-locked' : ''}`,
       'aria-checked': String(selected), onclick,
       'aria-label': `${item.name}${locked ? ', Premium' : ''}`,
-    }, item.icon ? h('span', { class: 'sound-chip__icon', 'aria-hidden': 'true', text: item.icon }) : null,
-    h('span', { class: 'sound-chip__name', text: item.name }),
-    locked ? h('span', { class: 'sound-chip__crown', 'aria-hidden': 'true', text: '👑' }) : null);
+    }, h('span', { class: 'sound-chip__name', text: item.name }), // v3.8: solo el nombre, sin emoji
+    locked ? h('span', { class: 'sound-chip__crown', 'aria-hidden': 'true' }, pic('corona', 20)) : null);
   };
   $('#ambientGrid').replaceChildren(
-    chip({ id: '', name: 'Silencio', icon: '🔇' }, !s.ambient, () => chooseAmbient('')),
+    chip({ id: '', name: 'Silencio' }, !s.ambient, () => chooseAmbient('')),
     ...C.AMBIENTS.map((a) => chip(a, s.ambient === a.id, () => chooseAmbient(a.id))));
-  $('#toneGrid').replaceChildren(...C.TONE_PACKS.map((t) => chip(t, s.tonePack === t.id, () => chooseTone(t.id))));
+  $('#toneGrid').replaceChildren(...C.TONE_PACKS.map((tone) => chip(tone, s.tonePack === tone.id, () => chooseTone(tone.id))));
   const vol = $('#ambientVol');
   if (document.activeElement !== vol) vol.value = String(s.ambientVolume);
 }

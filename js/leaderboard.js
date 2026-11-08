@@ -6,11 +6,12 @@
  * (tus minutos de la semana y de la temporada) y un aviso de que el ranking global llega pronto.
  *
  * Un top GLOBAL real necesita un servidor que reciba y valide las sesiones; si el ranking
- * se calculara en el teléfono, cualquiera podría editar sus minutos. El diseño seguro del
- * servidor está en server/supabase/schema.sql y docs/SEGURIDAD.md. Cuando exista, se activa
- * el proveedor "remote" con la misma interfaz: fetchBoard({ period, you, seasonStartKey }).
+ * se calculara en el teléfono, cualquiera podría editar sus minutos. Desde la v3.9 el servidor
+ * está en server/supabase/schema.sql y se activa con config.leaderboard.mode = 'remote'
+ * (paso a paso: docs/RANKING-GLOBAL.md).
  */
 import { rankForXp } from './game.js';
+import * as BOARD from './board.js';
 
 /**
  * Ordena filas por minutos y les asigna posición (los empates comparten puesto).
@@ -47,11 +48,12 @@ const LocalProvider = {
   },
 };
 
+// Ranking global (v3.9): el servidor de server/supabase/schema.sql, a través de js/board.js
 const RemoteProvider = {
   mode: 'remote',
   label: 'En línea',
-  async fetchBoard() {
-    throw new Error('El ranking en línea todavía no está conectado a un servidor.');
+  async fetchBoard({ period = 'week' } = {}) {
+    return (await BOARD.fetchBoard(period)).map((r) => ({ ...r, rank: rankForXp(r.xp) }));
   },
 };
 

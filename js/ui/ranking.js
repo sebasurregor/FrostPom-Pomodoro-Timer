@@ -1,17 +1,23 @@
 /*
  * FrostPom — vista Ranking.
- * Primer MVP: ranking local (solo tu marca) + aviso de que el ranking global llega pronto.
- * Cuando exista el servidor, el modo "remote" muestra el podio y la tabla completa.
+ *  - Modo "local" (config.leaderboard.mode): solo tu marca y el aviso "llega pronto".
+ *  - Modo "remote" (v3.9): ranking global con el servidor (js/board.js): podio, tabla y tu
+ *    lugar; avisos para unirte, para menores de 13 años y si elegiste no aparecer. Sin conexión
+ *    se muestra tu marca local con un botón para reintentar.
  */
 import * as U from '../util.js';
 import * as E from '../engine.js';
+import * as BOARD from '../board.js';
 import { getProvider } from '../leaderboard.js';
+import { rankForXp } from '../game.js';
 import { config } from '../config.js';
 import { seasonFor } from '../season.js';
 import { $, $$, h } from './dom.js';
 import { emblem } from './emblems.js';
 import { avatarContent, flagEl } from './widgets.js';
-import { state } from './context.js';
+import { joinDialog, ensureJoined, onBoardToggle } from './board-ui.js';
+import { state, mutate } from './context.js';
+import { t, tr, locale } from '../i18n.js';
 
 const LIMIT = 30;
 let period = 'week';
@@ -20,7 +26,7 @@ let token = 0;
 /** Tu fila usa tu avatar real; las demás, el emoji de cada persona. */
 const who = (r) => ({
   avatar: (size) => (r.isYou ? avatarContent(size) : r.avatar),
-  name: [flagEl(r.isYou ? state.profile.country : r.country), ' ', r.isYou ? `${r.nick} (tú)` : r.nick],
+  name: [flagEl(r.isYou ? state.profile.country : r.country), ' ', r.isYou ? t('{name} (tú)', { name: r.nick }) : r.nick],
 });
 
 const rowEl = (r, pos = String(r.position)) => {
@@ -33,53 +39,111 @@ const rowEl = (r, pos = String(r.position)) => {
     h('span', { class: 'row__min', text: U.formatMinutes(r.minutes) }));
 };
 
+/** Globo con birrete animado (con "Menos animaciones", la versión quieta). */
+function globe() {
+  const still = document.documentElement.classList.contains('reduce-motion');
+  return h('img', { class: 'soon__globe', src: still ? 'assets/icons/globo-quieto.webp' : 'assets/icons/globo.webp', width: '60', height: '60', alt: '', decoding: 'async', draggable: 'false' });
+}
+
 /** Tarjeta "El ranking global llega pronto". */
 function soonCard() {
   return h('div', { class: 'panel soon' },
-    h('div', { class: 'soon__icon', 'aria-hidden': 'true', text: '🌍' }),
+    h('div', { class: 'soon__icon', 'aria-hidden': 'true' }, globe()),
     h('h2', { class: 'panel__title', text: 'El ranking global llega pronto' }),
-    h('p', { class: 'panel__text', text: 'FrostPom acaba de nacer. Cuando el ranking en línea esté listo, aquí competirás con estudiantes de todo el mundo, semana a semana y por temporada. Mientras tanto, cada minuto que estudies ya cuenta para tu marca.' }));
+    h('p', { class: 'panel__text', text: 'Mientras tanto, tus minutos ya cuentan.' }));
 }
 
-export async function renderRanking() {
-  const mine = ++token;
-  const provider = getProvider(config);
-  const months = config.season.months;
-  const season = seasonFor(new Date(), months);
-  const mins = E.boardMinutes(state, new Date(), months);
-  const you = { nick: state.profile.nick, avatar: state.profile.avatar, xp: state.progress.xp, week: mins.week, season: mins.season, optIn: state.settings.leaderboardOn };
-  $('#seasonTab').textContent = 'Esta temporada';
-  $('#seasonTab').title = season.name;
-  $$('.seg__btn').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.period === period)));
+/** Tarjeta de estado del ranking global (unirte, menores, saliste…). null si no hace falta. */
+function statusCard() {
+  const acc = state.account;
+  if (!acc) return null;
+  const card = (title, text, button) => h('div', { class: 'panel soon board-status' },
+    h('div', { class: 'soon__icon', 'aria-hidden': 'true' }, globe()),
+    h('h2', { class: 'panel__title', text: title }),
+    h('p', { class: 'panel__text', text }),
+    button || null);
+  if (!acc.birth) {
+    return card('Únete al ranking global', 'Compite con estudiantes de todo el mundo por los minutos de estudio de la semana.',
+      h('button', { type: 'button', class: 'btn btn--gold', id: 'boardJoinBtn', onclick: () => joinDialog().then(renderRanking) }, 'Unirme al ranking'));
+  }
+  if (!BOARD.oldEnough(acc.birth)) {
+    return card('El ranking global es para mayores de 13 años', 'Puedes ver quién va adelante, y tus minutos siguen contando en tu progreso.');
+  }
+  if (!state.settings.leaderboardOn) {
+    return card('No apareces en el ranking', 'Elegiste no aparecer. Tus pomodoros no se envían al servidor.',
+      h('button', { type: 'button', class: 'btn btn--paper', id: 'boardBackBtn', onclick: async () => { mutate((s) => { s.settings.leaderboardOn = true; }); await onBoardToggle(true); renderRanking(); } }, 'Volver a aparecer'));
+  }
+  if (!BOARD.isJoined() || BOARD.joinedName() !== acc.username) {
+    return card('Todavía no estás en el ranking global', 'Necesitas internet para unirte. Tus pomodoros empiezan a contar desde que te unas.',
+      h('button', { type: 'button', class: 'btn btn--gold', id: 'boardRetryJoin', onclick: () => ensureJoined({ interactive: true }).then(renderRanking) }, 'Unirme ahora'));
+  }
+  return null;
+}
+
+/** Ranking global (modo "remote"). */
+async function renderGlobal(mine, { you, season }) {
+  const cap = U.formatMinutes(BOARD.capMin());
+  let when = '';
+  try { when = BOARD.nextWeekReset().toLocaleString(locale, { weekday: 'long', hour: 'numeric', minute: '2-digit' }); } catch { /* sin Intl */ }
+  $('#boardNotice').textContent = (period === 'week' && when ? `${t('La semana se reinicia el {when} (tu hora).', { when })} ` : '')
+    + t('Cada persona suma como máximo {cap} al día. Solo cuentan los pomodoros que empiezas con internet.', { cap });
+  $('#boardSoon').replaceChildren(...[statusCard()].filter(Boolean));
+  $('#board').setAttribute('aria-busy', 'true');
   let rows;
   try {
-    rows = await provider.fetchBoard({ period, you, seasonStartKey: season.startKey });
+    rows = await BOARD.fetchBoard(period, LIMIT);
   } catch (e) {
     if (mine !== token) return;
-    $('#boardNotice').textContent = e.message;
-    $('#boardSoon').replaceChildren();
+    $('#board').removeAttribute('aria-busy');
+    if (e.kind === 'notready') return renderLocal({ you, season, rows: await getProvider({}).fetchBoard({ period, you }) }); // el servidor aún no está montado
+    $('#boardNotice').textContent = e.kind === 'offline'
+      ? tr('No pudimos cargar el ranking global: no hay conexión. Esta es tu marca en este dispositivo.')
+      : tr('No pudimos cargar el ranking global en este momento. Esta es tu marca en este dispositivo.');
     $('#podium').replaceChildren();
-    $('#board').replaceChildren();
+    const local = await getProvider({}).fetchBoard({ period, you });
+    $('#board').removeAttribute('start');
+    $('#board').replaceChildren(
+      h('li', { class: 'board__label', text: period === 'week' ? tr('Tu marca de esta semana') : t('Tu marca de la temporada ({name})', { name: season.label }) }),
+      ...local.map((r) => rowEl(r, '★')),
+      h('li', { class: 'board__retry' }, h('button', { type: 'button', class: 'btn btn--paper btn--sm', id: 'boardRetry', onclick: renderRanking }, 'Reintentar')));
     return;
   }
   if (mine !== token) return;
-  const cap = U.formatMinutes(state.settings.dailyCapMin);
-  const optOut = state.settings.leaderboardOn ? '' : ' Elegiste no aparecer en el ranking: puedes cambiarlo en Ajustes.';
-
-  if (provider.mode === 'local') {
-    $('#boardNotice').textContent = `Cada persona sumará como máximo ${cap} al día, para premiar la constancia y no el desvelo.${optOut}`;
-    $('#boardSoon').replaceChildren(soonCard());
+  $('#board').removeAttribute('aria-busy');
+  rows = rows.map((r) => ({ ...r, rank: rankForXp(r.isYou ? state.progress.xp : r.xp) })); // tu emblema, el de tu app
+  if (!rows.length) {
     $('#podium').replaceChildren();
-    const label = period === 'week' ? 'Tu marca de esta semana' : `Tu marca de la temporada (${season.name.replace(/^Temporada\s+/, '')})`;
     $('#board').removeAttribute('start');
-    $('#board').replaceChildren(
-      h('li', { class: 'board__label', text: label }),
-      ...rows.map((r) => rowEl(r, '★')));
+    $('#board').replaceChildren(h('li', { class: 'board__label board__empty', text: period === 'week'
+      ? tr('Todavía nadie suma minutos esta semana. ¡Empieza un pomodoro y sé el primero!')
+      : tr('Todavía nadie suma minutos esta temporada. ¡Empieza un pomodoro y sé el primero!') }));
     return;
   }
+  renderTable(rows);
+  const counting = BOARD.isJoined() && state.settings.leaderboardOn && BOARD.oldEnough(state.account && state.account.birth);
+  if (counting && !rows.some((r) => r.isYou)) {
+    $('#board').append(h('li', { class: 'board__label board__you', text: period === 'week'
+      ? tr('Aún no sumas minutos esta semana: tus pomodoros con internet aparecen aquí.')
+      : tr('Aún no sumas minutos esta temporada: tus pomodoros con internet aparecen aquí.') }));
+  }
+}
 
-  $('#boardNotice').textContent = `Cada persona suma como máximo ${cap} al día.${optOut}`;
-  $('#boardSoon').replaceChildren();
+/** Ranking local (modo "local", o si el servidor del ranking todavía no está montado). */
+function renderLocal({ you, season, rows }) {
+  const cap = U.formatMinutes(state.settings.dailyCapMin);
+  const optOut = state.settings.leaderboardOn ? '' : tr(' Elegiste no aparecer en el ranking: puedes cambiarlo en Ajustes.');
+  $('#boardNotice').textContent = t('Cada persona sumará como máximo {cap} al día, para premiar la constancia y no el desvelo.', { cap }) + optOut;
+  $('#boardSoon').replaceChildren(soonCard());
+  $('#podium').replaceChildren();
+  const label = period === 'week' ? tr('Tu marca de esta semana') : t('Tu marca de la temporada ({name})', { name: season.label });
+  $('#board').removeAttribute('start');
+  $('#board').replaceChildren(
+    h('li', { class: 'board__label', text: label }),
+    ...rows.map((r) => rowEl(r, '★')));
+}
+
+/** Podio (los 3 primeros) y la tabla desde el 4.º; tu fila al final si quedaste más abajo. */
+function renderTable(rows) {
   const top3 = rows.slice(0, 3);
   $('#podium').replaceChildren(...[1, 0, 2].filter((i) => top3[i]).map((i) => {
     const r = top3[i];
@@ -96,6 +160,35 @@ export async function renderRanking() {
   $('#board').setAttribute('start', '4');
 }
 
+export async function renderRanking() {
+  const mine = ++token;
+  const provider = getProvider(config);
+  const months = config.season.months;
+  const season = seasonFor(new Date(), months);
+  const mins = E.boardMinutes(state, new Date(), months);
+  const you = { nick: state.profile.nick, avatar: state.profile.avatar, xp: state.progress.xp, week: mins.week, season: mins.season, optIn: state.settings.leaderboardOn };
+  $('#seasonTab').textContent = tr('Esta temporada');
+  $('#seasonTab').title = season.name;
+  $$('.seg__btn').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.period === period)));
+  if (BOARD.enabled()) return renderGlobal(mine, { you, season });
+  let rows;
+  try {
+    rows = await provider.fetchBoard({ period, you, seasonStartKey: season.startKey });
+  } catch (e) {
+    if (mine !== token) return;
+    $('#boardNotice').textContent = e.message;
+    $('#boardSoon').replaceChildren();
+    $('#podium').replaceChildren();
+    $('#board').replaceChildren();
+    return;
+  }
+  if (mine !== token) return;
+  if (provider.mode === 'local') return renderLocal({ you, season, rows });
+  renderTable(rows);
+}
+
 export function bindRanking() {
   $$('.seg__btn').forEach((b) => b.addEventListener('click', () => { period = b.dataset.period; renderRanking(); }));
+  // Algo del ranking global cambió (te uniste, terminaste un pomodoro…): si estás viendo el ranking, se repinta
+  document.addEventListener('frostpom:board', () => { if (document.body.dataset.route === 'ranking') renderRanking(); });
 }

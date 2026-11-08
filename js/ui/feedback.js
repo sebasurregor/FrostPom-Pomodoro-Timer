@@ -2,9 +2,10 @@
  * FrostPom — avisos: toasts, notificaciones del sistema y diálogos (uno a la vez).
  */
 import { $, h } from './dom.js';
+import { tr } from '../i18n.js';
 
 export function toast(text, tone = 'info', { icon, ms = 3800 } = {}) {
-  const el = h('div', { class: `toast toast--${tone}`, role: 'status' }, icon ? h('span', { class: 'toast__icon', 'aria-hidden': 'true', text: icon }) : null, h('span', { class: 'toast__text', text }));
+  const el = h('div', { class: `toast toast--${tone}`, role: 'status' }, icon ? h('span', { class: 'toast__icon', 'aria-hidden': 'true' }, icon) : null, h('span', { class: 'toast__text', text }));
   const box = $('#toasts');
   box.append(el);
   while (box.children.length > 3) box.firstElementChild.remove();
@@ -17,6 +18,7 @@ export function toast(text, tone = 'info', { icon, ms = 3800 } = {}) {
 
 /** Toast siempre; además, notificación del sistema si la app está en segundo plano y hay permiso. */
 export async function notify(title, body) {
+  title = tr(title); body = tr(body);
   toast(`${title} ${body}`, 'good');
   if (!document.hidden || !('Notification' in window) || Notification.permission !== 'granted') return;
   try {
@@ -42,6 +44,8 @@ let dialogChain = Promise.resolve();
 export function openDialog({ title, body = [], actions = [], className = '', dismissable = true, onOpen }) {
   const run = () => new Promise((resolve) => {
     dlg.className = `dlg ${className}`;
+    // Entrar / crear cuenta: detrás se ve el paisaje del ártico con la fogata (no la app)
+    if (/\bdlg--gate\b/.test(className)) document.documentElement.classList.add('gate-open');
     dlg.replaceChildren(
       h('div', { class: 'dlg__box' },
         title ? h('h2', { class: 'dlg__title', id: 'dlgTitle', text: title }) : null,
@@ -59,6 +63,8 @@ export function openDialog({ title, body = [], actions = [], className = '', dis
     dlg.addEventListener('cancel', onCancel);
     dlg.addEventListener('close', () => {
       dlg.removeEventListener('cancel', onCancel);
+      // Si enseguida se abre otro diálogo (por ejemplo, la foto después del registro), el paisaje sigue
+      setTimeout(() => { if (!dlg.open) document.documentElement.classList.remove('gate-open'); }, 150);
       resolve(dlg.returnValue || 'cancel');
     }, { once: true });
     dlg.returnValue = '';

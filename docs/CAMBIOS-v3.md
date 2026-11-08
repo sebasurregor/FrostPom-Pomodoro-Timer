@@ -1,5 +1,76 @@
 # Cambios de la v2 a la v3
 
+## v3.9: ranking global (listo, apagado hasta que lo enciendas)
+
+- **Servidor nuevo** (`server/supabase/schema.sql`): el nombre público es el nombre de usuario (revisado con las mismas reglas que la app y único); todos los de 13+ aparecen por defecto y se puede salir; semana de lunes 00:00 UTC y temporada de 3 meses; XP acotada; ocultar nombres (`private.hide_name`); pasar tu lugar a tu cuenta con correo con un código de un solo uso; descargar y borrar; limpieza (`private.cleanup`). Probado en PostgreSQL: 23 comprobaciones.
+- **App** (`js/board.js`, `js/ui/board-ui.js`): cuenta anónima de Supabase; avisa al servidor al empezar y al terminar cada pomodoro (sin internet al empezar no cuenta; si se va al terminar, se reintenta solo); podio y tabla con tu fila; tarjetas para unirte, para menores de 13 y si saliste; nombre ocupado → elegir otro o recuperarlo con el correo; Ajustes → descargar y borrar tus datos; al eliminar la cuenta también se borran del servidor.
+- **Edad:** con el ranking encendido, el registro pregunta mes y año de nacimiento (sin sugerir respuesta). Se queda en el dispositivo; los menores de 13 no se conectan. A quien ya tenía cuenta se le pregunta una vez ("¡Llegó el ranking global!").
+- **Arreglo del filtro de nombres:** bloqueaba nombres inocentes. "kkk" quedaba como "k" y bloqueaba cualquier nombre con k ("kevin"); "xxx" hacía lo mismo con la x ("xavier"); "perra" quedaba como "pera" ("esperanza") y "coño" bloqueaba "conocer". Ahora cada palabra se busca permitiendo letras repetidas ("puuuta" sigue bloqueado), y se ignoran palabras comunes como computadora, disputa o diputado.
+- **Correo y contraseña:** al recuperar la contraseña ya no se pierde la fecha de nacimiento; los errores "no encontrado" del servidor ya no se confunden con "servidor sin montar".
+- **Privacidad:** `privacidad.html` (ES/EN) explica el ranking: qué se envía, qué no, cuánto se guarda, cómo salir, descargar y borrar, y menores de 13.
+- **Pruebas:** `tests/e2e_ranking.py` (55 comprobaciones con Supabase simulado), 6 pruebas unitarias nuevas (66 en total).
+- Guía: `docs/RANKING-GLOBAL.md`.
+
+## v3.8.3: nevada suave en la entrada
+
+- **Nieve en la pantalla de entrar / crear cuenta** (`js/ui/gate-snow.js`): 40 copos con borde difuminado en tres profundidades. Los de lejos son pequeños y lentos; los de cerca, grandes, desenfocados y pocos. Caen despacio, se balancean de lado a lado y aparecen y se desvanecen poco a poco. Solo usa `transform` y `opacity`, y solo se anima mientras se ve la entrada.
+- **La capa negra leve** ahora va dentro de la escena (`.gate-scene__art::after`) y no en el fondo del diálogo. La imagen queda igual de oscurecida, pero la nieve queda encima, en primer plano.
+- Con **"Menos animaciones"** la nevada no aparece. `tests/e2e_smoke.py` lo revisa.
+
+## v3.8.2: íconos nuevos de gema y de foto
+
+- **Gema nueva** (`assets/icons/gema.png`, azul hielo, sin la sombra del piso para que se vea nítida en tamaño pequeño): en la barra de arriba, en el contador de la bandeja de comida y en el precio de cada comida. El color de las gemas (`--gem`, el "+N gemas" que flota y el borde al pasar el mouse) pasó de morado a azul hielo. El logro "Inquebrantable" conserva su 💎 porque es la insignia del logro, no la moneda.
+- **Ícono de foto nuevo** (`assets/icons/foto.png`) en lugar del emoji 📷: "Cambiar foto" / "Subir una foto" en el perfil, "Elegir una foto" / "Elegir otra foto" al crear la cuenta y el aviso "¡Foto de perfil lista!".
+- **Capturas actualizadas** con la gema nueva: `docs/microsoft-store/capturas-es/`, `capturas-en/` y las del manifiesto (`assets/screenshots/`).
+
+## v3.8.1: arreglos del globo y del inglés
+
+- **Globo sin parches blancos:** en el video, los huecos entre el birrete, el cordón y el globo eran blancos y quedaban como manchas que aparecían y desaparecían. Ahora todo hueco blanco es transparente (solo se conserva el brillo del birrete), los bordes se suavizan sin halo y todos los cuadros usan el mismo recorte, así que el birrete ya no queda pegado al borde.
+- **Botón "Genial" en inglés:** la ventana "Eres Premium" ya dice "Awesome".
+- **Perfil de impuestos y pagos:** la sección 2 de `docs/COBRO-PREMIUM.md` explica paso a paso el W-8BEN y el perfil de pagos en Partner Center.
+
+## v3.8: modo oscuro, fogata animada, pingüino incluido y cobro de Premium listo
+
+- **Fogata animada al entrar:** el paisaje ártico ahora es un elemento de la página (`#gateScene`) y encima va una llama dibujada con el contorno de la original: se estira, se mece, el centro titila, brilla la nieve y suben gotitas de fuego. Con "Menos animaciones" queda quieta. Las chispas fijas del dibujo se borraron para que no se dupliquen.
+- **Modo oscuro:** Ajustes → **Apariencia** (Automática, Clara u Oscura). Los colores son variables (`--text`, `--surface`, `--card`…) y `html[data-theme="dark"]` cambia sus valores; el paisaje se oscurece un poco. Lo controla `js/ui/theme.js`.
+- **El Pingüino viene con la cuenta:** ya está desbloqueado en Perfil (etiqueta "Incluido"), el primer pomodoro ya no muestra su ceremonia y nunca sale entre las mascotas del regalo de Premium. El logro "Primer paso" se sigue ganando.
+- **Sonidos de concentración sin emojis:** solo el nombre.
+- **Globo animado** (el del MP4) en "El ranking global llega pronto": WebP animado con fondo transparente (`assets/icons/globo.webp`) y versión quieta para "Menos animaciones".
+- **Cobro de Premium listo pero apagado:** `js/billing.js` usa la Digital Goods API de Microsoft Store (precio real, ventana de pago, revisar la suscripción al abrir). Se enciende con `config.premium.chargesEnabled`. Prueba simulada: `tests/e2e_cobro.py`. Guía: `docs/COBRO-PREMIUM.md`.
+- **Guía de despliegue completa:** `docs/DESPLIEGUE.md`.
+
+## v3.7: inglés y español, tarjetas claras en toda la app y recuperar contraseña por correo
+
+- **Idiomas:** la app sale en el idioma de Windows (español si está en español; inglés en cualquier otro caso) y se cambia en **Ajustes → Idioma · Language**. Funciona con `js/i18n.js` + el diccionario `js/i18n-en.js`: el texto en español es la "llave" y `t()` pone los datos. Fechas, números, días y meses también cambian. La prueba `tests/e2e_ingles.py` recorre todo en inglés y avisa si queda algo en español.
+- **Tarjetas claras en toda la app:** el estilo de Progreso (blanco, borde gris suave, esquinas grandes y sombra difusa) ahora lo usan los paneles, la placa de Enfocar, el ranking, los diálogos y los avisos. La **barra de arriba es una tarjeta redondeada** que flota, y el menú (abajo en el celular, a la izquierda en escritorio) también.
+- **Se quitó la pantalla blanca de Progreso:** vuelve a verse el paisaje.
+- **Entrar / crear cuenta:** una capa negra leve sobre el paisaje ártico para que no encandile.
+- **Recuperar contraseña:** correo opcional al crear la cuenta o en Ajustes; "¿Olvidaste la contraseña?" envía un **código** con Supabase y deja poner una contraseña nueva. A Supabase solo va el correo (con una contraseña aleatoria); la de FrostPom no sale del dispositivo. Prueba: `tests/e2e_recuperar.py` (simula Supabase). Configuración: `docs/RECUPERAR-CONTRASENA.md`.
+- **Privacidad:** `privacidad.html` explica el correo opcional y trae versión en inglés.
+- **Tienda:** ficha en inglés en `docs/microsoft-store/FICHA.md` y capturas en inglés en `docs/microsoft-store/capturas-en/`.
+
+## v3.6: íconos dibujados, Progreso estilo racha y pantalla de entrada ártica
+
+- **Íconos nuevos** (`assets/icons/`, función `pic()` en `js/ui/pics.js`): fuego de la racha, copo, corona de Premium, cofre del regalo y los de Icons8 (candado, check, info, reloj, música, llave, quitar). Reemplazan emojis como 🔥 👑 🔒 ⏱️ ✓. Crédito a Icons8 en Ajustes → Créditos.
+- **Progreso en blanco, como la racha de Duolingo:** la pantalla se vuelve blanca, arriba va una banda del color de tu rango con el escudo **nevado**, debajo la tarjeta de la racha con el fuego (gris si hoy aún no estudias, con "Estudiar ahora").
+- **El calendario sale primero** (la pestaña "7 días" sigue disponible y la app recuerda cuál elegiste). Días con meta en naranja con un copo, días estudiados en naranja suave y una banda que une los días seguidos.
+- **Se quitó "Tu polo" de Progreso** (ya está en la placa de Enfocar).
+- **Nuevo compañero:** el fondo ahora es un degradado negro en vez de azul y cada animal queda centrado (el tiburón y el zorro se medían mal porque su dibujo no está en el centro de la imagen).
+- **Entrar / crear cuenta:** detrás del cuadro ya no se ve la app, sino el paisaje ártico con los personajes junto a la fogata.
+- **Capturas de la tienda** rehechas con el nuevo Progreso.
+- **Guía** `docs/RECUPERAR-CONTRASENA.md` para la recuperación por correo (aún no programada).
+- **Pruebas:** 60 de lógica, todas las del navegador y `store_check.py` dice "Lista para la tienda".
+
+## v3.5: menos texto, sesión recordada y descanso a tu ritmo
+
+- **Placa de estado en Enfocar:** el botón de sonido, los minutos de hoy y la salud de tu polo juntos en un solo recuadro. Con el reloj quieto también se ve el clima.
+- **Mantener la sesión iniciada:** casilla al registrarte y al entrar (marcada por defecto) e interruptor en Ajustes → Tu cuenta. El dispositivo guarda un token aleatorio y la cuenta solo su huella (nunca la contraseña); dura 60 días y se anula al cerrar sesión o cambiar la contraseña.
+- **Al terminar de estudiar** (Ajustes → Temporizador): "El descanso empieza solo" o "El reloj me espera". Aparte, "Volver a estudiar solo".
+- **Menos descripciones:** se quitaron las explicaciones de Ajustes (guardado automático, temporadas, sonido, región, límite saludable, recordatorios y todos los subtítulos de los interruptores), de Compañeros, de Personalizar, de la tienda, de Premium y de varios diálogos.
+- **Montañas:** la nieve de cada cima ahora sigue las dos laderas reales (antes era un triángulo fijo que sobresalía o quedaba corto).
+- **Arreglado:** en celulares de 430 px la barra de XP se montaba sobre la racha y Premium; ahora la barra de arriba usa dos filas hasta 640 px.
+- **Pruebas:** 60 de lógica y 107 comprobaciones en el navegador; `store_check.py` dice "Lista para la tienda".
+
 ## v3.4: la app ahora se llama FrostPom (primer MVP para Microsoft Store)
 
 - **Nuevo nombre: FrostPom.**

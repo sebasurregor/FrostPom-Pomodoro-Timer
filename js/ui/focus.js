@@ -15,9 +15,12 @@ import { currentPetId, fullness } from '../pet.js';
 import { presetButton, mascotPop } from './widgets.js';
 import { premiumDialog } from './premium.js';
 import { syncAmbient } from './sound.js';
+import { pic } from './pics.js';
+import { onStudyStart, onStudyRecorded, onStudyDropped } from './board-ui.js';
 import { state, mutate, prefs, today, session, isPremium, poleNow } from './context.js';
+import { t, tr } from '../i18n.js';
 
-const MODE_NAMES = { study: 'Estudio', break: 'Descanso', long: 'Descanso largo' };
+const MODE_NAMES = { study: tr('Estudio'), break: tr('Descanso'), long: tr('Descanso largo') };
 const RING_R = 120;
 const RING_C = 2 * Math.PI * RING_R;
 const LATE_MS = 5 * 60 * 1000; // si volviste mucho después del fin, no se arranca solo
@@ -46,6 +49,7 @@ export function startOrToggle() {
   if (action === 'start') {
     FX.buzz(25);
     buddySays();
+    if (session.state.mode === 'study') onStudyStart(session.state); // ranking global: el servidor anota la hora
   }
   timerChanged();
 }
@@ -58,13 +62,16 @@ function finishEarly() {
 }
 
 function skip() {
+  const startMs = session.state.sessionStartMs;
   const { skippedStudy, lost } = session.skip();
+  if (skippedStudy) onStudyDropped(startMs);
   if (skippedStudy) mutate((s) => E.skipStudy(s));
   timerChanged();
   if (lost) toast('Saltaste la sesión y ese tiempo no se guardó. Usa "Terminar y guardar" si quieres que cuente.');
 }
 
 function resetTimer() {
+  if (session.state.mode === 'study') onStudyDropped(session.state.sessionStartMs);
   session.reset();
   timerChanged();
 }
@@ -86,23 +93,27 @@ function celebrate(rec, res) {
     mascotPop('saludo', $('#mainBtn'));
     buddySays();
     FX.buzz([60, 40, 60]);
-    notify('¡Sesión completa!', res.reward.xp ? `Ganaste ${res.reward.xp} XP. Ahora toca descansar.` : 'Ahora toca descansar.');
+    const next = state.settings.autoBreak ? 'Ahora toca descansar.' : 'Empieza tu descanso cuando quieras.';
+    notify('¡Sesión completa!', res.reward.xp ? `${t('Ganaste {n} XP.', { n: res.reward.xp })} ${tr(next)}` : next);
   } else if (!res.reward.tooShort) {
-    toast(`Sesión guardada: ${U.formatMinutes(rec.actualSec / 60)}.`);
+    toast(t('Sesión guardada: {time}.', { time: U.formatMinutes(rec.actualSec / 60) }));
   }
 }
 
 function afterRecord(rec, { auto }) {
   const poleBefore = poleNow();
   const res = mutate((s) => E.applyRecord(s, rec, { todayKey: today() }));
+  onStudyRecorded(rec); // ranking global: el servidor decide cuánto cuenta
   celebrate(rec, res);
   const poleAfter = poleNow();
   if (poleAfter - poleBefore > 0.015) {
-    setTimeout(() => toast(`¡Limpiaste tu polo! Ahora está al ${Math.round(poleAfter * 100)} %.`, 'good', { icon: '🐧' }), 900);
+    setTimeout(() => toast(t('¡Limpiaste tu polo! Ahora está al {n} %.', { n: Math.round(poleAfter * 100) }), 'good', { icon: '🐧' }), 900);
   }
   session.advance(C.nextModeAfter(rec, state.progress.cycle));
   timerChanged();
-  if (auto && rec.completed && state.settings.autoContinue && Date.now() - rec.endMs <= LATE_MS) {
+  // Tras estudiar decide autoBreak ("el descanso empieza solo"); tras descansar, autoContinue.
+  const autoNext = rec.mode === 'study' ? state.settings.autoBreak : state.settings.autoContinue;
+  if (auto && rec.completed && autoNext && Date.now() - rec.endMs <= LATE_MS) {
     setTimeout(() => {
       if (session.state.status === 'idle') startOrToggle();
     }, 1600);
@@ -145,7 +156,7 @@ function choosePreset(id) {
 function setCustomValue(key, value) {
   const res = mutate((s) => E.setCustomMinutes(s, key, value, today()));
   if (res.clamped && !isPremium()) {
-    toast(`En la versión gratis el límite es de ${res.limits[0]} a ${res.limits[1]} min. Con Premium la duración es libre.`, 'warn', { icon: '👑' });
+    toast(t('En la versión gratis el límite es de {a} a {b} min. Con Premium la duración es libre.', { a: res.limits[0], b: res.limits[1] }), 'warn', { icon: pic('corona', 30) });
   }
   afterDurationChange();
 }
@@ -173,7 +184,7 @@ export function renderPresets() {
   const custom = s.preset === C.CUSTOM_PRESET;
   $('#customPanel').hidden = !custom;
   $('#customizeBtn').setAttribute('aria-expanded', String(custom));
-  const { limits: L, durations, premium } = prefs();
+  const { limits: L, premium } = prefs();
   for (const st of $$('.stepper[data-key]')) {
     const input = $('.stepper__input', st);
     const [min, max] = st.dataset.key === 'customStudyMin' ? L.study : L.brk;
@@ -182,10 +193,9 @@ export function renderPresets() {
     if (document.activeElement !== input) input.value = String(s[st.dataset.key]);
   }
   $('#customLimits').replaceChildren(premium
-    ? 'Duración libre: de 1 a 180 minutos.'
-    : h('span', {}, `Versión gratis: estudio de ${L.study[0]} a ${L.study[1]} min y descanso de ${L.brk[0]} a ${L.brk[1]} min. `,
-      h('button', { type: 'button', class: 'link-btn', onclick: premiumDialog }, '👑 Duración libre con Premium')));
-  $('#longBreakText').textContent = `Cada ${C.LONG_EVERY} pomodoros tomas un descanso largo de ${durations.long} min.`;
+    ? tr('De 1 a 180 min.')
+    : h('span', {}, t('Estudio {a}–{b} min, descanso {c}–{d} min. ', { a: L.study[0], b: L.study[1], c: L.brk[0], d: L.brk[1] }),
+      h('button', { type: 'button', class: 'link-btn', onclick: premiumDialog }, pic('corona', 18), ' Duración libre con Premium')));
 }
 
 // =====================================================================
@@ -250,7 +260,7 @@ function renderCycleDots(st) {
   const filled = st.mode === 'long' ? every : state.progress.cycle % every;
   const dots = $('#cycleDots');
   dots.replaceChildren(...Array.from({ length: every }, (_, i) => h('span', { class: `dot${i < filled ? ' is-done' : ''}` })));
-  dots.setAttribute('aria-label', `Sesión ${Math.min(filled + (st.mode === 'study' ? 1 : 0), every)} de ${every} antes del descanso largo`);
+  dots.setAttribute('aria-label', t('Sesión {n} de {m} antes del descanso largo', { n: Math.min(filled + (st.mode === 'study' ? 1 : 0), every), m: every }));
   dots.setAttribute('role', 'img');
   dots.hidden = false;
 }
@@ -262,15 +272,15 @@ function renderXpHint(st) {
     hint.className = 'xp-hint';
     if (r.xp === 0) {
       hint.classList.add('is-capped');
-      hint.textContent = 'Ya llegaste a tu límite saludable de hoy. Puedes seguir, pero no suma XP.';
+      hint.textContent = tr('Ya llegaste a tu límite saludable de hoy. Puedes seguir, pero no suma XP.');
     } else {
-      hint.textContent = `Si completas esta sesión: +${r.xp} XP${r.capped ? ' (llegarás a tu límite de hoy)' : ''}`;
+      hint.textContent = t('Si completas esta sesión: +{n} XP', { n: r.xp }) + (r.capped ? tr(' (llegarás a tu límite de hoy)') : '');
     }
   } else {
     hint.className = 'xp-hint xp-hint--break';
     hint.textContent = state.progress.breakEarned
-      ? `Descanso completo: +${G.RULES.breakXp} XP. Párate, toma agua y mira algo lejano 20 segundos.`
-      : 'Párate, toma agua y mira algo lejano 20 segundos.';
+      ? t('Descanso completo: +{n} XP. Párate, toma agua y mira algo lejano 20 segundos.', { n: G.RULES.breakXp })
+      : tr('Párate, toma agua y mira algo lejano 20 segundos.');
   }
 }
 
@@ -291,13 +301,13 @@ export function renderTimer() {
   ring.dataset.status = st.status;
   $('#modeLabel').textContent = MODE_NAMES[st.mode];
   const main = $('#mainBtn');
-  main.textContent = st.status === 'running' ? 'Pausar' : st.status === 'paused' ? 'Continuar' : st.mode === 'study' ? 'Empezar a estudiar' : 'Empezar descanso';
+  main.textContent = tr(st.status === 'running' ? 'Pausar' : st.status === 'paused' ? 'Continuar' : st.mode === 'study' ? 'Empezar a estudiar' : 'Empezar descanso');
   main.className = `btn btn--xl ${st.status === 'running' ? 'btn--paper' : st.mode === 'study' ? 'btn--gold' : 'btn--mint'}`;
   const finish = $('#finishBtn');
   finish.hidden = st.mode !== 'study';
   finish.disabled = st.status === 'idle';
   $('#resetBtn').disabled = st.status === 'idle';
-  $('#skipBtn').textContent = st.mode === 'study' ? 'Saltar al descanso' : 'Saltar descanso';
+  $('#skipBtn').textContent = tr(st.mode === 'study' ? 'Saltar al descanso' : 'Saltar descanso');
   renderCycleDots(st);
   renderBuddy();
   syncAmbient();

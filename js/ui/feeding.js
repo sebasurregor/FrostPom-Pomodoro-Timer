@@ -13,6 +13,8 @@ import { toast } from './feedback.js';
 import { say } from './companions.js';
 import { state, mutate } from './context.js';
 import { setEating } from './focus.js';
+import { pic } from './pics.js';
+import { t, tr } from '../i18n.js';
 
 const tray = () => $('#foodTray');
 export const trayOpen = () => !tray().hidden;
@@ -62,7 +64,7 @@ export function renderTray() {
   const pct = Math.round(full);
   const m = P.mood(full);
   const isFull = full >= P.FULL_AT;
-  $('#trayPetName').textContent = state.profile.companion ? `tu ${pet.name.toLowerCase()}` : 'tu pingüino';
+  $('#trayPetName').textContent = state.profile.companion ? t('tu {pet}', { pet: pet.name.toLowerCase() }) : tr('tu pingüino');
   $('#trayPct').textContent = `${pct} %`;
   $('#trayFill').style.setProperty('--p', `${pct}%`);
   $('#trayMeter').setAttribute('aria-valuenow', String(pct));
@@ -70,21 +72,21 @@ export function renderTray() {
   $('#trayMeter').dataset.mood = m.id;
   $('#trayGems').textContent = fmtInt(state.progress.gems);
   $('#trayHint').textContent = isFull
-    ? `${m.emoji} ¡Está lleno! Vuelve cuando le dé hambre otra vez.`
-    : 'Arrastra una comida hasta tu compañero (con el mouse o con el dedo). ★ = su favorita.';
+    ? `${m.emoji} ${tr('¡Está lleno!')}`
+    : tr('Arrástrala hasta tu compañero. ★ = favorita.');
   $('#trayFoods').replaceChildren(...P.FOODS.map((f) => {
     const fav = P.isFavorite(petId, f.id);
     const missing = f.cost - state.progress.gems;
     const can = !isFull && missing <= 0;
-    const why = isFull ? 'está lleno' : missing > 0 ? `te faltan ${missing} gemas` : `${f.cost} gemas, +${P.fillFor(petId, f.id)} barriguita${fav ? ', su favorita' : ''}`;
+    const why = isFull ? tr('está lleno') : missing > 0 ? t('te faltan {n} gemas', { n: missing }) : t('{cost} gemas, +{fill} barriguita', { cost: f.cost, fill: P.fillFor(petId, f.id) }) + (fav ? tr(', su favorita') : '');
     return h('li', {},
       h('button', {
         type: 'button', class: `tray-food${fav ? ' is-fav' : ''}`, 'data-food': f.id, disabled: !can,
-        'aria-label': `Darle ${f.name}: ${why}`, title: `${f.name}: ${why}`,
+        'aria-label': t('Darle {food}: {why}', { food: f.name, why }), title: `${f.name}: ${why}`,
       },
       fav ? h('span', { class: 'tray-food__fav', 'aria-hidden': 'true', text: '★' }) : null,
       h('img', { class: 'tray-food__img', src: f.img, alt: '', width: '52', height: '52', draggable: 'false', decoding: 'async' }),
-      h('span', { class: 'tray-food__price', 'aria-hidden': 'true', text: `${f.cost} 💎` })));
+      h('span', { class: 'tray-food__price', 'aria-hidden': 'true' }, String(f.cost), pic('gema', 14))));
   }));
 }
 

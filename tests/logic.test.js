@@ -15,6 +15,7 @@ import * as SEA from '../js/season.js';
 import * as W from '../js/weather.js';
 import * as V from '../js/voices.js';
 import * as PET from '../js/pet.js';
+import * as SEC from '../js/security.js';
 
 const G = { ...game, ...catalog, ...identity };
 
@@ -337,17 +338,20 @@ test('logro: semana constante (5 días activos en la misma semana)', () => {
   assert.ok(st.progress.achievements['semana-constante']);
 });
 
-test('compañeros: solo se equipan si su logro está desbloqueado', () => {
+test('compañeros: el Pingüino viene con la cuenta; los demás, con su logro', () => {
   const st = S.defaultState();
-  assert.equal(E.equipCompanion(st, 'pinguino').ok, false);
+  assert.equal(E.equipCompanion(st, 'pinguino').ok, true); // incluido desde el inicio
+  assert.equal(G.lockedCompanions(st.progress).some((c) => c.id === 'pinguino'), false); // nunca es regalo de Premium
+  assert.equal(G.lockedCompanions(st.progress).length, G.COMPANIONS.length - 1);
   const { events } = E.applyStudy(st, studyRec(at(2026, 11, 2)), { todayKey: '2026-11-02' });
-  assert.ok(events.some((e) => e.type === 'companion' && e.companion.id === 'pinguino'));
-  assert.equal(E.equipCompanion(st, 'pinguino').ok, true);
+  assert.ok(events.some((e) => e.type === 'achievement' && e.id === 'primer-paso'));
+  assert.ok(!events.some((e) => e.type === 'companion')); // el primer pomodoro ya no "desbloquea" al pingüino
   assert.equal(st.profile.companion, 'pinguino');
   assert.equal(E.equipCompanion(st, 'oso-polar').ok, false);
   assert.equal(E.equipCompanion(st, null).ok, true);
-  assert.equal(G.COMPANIONS.every((c) => G.ACHIEVEMENT_BY_ID[c.unlock]), true);
-  assert.equal(new Set(G.COMPANIONS.map((c) => c.unlock)).size, G.COMPANIONS.length); // un logro por compañero
+  const earned = G.COMPANIONS.filter((c) => !c.starter);
+  assert.equal(earned.every((c) => G.ACHIEVEMENT_BY_ID[c.unlock]), true);
+  assert.equal(new Set(earned.map((c) => c.unlock)).size, earned.length); // un logro por compañero
 });
 
 test('duración personalizada: se valida y sobrevive a la migración', () => {
@@ -773,4 +777,112 @@ test('premium: la mascota regalada sobrevive a guardar/cargar y no repite la cer
   const evil = S.validateState({ ...JSON.parse(JSON.stringify(S.defaultState())), premium: { active: true, giftPending: true }, progress: { gifted: ['dragon', 'oso-polar', 'oso-polar'] } });
   assert.deepEqual(evil.progress.gifted, ['oso-polar']);
   assert.equal(evil.premium.giftPending, false);
+});
+
+// ---------------------------------------------------------------------------
+// v3.5: "el reloj me espera" y "mantener sesión iniciada"
+// ---------------------------------------------------------------------------
+test('ajustes: el descanso automático se elige aparte y hereda el ajuste antiguo', () => {
+  assert.equal(S.defaultState().settings.autoBreak, true);
+  // Datos de antes (solo "Seguir solo" apagado): el descanso tampoco empieza solo.
+  assert.equal(S.validateState({ settings: { autoContinue: false } }).settings.autoBreak, false);
+  // Ya elegido por separado: se respeta cada uno.
+  const st = S.validateState({ settings: { autoContinue: true, autoBreak: false } });
+  assert.equal(st.settings.autoBreak, false);
+  assert.equal(st.settings.autoContinue, true);
+  assert.equal(S.validateState({ settings: { autoBreak: 'sí' } }).settings.autoBreak, true); // tipo inválido → por defecto
+});
+
+test('sesión recordada: el token abre solo su cuenta, vigente y con la huella correcta', async () => {
+  const t = SEC.newRememberToken();
+  assert.match(t, /^[0-9a-f]{64}$/);
+  const tag = await SEC.rememberTag(t);
+  const acc = { username: 'Pingu.Estudia', remember: tag };
+  const now = Date.now();
+  const rec = { u: 'pingu.estudia', t, exp: now + 1000 };
+  assert.equal(await SEC.rememberValid(rec, acc, now), true);
+  assert.equal(await SEC.rememberValid({ ...rec, exp: now - 1 }, acc, now), false); // vencido
+  assert.equal(await SEC.rememberValid({ ...rec, exp: now + SEC.REMEMBER_MS * 2 }, acc, now), false); // fecha inventada
+  assert.equal(await SEC.rememberValid({ ...rec, u: 'otro_usuario' }, acc, now), false); // otra cuenta
+  assert.equal(await SEC.rememberValid({ ...rec, t: SEC.newRememberToken() }, acc, now), false); // otro token
+  assert.equal(await SEC.rememberValid(rec, { username: 'Pingu.Estudia' }, now), false); // la cuenta lo desactivó
+});
+
+test('sesión recordada: la cuenta solo guarda la huella y el token se valida al leerlo', () => {
+  const base = { username: 'pingu_estudia', hash: 'a'.repeat(64), salt: 'b'.repeat(32), iter: 210000 };
+  assert.equal(S.validateState({ account: { ...base, remember: 'c'.repeat(64) } }).account.remember, 'c'.repeat(64));
+  assert.equal('remember' in S.validateState({ account: { ...base, remember: '<script>' } }).account, false);
+  const b = S.memoryBackend();
+  const store = S.createStore(b, S.memoryBackend());
+  assert.equal(store.loadRemember(), null);
+  store.saveRemember({ u: 'pingu_estudia', t: 'd'.repeat(64), exp: 123 });
+  assert.deepEqual(store.loadRemember(), { u: 'pingu_estudia', t: 'd'.repeat(64), exp: 123 });
+  assert.ok(b.getItem('st2_remember')); // vive en localStorage: sobrevive al cerrar la app
+  b.setItem('st2_remember', JSON.stringify({ u: 'pingu_estudia', t: 'corto', exp: 1 }));
+  assert.equal(store.loadRemember(), null); // manipulado → se ignora
+  store.clearRemember();
+  assert.equal(b.getItem('st2_remember'), null);
+});
+
+// ---------------------------------------------------------------------
+// v3.9 — Ranking global
+// ---------------------------------------------------------------------
+import * as BOARD from '../js/board.js';
+import { readFileSync } from 'node:fs';
+
+test('ranking global: la edad se calcula con mes y año (13 años o más)', () => {
+  const now = new Date(2026, 10, 15); // 15 de noviembre de 2026
+  assert.equal(BOARD.ageYears('2013-10', now), 13); // cumplió en octubre
+  assert.equal(BOARD.ageYears('2013-11', now), 12); // en el mes del cumpleaños se cuenta como "aún no"
+  assert.equal(BOARD.ageYears('2013-12', now), 12);
+  assert.equal(BOARD.oldEnough('2013-10', now), true);
+  assert.equal(BOARD.oldEnough('2014-01', now), false);
+  assert.equal(BOARD.oldEnough('2000-05', now), true);
+  for (const bad of ['', '2013', '2013-13', '13-2013', '1800-01', null]) assert.equal(BOARD.isBirth(bad), false, String(bad));
+  assert.equal(BOARD.ageYears('nope', now), -1);
+});
+
+test('ranking global: la semana se reinicia el lunes 00:00 UTC', () => {
+  const at = (iso) => BOARD.nextWeekReset(new Date(iso)).toISOString();
+  assert.equal(at('2026-11-08T23:59:00Z'), '2026-11-09T00:00:00.000Z'); // domingo → lunes siguiente
+  assert.equal(at('2026-11-09T00:00:00Z'), '2026-11-16T00:00:00.000Z'); // lunes → el otro lunes
+  assert.equal(at('2026-11-11T12:00:00Z'), '2026-11-16T00:00:00.000Z'); // miércoles
+});
+
+test('ranking global: el servidor usa las mismas reglas de nombres y avatares que la app', () => {
+  const sql = readFileSync(new URL('../server/supabase/schema.sql', import.meta.url), 'utf8');
+  const arr = (fn) => {
+    const body = sql.slice(sql.indexOf(`function private.${fn}()`));
+    const inside = body.slice(body.indexOf('array[') + 6, body.indexOf(']', body.indexOf('array[')));
+    return [...inside.matchAll(/'([^']*)'/g)].map((m) => m[1]);
+  };
+  assert.deepEqual(arr('blocked_patterns'), identity.BLOCKED_PATTERNS, 'private.blocked_patterns() debe coincidir con identity.BLOCKED_PATTERNS');
+  assert.deepEqual(arr('avatars'), identity.AVATARS, 'private.avatars() debe coincidir con identity.AVATARS');
+  assert.ok(sql.includes(`'${identity.ALLOWED_PARTS.join('|')}'`), 'las palabras permitidas deben coincidir');
+  assert.ok(sql.includes('select 4 * 60 * 60'), 'el tope diario del servidor es 4 h');
+});
+
+test('nombres de usuario: ya no se bloquean nombres inocentes (v3.9)', () => {
+  for (const ok of ['kevin', 'nightowl', 'conocer', 'xavier', 'luna.k', 'Kaka', 'computadora', 'esperanza', 'operador', 'diputado']) {
+    assert.equal(identity.checkUsername(ok).ok, true, ok);
+  }
+  for (const bad of ['puuuta', 'kkk_fan', 'xxx99', 'perrra', 'p_e_r_r_a', 'fuuuck', 'hdp_fan']) {
+    assert.equal(identity.checkUsername(bad).ok, false, bad);
+  }
+});
+
+test('ranking global: apagado por configuración no llama al servidor', async () => {
+  assert.equal(BOARD.enabled(), false); // config.leaderboard.mode = 'local'
+  const r = await BOARD.startSession(Date.now(), 1500);
+  assert.equal(r.ok, false);
+  assert.deepEqual(await BOARD.flush(), { ok: true, credited: 0 });
+  assert.equal((await BOARD.join({ username: 'Ana' })).kind, 'off');
+});
+
+test('cuenta: la fecha de nacimiento se guarda solo si es válida', () => {
+  const base = { username: 'Ana_23', hash: 'a'.repeat(64), salt: 'b'.repeat(32), iter: 210000 };
+  const ok = S.validateState({ ...S.defaultState(), account: { ...base, birth: '2010-04' } });
+  assert.equal(ok.account.birth, '2010-04');
+  const bad = S.validateState({ ...S.defaultState(), account: { ...base, birth: '2010-4' } });
+  assert.equal(bad.account.birth, undefined);
 });

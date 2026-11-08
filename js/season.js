@@ -10,6 +10,7 @@
  *
  * Módulo puro: sin DOM ni almacenamiento.
  */
+import { t } from './i18n.js';
 import * as U from './util.js';
 
 export const DEFAULT_MONTHS = 3;
@@ -38,7 +39,8 @@ function fromIndex(index, months) {
     end,
     startKey: U.dateKey(start),
     endKey: U.dateKey(new Date(end.getFullYear(), end.getMonth(), 0)), // último día (incluido)
-    name: `Temporada ${name}`,
+    label: name, // sin la palabra "Temporada"
+    name: t('Temporada {name}', { name }),
   };
 }
 

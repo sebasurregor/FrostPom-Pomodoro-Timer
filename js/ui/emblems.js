@@ -50,7 +50,7 @@ function wings(fill) {
 /**
  * rank: objeto de rankForXp() (game.js). Devuelve un <svg> listo para insertar.
  */
-export function emblem(rank, { size = 64, label = true } = {}) {
+export function emblem(rank, { size = 64, label = true, snow = false } = {}) {
   const id = 'emb' + ++seq;
   const { a, b } = rank.colors;
   const t = rank.tierIndex;
@@ -75,6 +75,11 @@ export function emblem(rank, { size = 64, label = true } = {}) {
     s('path', { d: 'M22 26 L60 13 L60 44 L22 64 Z', fill: `url(#${id}s)` }),
     centerSymbol(t, t === 1 ? '#ffffff' : a === '#F4F8FF' ? '#ffffff' : '#FFF8E1'),
   );
+  // Un poco de nieve encima del escudo (con gotitas que cuelgan)
+  if (snow) svg.append(
+    s('path', { d: 'M12 25 C14 17 40 9 60 4 C80 9 106 17 108 25 C109 31 104 33 100 31 C97 38 89 39 86 33 C81 40 72 39 70 32 C65 36 58 35 56 31 C51 41 41 40 39 33 C34 37 27 36 26 31 C21 35 13 33 12 25 Z', fill: '#ffffff', stroke: INK, 'stroke-width': 4, 'stroke-linejoin': 'round' }),
+    s('path', { d: 'M30 20 C40 15 50 12 58 11', fill: 'none', stroke: '#CFE3F8', 'stroke-width': 3.5, 'stroke-linecap': 'round' }),
+    s('circle', { cx: 92, cy: 40, r: 3.2, fill: '#ffffff', stroke: INK, 'stroke-width': 2.5 }));
   const pips = rank.division ? 4 - rank.division : 0;
   for (let i = 0; i < pips; i++) {
     const x = 60 + (i - (pips - 1) / 2) * 13;

@@ -2,11 +2,15 @@
  * FrostPom — contraseña de la cuenta.
  * La contraseña NUNCA se guarda: se guarda un hash PBKDF2-SHA256 con sal aleatoria.
  * Tras 5 intentos fallidos se bloquea 60 segundos (y el bloqueo crece si siguen fallando).
+ * "Mantener sesión iniciada": un token aleatorio en este dispositivo; la cuenta guarda solo su
+ * huella SHA-256. Cerrar sesión, apagar la opción o cambiar la contraseña lo invalida.
  *
  * Importante: mientras la cuenta viva solo en el dispositivo, esto protege el progreso de
  * quien use el mismo teléfono, pero no es una caja fuerte. La protección real de las cuentas
  * debe vivir en el servidor (ver docs/SEGURIDAD.md).
  */
+import { tr } from './i18n.js';
+
 const ITERATIONS = 210000;
 export const MAX_FAILS = 5;
 const BASE_LOCK_MS = 60 * 1000;
@@ -34,14 +38,14 @@ function safeEqual(a, b) {
 
 // Contraseña de la cuenta: 8 a 64 caracteres, con al menos una letra y un número.
 export function checkPassword(pw) {
-  if (typeof pw !== 'string' || pw.length < 8) return { ok: false, reason: 'La contraseña debe tener al menos 8 caracteres.' };
-  if (pw.length > 64) return { ok: false, reason: 'La contraseña es demasiado larga (máximo 64).' };
-  if (!/[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/.test(pw) || !/\d/.test(pw)) return { ok: false, reason: 'Usa al menos una letra y un número.' };
-  if (/^(.)\1+$/.test(pw) || /12345678|password|contrasena|contraseña|qwerty/i.test(pw)) return { ok: false, reason: 'Esa contraseña es muy fácil de adivinar.' };
+  if (typeof pw !== 'string' || pw.length < 8) return { ok: false, reason: tr('La contraseña debe tener al menos 8 caracteres.') };
+  if (pw.length > 64) return { ok: false, reason: tr('La contraseña es demasiado larga (máximo 64).') };
+  if (!/[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/.test(pw) || !/\d/.test(pw)) return { ok: false, reason: tr('Usa al menos una letra y un número.') };
+  if (/^(.)\1+$/.test(pw) || /12345678|password|contrasena|contraseña|qwerty/i.test(pw)) return { ok: false, reason: tr('Esa contraseña es muy fácil de adivinar.') };
   return { ok: true };
 }
 export async function hashPassword(pw) {
-  if (!isAvailable()) throw new Error('Este navegador no permite guardar una contraseña segura (abre la app desde https o localhost).');
+  if (!isAvailable()) throw new Error(tr('Este navegador no permite guardar una contraseña segura (abre la app desde https o localhost).'));
   const c = checkPassword(pw);
   if (!c.ok) throw new Error(c.reason);
   const salt = new Uint8Array(16);
@@ -64,4 +68,26 @@ export function registerFailure(guard, now = Date.now()) {
     lockedUntil = now + BASE_LOCK_MS * Math.pow(2, Math.min(rounds, 6));
   }
   return { fails, lockedUntil };
+}
+
+// ---------- Mantener la sesión iniciada ----------
+export const REMEMBER_DAYS = 60;
+export const REMEMBER_MS = REMEMBER_DAYS * 24 * 60 * 60 * 1000;
+
+export function newRememberToken() {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return toHex(bytes);
+}
+/** Huella del token: es lo único que queda en la cuenta. */
+export async function rememberTag(token) {
+  return toHex(await subtle().digest('SHA-256', new TextEncoder().encode(`frostpom-remember:${token}`)));
+}
+/** ¿El token guardado en este dispositivo abre esta cuenta? (vigente, del mismo usuario y con la huella correcta) */
+export async function rememberValid(rec, account, now = Date.now()) {
+  if (!rec || !account || !account.remember || !isAvailable()) return false;
+  if (typeof rec.t !== 'string' || !/^[0-9a-f]{64}$/.test(rec.t)) return false;
+  if (rec.u !== String(account.username).toLowerCase()) return false;
+  if (!(rec.exp > now) || rec.exp > now + REMEMBER_MS + 60 * 1000) return false; // vencido o con fecha inventada
+  return safeEqual(await rememberTag(rec.t), account.remember);
 }

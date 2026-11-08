@@ -13,45 +13,52 @@ import * as E from '../engine.js';
 import * as C from '../catalog.js';
 import { config } from '../config.js';
 import * as FX from './effects.js';
-import { $, h, svg, fmtInt } from './dom.js';
+import { $, h, fmtInt } from './dom.js';
 import { toast, openDialog } from './feedback.js';
 import { penguin, companion } from './companions.js';
+import { pic } from './pics.js';
 import { state, store, mutate, today, isPremium } from './context.js';
+import { t, tr } from '../i18n.js';
+import * as BILL from '../billing.js';
 
-const crown = () => svg('svg', { viewBox: '0 0 24 24', 'aria-hidden': 'true' },
-  svg('path', { class: 'i-crown', d: 'M3 8.5l4.2 3.6L12 5l4.8 7.1L21 8.5l-2 10H5z' }),
-  svg('circle', { class: 'i-crown-gem', cx: 12, cy: 15, r: 1.6 }));
+const crown = () => pic('corona', 84);
 
 const BENEFITS = [
-  ['🎁', `Regalo de bienvenida: ${fmtInt(E.PREMIUM_GEMS)} gemas`, 'Para alimentar a tu mascota en la tienda de Enfocar. Se entrega una sola vez.'],
-  ['🐻‍❄️', 'Una mascota de edición limitada', 'Elige la que quieras, sin esperar a ganar su logro.'],
+  ['cofre', t('Regalo de bienvenida: {n} gemas', { n: fmtInt(E.PREMIUM_GEMS) }), ''],
+  ['🐻‍❄️', 'Una mascota de edición limitada', ''],
   ['⏰', 'Recordatorios de tu horario de enfoque', ''],
-  ['⏱️', 'Duración del temporizador totalmente libre', 'De 1 a 180 minutos de estudio.'],
-  ['🎨', 'Todos los temas, sonidos y tonos', 'Aurora, Galaxia, Olas del mar, Fogata y más.'],
-  ['🐧', 'Más animaciones adorables en el temporizador', 'Próximamente.'],
-  ['🚫', 'Sin anuncios', 'Cuando la versión gratis tenga anuncios, tú no los verás.'],
+  ['⏱️', 'Duración del temporizador totalmente libre', ''],
+  ['🎨', 'Todos los temas, sonidos y tonos', ''],
+  ['🐧', 'Más animaciones adorables en el temporizador', ''],
+  ['🚫', 'Sin anuncios', ''],
 ];
 
 export async function premiumDialog() {
-  const price = (config.premium && config.premium.priceLabel) || '';
   // Mientras no haya cobro real, el botón no dice "Suscribirme" (las tiendas exigen no confundir)
-  const charging = !!(config.premium && config.premium.chargesEnabled);
+  const charging = BILL.charging();
+  // Con cobro real, el precio sale de Microsoft Store (en la moneda de cada persona)
+  const offer = charging ? await BILL.premiumOffer() : null;
+  const canBuy = !charging || !!offer;
+  const price = offer ? offer.price : (config.premium && config.premium.priceLabel) || '';
+  const storeUrl = (config.premium && config.premium.storeUrl) || '';
   if (isPremium()) {
     const r = await openDialog({
       className: 'dlg--premium',
-      title: 'Eres Premium 👑',
+      title: 'Eres Premium',
       body: [
         h('div', { class: 'premium__hero' }, h('span', { class: 'premium__crown' }, crown()), penguin('amor', { size: 96 })),
-        h('p', { class: 'dlg__text', text: 'Tienes todas las funciones Premium activas en modo prueba (sin cobro).' }),
-        state.premium.giftPending ? h('p', { class: 'dlg__text', text: 'Todavía no eliges tu mascota de regalo. 🎁' }) : null,
+        h('p', { class: 'dlg__text', text: charging ? 'Tu suscripción está activa. Gracias por apoyar FrostPom.' : 'Tienes todas las funciones Premium activas en modo prueba (sin cobro).' }),
+        state.premium.giftPending ? h('p', { class: 'dlg__text', text: 'Todavía no eliges tu mascota de regalo.' }) : null,
       ],
       actions: [
-        { label: 'Desactivar prueba', value: 'off' },
-        state.premium.giftPending ? { label: '🎁 Elegir mascota', value: 'gift', variant: 'btn--crown' } : null,
+        charging ? { label: 'Administrar suscripción', value: 'manage' } : { label: 'Desactivar prueba', value: 'off' },
+        state.premium.giftPending ? { label: [pic('cofre', 24), 'Elegir mascota'], value: 'gift', variant: 'btn--crown' } : null,
         { label: 'Genial', value: 'ok', variant: 'btn--gold', primary: true },
       ].filter(Boolean),
     });
     if (r === 'gift') return giftCompanionDialog();
+    // Las suscripciones de Microsoft Store se cancelan en la cuenta de Microsoft
+    if (r === 'manage') window.open('https://account.microsoft.com/services', '_blank', 'noopener');
     if (r === 'off') {
       mutate((st) => E.setPremium(st, false));
       toast('Premium desactivado. Tus temas y sonidos gratis siguen igual.');
@@ -64,25 +71,38 @@ export async function premiumDialog() {
     body: [
       h('div', { class: 'premium__hero' }, h('span', { class: 'premium__crown' }, crown()), penguin('saludo', { size: 96 })),
       h('ul', { class: 'premium__list' }, BENEFITS.map(([icon, title, sub]) => h('li', {},
-        h('span', { class: 'premium__icon', 'aria-hidden': 'true', text: icon }),
+        h('span', { class: 'premium__icon', 'aria-hidden': 'true' }, icon === 'cofre' ? pic('cofre', 30) : icon),
         h('span', {}, h('b', { text: title }), sub ? h('small', { text: sub }) : null)))),
       charging
-        ? h('p', { class: 'premium__price', text: price ? `${price}. Cancela cuando quieras.` : 'Suscripción mensual. Cancela cuando quieras.' })
+        ? h('p', { class: 'premium__price', text: price ? t('{price}. Cancela cuando quieras.', { price }) : 'Suscripción mensual. Cancela cuando quieras.' })
         : h('p', { class: 'premium__price', text: 'Gratis por ahora' }),
-      h('p', { class: 'dlg__note', text: charging ? 'El cobro lo hace la tienda donde instalaste la app. Cancela cuando quieras.' : `Modo prueba: no se cobra nada.${price ? ` Cuando se active el cobro, costará ${price}, y te avisaremos antes.` : ''}` }),
+      h('p', { class: 'dlg__note', text: charging ? (canBuy ? 'El cobro lo hace Microsoft Store. Cancela cuando quieras desde tu cuenta de Microsoft.' : 'Para suscribirte, instala FrostPom desde Microsoft Store.') : tr('Modo prueba: no se cobra nada.') + (price ? t(' Cuando se active el cobro, costará {price}, y te avisaremos antes.', { price }) : '') }),
     ],
     actions: [
       { label: 'Ahora no', value: 'later' },
-      { label: charging ? (price ? `Suscribirme, ${price}` : 'Suscribirme') : 'Probar Premium gratis', value: 'buy', variant: 'btn--gold', primary: true },
-    ],
+      !canBuy
+        ? (storeUrl ? { label: 'Abrir Microsoft Store', value: 'store', variant: 'btn--gold', primary: true } : null)
+        : { label: charging ? (price ? t('Suscribirme, {price}', { price }) : 'Suscribirme') : 'Probar Premium gratis', value: 'buy', variant: 'btn--gold', primary: true },
+    ].filter(Boolean),
   });
+  if (r === 'store' && storeUrl) window.open(storeUrl, '_blank', 'noopener');
+  if (r === 'buy' && charging) {
+    const paid = await BILL.buyPremium();
+    if (!paid.ok) {
+      if (paid.reason !== 'cancel') toast('No se pudo completar la compra. Si se hizo el cobro, Premium se activará solo al volver a abrir la app.', 'warn', { ms: 7000 });
+      return;
+    }
+    const res = mutate((st) => E.setPremium(st, true));
+    if (!res.events.some((e) => e.type === 'premiumGift')) toast('¡Bienvenido a Premium! Gracias por apoyar FrostPom.', 'good', { icon: pic('corona', 30) });
+    return;
+  }
   if (r === 'buy') {
     const res = mutate((st) => E.setPremium(st, true));
     // La primera vez llega el regalo (lo celebra celebrations.js); las siguientes, solo un aviso.
     if (!res.events.some((e) => e.type === 'premiumGift')) {
       FX.sfx.achievement();
       FX.confetti({ count: 90, colors: ['#FFC531', '#FFE680', '#ffffff', '#93c0ed'] });
-      toast('¡Premium activado en modo prueba! 👑 Sin cobro.', 'good', { icon: '👑' });
+      toast('¡Premium activado en modo prueba! Sin cobro.', 'good', { icon: pic('corona', 30) });
     }
   }
 }
@@ -105,13 +125,13 @@ export async function giftCompanionDialog() {
     className: 'dlg--gift',
     title: 'Elige tu mascota de regalo',
     body: [
-      h('p', { class: 'dlg__text', text: 'Por ser Premium te quedas con una mascota de edición limitada sin ganar su logro. Elige con calma: el regalo es uno solo.' }),
+      h('p', { class: 'dlg__text', text: 'Elige una: el regalo es uno solo.' }),
       h('div', { class: 'gift-pets', role: 'radiogroup', 'aria-label': 'Mascotas de edición limitada' }, cards),
       err,
     ],
     actions: [
       { label: 'Luego', value: 'later' },
-      { label: 'Quedármela', value: 'ok', variant: 'btn--gold', primary: true, validate: () => { if (!pick) err.textContent = 'Toca una mascota para elegirla.'; return !!pick; } },
+      { label: 'Quedármela', value: 'ok', variant: 'btn--gold', primary: true, validate: () => { if (!pick) err.textContent = tr('Toca una mascota para elegirla.'); return !!pick; } },
     ],
     onOpen: () => cards[0].focus(),
   });
@@ -139,13 +159,25 @@ export const skipPaywallToday = () => store.pref.set('paywall_day', today());
 export function renderPremium() {
   const on = isPremium();
   $('#hudCrown').classList.toggle('is-active', on);
-  $('#hudCrown').setAttribute('aria-label', on ? 'Eres Premium' : 'Conoce FrostPom Premium');
+  $('#hudCrown').setAttribute('aria-label', tr(on ? 'Eres Premium' : 'Conoce FrostPom Premium'));
   $('#premiumStatus').textContent = on
-    ? 'Premium activo en modo prueba (sin cobro). Tienes todos los temas, sonidos, recordatorios y duración libre.'
-    : `Recordatorios, duración libre, todos los temas y sonidos, ${fmtInt(E.PREMIUM_GEMS)} gemas de regalo y una mascota de edición limitada.`;
-  $('#premiumActions').replaceChildren(h('button', { type: 'button', class: `btn btn--sm ${on ? 'btn--paper' : 'btn--gold'}`, onclick: premiumDialog }, on ? 'Ver mi Premium' : '👑 Ver Premium'));
+    ? tr('Premium activo en modo prueba (sin cobro). Tienes todos los temas, sonidos, recordatorios y duración libre.')
+    : t('Recordatorios, duración libre, todos los temas y sonidos, {n} gemas de regalo y una mascota de edición limitada.', { n: fmtInt(E.PREMIUM_GEMS) });
+  $('#premiumActions').replaceChildren(h('button', { type: 'button', class: `btn btn--sm ${on ? 'btn--paper' : 'btn--gold'}`, onclick: premiumDialog }, on ? null : pic('corona', 20), on ? 'Ver mi Premium' : 'Ver Premium'));
 }
 
 export function bindPremium() {
   $('#hudCrown').addEventListener('click', premiumDialog);
+}
+
+/**
+ * Con cobro real: al abrir la app se pregunta a Microsoft Store si la suscripción sigue activa
+ * (se renovó, se canceló o se compró en otro equipo con la misma cuenta) y Premium se ajusta solo.
+ */
+export async function syncStorePremium() {
+  if (!BILL.charging()) return;
+  const has = await BILL.storeHasPremium();
+  if (has === null) return; // fuera de la tienda no se puede saber: no se cambia nada
+  if (has && !isPremium()) mutate((st) => E.setPremium(st, true));
+  if (!has && state.premium.active) mutate((st) => E.setPremium(st, false));
 }
