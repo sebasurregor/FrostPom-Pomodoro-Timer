@@ -4,7 +4,7 @@
  * teléfono o al navegador lo puede leer cualquiera. Ver docs/SEGURIDAD.md.
  */
 export const config = Object.freeze({
-  version: '3.9.0',
+  version: '3.9.1',
   // Supabase (solo para recuperar la contraseña por correo; ver docs/RECUPERAR-CONTRASENA.md).
   // La clave publicable puede ir aquí. La clave secreta (service_role / sb_secret_…) NUNCA.
   // Si dejas url vacía, la app oculta todo lo del correo.
@@ -17,7 +17,7 @@ export const config = Object.freeze({
     // 'remote' = ranking global con el servidor de Supabase (v3.9). Cámbialo SOLO después de
     //            correr server/supabase/schema.sql y activar "Anonymous sign-ins".
     //            Paso a paso: docs/RANKING-GLOBAL.md
-    mode: 'local',
+    mode: 'remote',
     dailyCapMin: 240, // máximo que cuenta por día en el ranking (igual al del servidor)
   }),
   // Reemplazar la imagen de un compañero (opcional). Ejemplo:
