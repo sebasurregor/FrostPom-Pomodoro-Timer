@@ -10,9 +10,10 @@
 import * as U from '../util.js';
 import * as BOARD from '../board.js';
 import * as CLOUD from '../cloud.js';
+import * as SYNC from '../sync.js';
 import { checkUsername } from '../identity.js';
-import { $, h, download } from './dom.js';
-import { toast, openDialog, confirmDialog, dlg } from './feedback.js';
+import { h } from './dom.js';
+import { toast, openDialog, dlg } from './feedback.js';
 import { state, store, mutate } from './context.js';
 import { t, tr } from '../i18n.js';
 
@@ -37,7 +38,7 @@ export function errorText(kind) {
 // Mes y año de nacimiento
 // ---------------------------------------------------------------------
 /** Dos listas (mes y año), sin sugerir ninguna respuesta. value() → "YYYY-MM" o "". */
-export function birthField(id = 'accBirth', initial = '') {
+export function birthField(id = 'accBirth', initial = '', { hint = true } = {}) {
   const [iy, im] = BOARD.isBirth(initial) ? initial.split('-') : ['', ''];
   const year = new Date().getFullYear();
   const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -51,7 +52,10 @@ export function birthField(id = 'accBirth', initial = '') {
     nodes: [
       h('label', { class: 'pin-label', for: `${id}M`, text: '¿Cuándo naciste?' }),
       h('div', { class: 'birth' }, month, yr),
-      h('p', { class: 'acc-hint', text: 'Solo para saber si puedes aparecer en el ranking global. Se queda en tu dispositivo.' }),
+      hint ? h('p', { class: 'acc-hint', text: SYNC.enabled() && BOARD.enabled()
+        ? 'Para saber si puedes tener cuenta en línea y aparecer en el ranking global. Se queda en tu dispositivo.'
+        : SYNC.enabled() ? 'Para saber si puedes tener cuenta en línea. Se queda en tu dispositivo.'
+          : 'Solo para saber si puedes aparecer en el ranking global. Se queda en tu dispositivo.' }) : null,
     ],
     value: () => (month.value && yr.value ? `${yr.value}-${month.value}` : ''),
     focus: () => month.focus(),
@@ -254,7 +258,7 @@ export async function bootBoard() {
     });
   }
   BOARD.flush().catch(() => {});
-  if (!state.account.birth) {
+  if (!state.account.birth && !state.account.online) { // una cuenta en línea ya es de 13+
     if (!BOARD.load().asked) await joinDialog();
     return;
   }
@@ -298,41 +302,47 @@ export function onStudyDropped(startMs) {
 export async function onBoardToggle(on) {
   if (!BOARD.enabled() || !state.account) return;
   if (on) {
-    if (!state.account.birth) { await joinDialog(); return; }
-    if (!BOARD.oldEnough(state.account.birth)) {
+    if (!state.account.birth && !state.account.online) { await joinDialog(); return; }
+    if (!BOARD.eligible(state.account)) {
       toast('El ranking global es para mayores de 13 años. Tus minutos siguen contando en tu progreso.', 'info', { ms: 6500 });
       return;
     }
     const r = BOARD.isJoined() ? await BOARD.setVisible(true) : await ensureJoined({ interactive: true });
     if (r && !r.ok && r.kind === 'offline') toast('Sin conexión: volverás a aparecer cuando estés en línea.', 'info');
     else if (r && r.ok) toast('Volviste a aparecer en el ranking global.', 'good');
+    changed();
+    return;
+  }
+  if (!BOARD.isJoined()) { changed(); return; }
+  // Salir del ranking, en palabras simples: ¿también borrar los minutos?
+  const wipe = h('input', { type: 'checkbox', id: 'boardWipe' });
+  const res = await openDialog({
+    className: 'dlg--board',
+    title: '¿Dejar de aparecer en el ranking?',
+    body: [
+      h('p', { class: 'dlg__text', text: 'Tu nombre ya no se verá en el ranking global y tus pomodoros dejarán de enviarse. Tu progreso no cambia.' }),
+      h('label', { class: 'check-row', for: 'boardWipe' }, wipe, h('span', { text: 'Borrar también mis minutos del ranking (no se puede deshacer)' })),
+    ],
+    actions: [
+      { label: 'Cancelar', value: 'cancel' },
+      { label: 'Dejar de aparecer', value: 'ok', variant: 'btn--gold', primary: true },
+    ],
+  });
+  if (res !== 'ok') {
+    mutate((s) => { s.settings.leaderboardOn = true; }); // se queda como estaba
+    changed();
+    return;
+  }
+  if (wipe.checked) {
+    try {
+      await BOARD.deleteData();
+      toast('Listo: ya no apareces en el ranking y borramos tus minutos.', 'good');
+    } catch (e) {
+      toast(errorText(e.kind), 'warn');
+    }
   } else {
     const r = await BOARD.setVisible(false);
     toast(r.ok ? 'Ya no apareces en el ranking global.' : 'Sin conexión: dejarás de aparecer cuando vuelvas a estar en línea.', r.ok ? 'good' : 'info');
-  }
-  changed();
-}
-
-/** Descargar tus datos del ranking (lo que guarda el servidor). */
-export async function downloadBoardData() {
-  try {
-    const data = await BOARD.exportData();
-    download('frostpom-ranking.json', JSON.stringify(data, null, 2), 'application/json');
-  } catch (e) {
-    toast(errorText(e.kind), 'warn');
-  }
-}
-
-/** Borrar tus datos del ranking (perfil, sesiones y totales en el servidor). */
-export async function deleteBoardData() {
-  const ok = await confirmDialog('¿Borrar tus datos del ranking global?', 'Se borran tu lugar, tus minutos y tus sesiones del servidor, y dejas de aparecer. Tu progreso en este dispositivo no cambia.', 'Borrar mis datos');
-  if (!ok) return;
-  try {
-    await BOARD.deleteData();
-    mutate((s) => { s.settings.leaderboardOn = false; });
-    toast('Borramos tus datos del ranking global. Ya no apareces en él.', 'good');
-  } catch (e) {
-    toast(errorText(e.kind), 'warn');
   }
   changed();
 }
@@ -345,10 +355,4 @@ export async function deleteBoardOnAccountDelete() {
   } catch {
     BOARD.forget();
   }
-}
-
-/** Fila de Ajustes con "Descargar" y "Borrar" (solo si ya te uniste). */
-export function renderBoardData() {
-  const row = $('#boardData');
-  if (row) row.hidden = !(BOARD.enabled() && BOARD.load().refresh && BOARD.isJoined());
 }

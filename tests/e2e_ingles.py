@@ -7,6 +7,9 @@ Uso (con la app servida: python -m http.server 8000):
 """
 import os, sys, re, json, tempfile
 from playwright.sync_api import sync_playwright
+import os as _os, sys as _sys
+_sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+from _classic import classic, classic_text
 URL = sys.argv[1] if len(sys.argv) > 1 else 'http://localhost:8000/'
 OUT = sys.argv[2] if len(sys.argv) > 2 else tempfile.mkdtemp(prefix='frostpom-en-')
 IGNORE = {'Español', 'FrostPom necesita JavaScript para funcionar.'}
@@ -29,6 +32,7 @@ def grab(pg, where):
 with sync_playwright() as p:
     b = p.chromium.launch(**({'executable_path': os.environ['CHROME_PATH']} if os.environ.get('CHROME_PATH') else {}))
     ctx = b.new_context(viewport={'width':1280,'height':900}, locale='en-US')
+    ctx.route('**/js/config.js', classic)
     ctx.route("https://*.supabase.co/auth/v1/**", lambda r: r.fulfill(status=200, content_type='application/json', body='{}'))
     pg = ctx.new_page(); errs=[]; pg.on('pageerror', lambda e: errs.append(str(e)))
     pg.goto(URL); pg.wait_for_timeout(900)

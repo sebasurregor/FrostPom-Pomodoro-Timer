@@ -38,7 +38,10 @@ let savedAt = null;
 export const lastSavedAt = () => savedAt;
 
 function persist() {
-  if (store.save(state)) savedAt = new Date();
+  if (store.save(state)) {
+    savedAt = new Date();
+    document.dispatchEvent(new CustomEvent('frostpom:saved')); // cuentas en línea: hay algo que subir
+  }
   else toast('No se pudo guardar. El navegador no tiene espacio o lo bloquea.', 'warn');
 }
 

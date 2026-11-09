@@ -6,6 +6,8 @@ Desde la v3.7, FrostPom ya trae programado "¿Olvidaste la contraseña?" y está
 
 ## 1. Cómo funciona
 
+> **Desde la v4.0** esto describe las cuentas **solo de este dispositivo** (menores de 13 y cuentas de antes sin conectar). En las **cuentas en línea** (13+) el correo es el de la cuenta, Supabase sí guarda la contraseña (cifrada) y "¿Olvidaste la contraseña?" cambia la contraseña también en línea. Ver `CUENTAS-EN-LINEA.md`.
+
 1. Al crear la cuenta (o después, en **Ajustes → Tu cuenta**), la persona puede escribir un **correo opcional**.
 2. La app crea un usuario en Supabase con ese correo y una **contraseña aleatoria**. La contraseña de FrostPom **nunca sale del dispositivo**: en Supabase solo queda el correo.
 3. Si alguien olvida la contraseña, toca **¿Olvidaste la contraseña?** y escribe su correo. La app comprueba que sea el mismo correo de la cuenta y le pide a Supabase que envíe un **código** (`/auth/v1/recover`).

@@ -11,6 +11,9 @@ import os
 import sys
 
 from playwright.sync_api import sync_playwright
+import os as _os, sys as _sys
+_sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+from _classic import classic, classic_text
 
 URL = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:8000/"
 failures = []
@@ -45,6 +48,7 @@ with sync_playwright() as p:
     launch = {"executable_path": os.environ["CHROME_PATH"]} if os.environ.get("CHROME_PATH") else {}
     browser = p.chromium.launch(**launch)
     ctx = browser.new_context(viewport={"width": 1280, "height": 800}, locale="es-CO")
+    ctx.route("**/js/config.js", classic)
     ctx.route("https://*.supabase.co/auth/v1/**", fake_supabase)
     pg = ctx.new_page()
     errors = []

@@ -39,9 +39,12 @@ export function ageYears(birth, now = new Date()) {
 }
 export const oldEnough = (birth, now = new Date()) => ageYears(birth, now) >= MIN_AGE;
 
-/** ¿Esta cuenta puede estar en el ranking global? */
+/**
+ * ¿Esta cuenta puede estar en el ranking global? Una cuenta en línea (v4.0) cuenta como mayor
+ * de 13: solo se crea para ellos (en otro equipo, la fecha de nacimiento no viaja).
+ */
 export function eligible(account, now = new Date()) {
-  return enabled() && !!account && oldEnough(account.birth, now);
+  return enabled() && !!account && (account.online === true || oldEnough(account.birth, now));
 }
 
 // ---------------------------------------------------------------------
@@ -124,6 +127,13 @@ async function token({ create = false } = {}) {
     return mem.access;
   });
 }
+
+/** Llamar al servidor con la sesión de este equipo (renueva y reintenta si venció). */
+export const callServer = (fn, args, opts) => call(fn, args, opts);
+/** Token de la sesión de este equipo (también la usa la cuenta en línea). '' si no hay. */
+export const authToken = (opts) => token(opts);
+/** ¿La sesión guardada es de una cuenta con correo (no anónima)? */
+export const hasAccountSession = () => { const st = load(); return !!st.refresh && !st.anon; };
 
 /** Llama una función del servidor; si la sesión venció, la renueva y reintenta una vez. */
 async function call(fn, args, { create = false, auth = true } = {}) {
@@ -280,10 +290,6 @@ export function nextWeekReset(now = new Date()) {
 // ---------------------------------------------------------------------
 // Tus datos
 // ---------------------------------------------------------------------
-export async function exportData() {
-  return call('export_my_data', {});
-}
-
 /** Borra tus datos del ranking en el servidor y olvida la sesión en este dispositivo. */
 export async function deleteData() {
   if (load().refresh) await call('delete_my_account', {});
@@ -299,7 +305,8 @@ export async function deleteData() {
  * de un solo uso. Desde ahí, el ranking usa la cuenta con correo.
  */
 export async function adoptSession(session) {
-  if (!enabled() || !session || !session.access || !session.refresh) return { ok: false, kind: 'nosession' };
+  if (!session || !session.access || !session.refresh) return { ok: false, kind: 'nosession' };
+  if (!enabled()) { keep(session); return { ok: true }; } // sin ranking: solo se guarda la sesión (cuenta en línea)
   const st = load();
   if (st.uid === session.uid) { keep(session); return { ok: true }; }
   if (st.refresh && !st.anon) return { ok: false, kind: 'already' }; // ya está en una cuenta con correo

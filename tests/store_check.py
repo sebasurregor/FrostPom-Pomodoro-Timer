@@ -60,6 +60,11 @@ with sync_playwright() as p:
     import tempfile
     profile_dir = tempfile.mkdtemp(prefix="st-store-")
     ctx = p.chromium.launch_persistent_context(profile_dir, viewport={"width": 1366, "height": 768}, **launch)
+    if "localhost" in URL or "127.0.0.1" in URL:
+        # En local, el ranking y las cuentas en línea hablan con un Supabase simulado (sin internet)
+        sys.path.insert(0, HERE)
+        from _fake_supabase import FakeSupabase
+        ctx.route("https://*.supabase.co/**", FakeSupabase().handle)
     pg = ctx.pages[0] if ctx.pages else ctx.new_page()
     errors, missing = [], []
     pg.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)

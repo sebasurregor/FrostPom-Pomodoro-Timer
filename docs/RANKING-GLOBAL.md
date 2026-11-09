@@ -2,6 +2,8 @@
 
 Desde la v3.9 el ranking global **ya está construido y probado**, pero viene **apagado** (`leaderboard.mode: 'local'` en `js/config.js`). Así puedes publicar la v3.9 sin que cambie nada para los usuarios, y encenderlo cuando termines estos pasos.
 
+> **Ya lo encendiste (v3.9.1).** Desde la v4.0 la app trae `mode: 'remote'` por defecto, y quien tiene **cuenta en línea** usa esa misma cuenta en el ranking (ya no necesita una cuenta anónima). Lo nuevo de la v4.0 está en `CUENTAS-EN-LINEA.md`. Esta guía queda como referencia.
+
 Cada paso dice **qué hacer**, **dónde** y **cómo saber que quedó bien** (✅).
 
 **Lo que hace el ranking, en una frase:** cuando empiezas un pomodoro con internet, el servidor anota la hora con su propio reloj; cuando terminas, acredita el **menor** entre lo que dice la app, lo planeado y el tiempo real (máximo 4 h al día). Por eso nadie puede hacer trampa cambiando la hora del teléfono.
@@ -82,7 +84,7 @@ Debe decir **Success. No rows returned**. Si sale un aviso amarillo de "destruct
 
 ✅ **Quedó bien si** tu cuenta de prueba aparece en la app y en esa consulta.
 
-Si quieres borrar la cuenta de prueba: en la app, **Ajustes → Tus datos del ranking global → Borrar**.
+Si quieres borrar la cuenta de prueba: en la app, **Ajustes → Tu cuenta → Eliminar mi cuenta**. Para borrar solo sus minutos del ranking: apaga **Aparecer en el ranking** y marca **"Borrar también mis minutos del ranking"**.
 
 ---
 
@@ -159,24 +161,24 @@ La política de privacidad promete que se borran las cuentas anónimas sin activ
 | El Ranking sigue diciendo "llega pronto" | `mode` sigue en `'local'`, o falta el SQL | Revisa el paso 3.1 y vuelve a correr el paso 2 |
 | "No pudimos cargar el ranking global" | Sin internet, o el proyecto de Supabase está **en pausa** | En el plan gratis, Supabase pausa los proyectos tras una semana sin uso. Entra al panel y pulsa **Restore project** |
 | Al crear una cuenta no sale "Apareces en el ranking" | Las cuentas anónimas están apagadas | Paso 1 |
-| Alguien dice "mi nombre ya está en el ranking", y es suyo | Reinstaló la app o cambió de equipo | Si tenía correo de recuperación: botón **"¿Es tuyo, de otro equipo? Recupéralo con tu correo"**. Si no, que elija otro nombre (el viejo se libera en 90 días con la limpieza) |
+| Alguien dice "mi nombre ya está en el ranking", y es suyo | Reinstaló la app o cambió de equipo | Desde la v4.0: que entre con **¿Ya tienes cuenta? Inicia sesión** (correo y contraseña). Con una cuenta de antes que tenía correo de recuperación: botón **"¿Es tuyo, de otro equipo? Recupéralo con tu correo"**. Si no, que elija otro nombre (el viejo se libera en 90 días con la limpieza) |
 | Necesitas apagar el ranking ya | — | `mode: 'local'`, sube `VERSION` y haz `git push`. Los datos quedan en Supabase |
 
 ---
 
 ## Cómo funciona por dentro (para entenderlo y explicarlo)
 
-- **Cuentas anónimas.** Al unirte, la app crea una cuenta anónima en Supabase y guarda en el dispositivo una llave para renovarla (*refresh token*). La llave de acceso dura una hora y se renueva sola.
+- **Cuentas.** Con cuenta en línea (v4.0), el ranking usa esa cuenta. Si tu cuenta es solo de este dispositivo, al unirte la app crea una cuenta **anónima** en Supabase. En los dos casos guarda en el dispositivo una llave para renovar la sesión (*refresh token*). La llave de acceso dura una hora y se renueva sola.
 - **El servidor mide el tiempo.** `start_session` anota la hora del servidor y `finish_session` acredita `mínimo(lo que dice la app, lo planeado, el tiempo real + 5 s)`. Si al terminar no hay internet, la app guarda el aviso y lo manda cuando vuelve la conexión.
 - **Tope diario de 4 h** por persona, contado en su zona horaria. La **semana** es igual para todo el mundo: empieza el lunes a las 00:00 UTC.
 - **Nombres.** Mismas reglas que la app: formato, groserías (también disfrazadas: "Pu7a", "p.u.t.a", "puuuta") y nombres que suplantan (admin, soporte, frostpom). Son únicos sin importar mayúsculas.
 - **XP acotada.** La app manda tu XP de la temporada solo para mostrar tu emblema, y el servidor no acepta más de lo posible con los minutos que él midió.
 - **Tu correo.** Si agregas un correo de recuperación (o recuperas la contraseña), tu lugar pasa de la cuenta anónima a la del correo. Se hace con un código de un solo uso que dura 10 minutos. Así puedes recuperar tu nombre en otro equipo.
 - **Menores de 13.** No se conectan: pueden ver el ranking, pero no se envía nada suyo. La fecha de nacimiento nunca sale del dispositivo.
-- **Tus datos.** En Ajustes puedes salir del ranking, descargar tus datos (JSON) y borrarlos. Al eliminar tu cuenta de FrostPom también se borran del servidor.
+- **Tus datos.** En Ajustes puedes salir del ranking y, al salir, marcar **"Borrar también mis minutos del ranking"**. Al eliminar tu cuenta de FrostPom también se borran del servidor. Desde la v4.0 ya no hay botón de descargar (era un archivo JSON difícil de entender): quien quiera una copia la pide por correo y tú la sacas con las consultas de `CUENTAS-EN-LINEA.md`.
 
 ## Pruebas
 
-- **Servidor** (PostgreSQL real, 23 comprobaciones: trampas, tope diario, nombres, quién aparece, moderación, pasar el lugar al correo, borrar y limpieza): `server/supabase/test/run_local.sh`
-- **App con un Supabase simulado** (55 comprobaciones: registro, unirse, pomodoros con y sin internet, ranking, nombre ocupado, recuperar con correo, salir, descargar, borrar, menores de 13 e inglés): `python tests/e2e_ranking.py http://localhost:8000/`
+- **Servidor** (PostgreSQL real, 27 comprobaciones: trampas, tope diario, nombres, quién aparece, moderación, pasar el lugar al correo, borrar, limpieza y las cuentas en línea de la v4.0): `server/supabase/test/run_local.sh`
+- **App con un Supabase simulado** (56 comprobaciones: registro, unirse, pomodoros con y sin internet, ranking, nombre ocupado, recuperar con correo, salir del ranking borrando o no los minutos, menores de 13 e inglés): `python tests/e2e_ranking.py http://localhost:8000/`
 - **Unitarias** (edad, semana UTC y que las reglas de nombres de la app y del servidor sean idénticas): `npm test`

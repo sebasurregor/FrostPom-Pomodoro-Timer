@@ -2,7 +2,7 @@
 
 Lista en orden. Cada paso dice **qué hacer**, **dónde** y **cómo saber que quedó bien**. Cuando termines uno, sigue con el siguiente.
 
-Estado actual: **v3.8 lista en tu computador**. 👉 **La guía completa y actualizada para publicar es `docs/DESPLIEGUE.md`** (de tu PC a Microsoft Store, con Supabase y Brevo). Este archivo queda como referencia (incluye el paso 0 de la tarjeta de la cuenta de trabajo). El cobro de Premium está en `docs/COBRO-PREMIUM.md`.
+Estado actual: **v4.0 lista en tu computador** (cuentas en línea: `docs/CUENTAS-EN-LINEA.md`). 👉 **La guía completa y actualizada para publicar es `docs/DESPLIEGUE.md`** (de tu PC a Microsoft Store, con Supabase y Brevo). Este archivo queda como referencia (incluye el paso 0 de la tarjeta de la cuenta de trabajo). El cobro de Premium está en `docs/COBRO-PREMIUM.md`.
 
 ---
 

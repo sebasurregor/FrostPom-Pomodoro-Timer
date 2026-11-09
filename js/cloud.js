@@ -1,6 +1,7 @@
 /*
- * FrostPom — conexión con Supabase: recuperar la contraseña por correo (v3.7) y, desde la
- * v3.9, la sesión y las funciones del ranking global (ver js/board.js).
+ * FrostPom — conexión con Supabase: recuperar la contraseña por correo (v3.7), la sesión y las
+ * funciones del ranking global (v3.9, js/board.js) y las cuentas en línea con correo y
+ * contraseña (v4.0, js/sync.js).
  *
  * Cómo funciona (sin librerías, con fetch a la API de Supabase Auth):
  *  1. Al agregar un correo, se crea un usuario en Supabase con ese correo y una contraseña
@@ -42,6 +43,9 @@ function classify(status, data) {
   const msg = String(data.msg || data.message || data.error_description || '').toLowerCase();
   // Sin SMTP propio, Supabase solo envía correos al equipo del proyecto
   if (code.includes('not_authorized') || msg.includes('not authorized')) return 'notallowed';
+  if (code.includes('invalid_credentials') || msg.includes('invalid login credentials')) return 'badlogin';
+  if (code.includes('weak_password') || msg.includes('password should')) return 'weak';
+  if (code.includes('same_password')) return 'same';
   if (status === 429 || code.includes('rate_limit') || msg.includes('rate limit') || msg.includes('only request this after')) return 'rate';
   if (code.includes('email_address_invalid') || msg.includes('email address') || code.includes('validation')) return 'email';
   if (code.includes('already') || msg.includes('already registered')) return 'exists';
@@ -128,6 +132,45 @@ export async function verifyRecoveryCode(email, code, { keep = false } = {}) {
 }
 
 // ---------------------------------------------------------------------
+// Cuentas en línea (v4.0): correo + contraseña
+// ---------------------------------------------------------------------
+/**
+ * Crea la cuenta en línea con el correo y la contraseña de FrostPom. Devuelve la sesión.
+ * Error 'exists' si el correo ya tiene cuenta. (Con "Confirm email" apagado, Supabase entrega
+ * la sesión enseguida; si estuviera encendido, la cuenta se crea pero sin sesión: 'confirm'.)
+ */
+export async function signUp(email, password) {
+  const e = cleanEmail(email);
+  if (!e) throw new CloudError('email');
+  const s = sessionFrom(await call('/signup', { body: { email: e, password } }));
+  if (!s) throw new CloudError('confirm');
+  return s;
+}
+
+/** Inicia sesión con correo y contraseña. Error 'badlogin' si no coinciden. */
+export async function signIn(email, password) {
+  const e = cleanEmail(email);
+  if (!e) throw new CloudError('email');
+  const s = sessionFrom(await call('/token?grant_type=password', { body: { email: e, password } }));
+  if (!s) throw new CloudError('server');
+  return s;
+}
+
+/** Cambia la contraseña de la cuenta en línea (con una sesión vigente). */
+export async function updatePassword(token, password) {
+  try {
+    await call('/user', { method: 'PUT', token, body: { password } });
+  } catch (e) {
+    if (e.kind !== 'same') throw e; // ya era esa: no hay nada que cambiar
+  }
+}
+
+/** Cierra la sesión en Supabase (si falla, no importa: en el equipo ya se borró). */
+export async function signOut(token) {
+  if (token) await call('/logout', { token }).catch(() => {});
+}
+
+// ---------------------------------------------------------------------
 // Ranking global (v3.9): sesión anónima, renovarla y llamar funciones del servidor
 // ---------------------------------------------------------------------
 /** Crea una cuenta anónima (Supabase → Anonymous sign-ins). Nadie ve ni necesita su contraseña. */
@@ -173,6 +216,9 @@ export async function rpc(fn, args = {}, token = '') {
   else if (msg.includes('name_blocked')) kind = 'name_blocked';
   else if (msg.includes('name_invalid')) kind = 'name_invalid';
   else if (msg.includes('code_invalid')) kind = 'code_invalid';
+  else if (msg.includes('save_conflict')) kind = 'conflict';
+  else if (msg.includes('save_too_big')) kind = 'too_big';
+  else if (msg.includes('account_required')) kind = 'account_required';
   // La función no existe: todavía no se corrió server/supabase/schema.sql en Supabase
   else if (code === 'PGRST202' || code === '42883' || code === 'PGRST205') kind = 'notready';
   else if (res.status === 404) kind = 'notfound';
@@ -189,6 +235,10 @@ export function errorText(err) {
     case 'email': return tr('Revisa el correo: parece que está mal escrito.');
     case 'disabled': return tr('La recuperación por correo no está activa en este momento.');
     case 'notallowed': return tr('Todavía no podemos enviar correos a esa dirección. Inténtalo más adelante.');
+    case 'badlogin': return tr('El correo o la contraseña no coinciden.');
+    case 'exists': return tr('Ese correo ya tiene una cuenta. Toca «Inicia sesión».');
+    case 'weak': return tr('Esa contraseña es muy fácil de adivinar. Prueba con otra más larga.');
+    case 'confirm': return tr('Revisa tu correo para confirmar la cuenta y vuelve a intentarlo.');
     case 'off': return tr('La recuperación por correo no está configurada en esta versión.');
     default: return tr('Algo falló al hablar con el servidor. Inténtalo de nuevo en un rato.');
   }

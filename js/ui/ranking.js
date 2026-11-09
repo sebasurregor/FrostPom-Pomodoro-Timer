@@ -62,11 +62,11 @@ function statusCard() {
     h('h2', { class: 'panel__title', text: title }),
     h('p', { class: 'panel__text', text }),
     button || null);
-  if (!acc.birth) {
+  if (!acc.birth && !acc.online) {
     return card('Únete al ranking global', 'Compite con estudiantes de todo el mundo por los minutos de estudio de la semana.',
       h('button', { type: 'button', class: 'btn btn--gold', id: 'boardJoinBtn', onclick: () => joinDialog().then(renderRanking) }, 'Unirme al ranking'));
   }
-  if (!BOARD.oldEnough(acc.birth)) {
+  if (!BOARD.eligible(acc)) {
     return card('El ranking global es para mayores de 13 años', 'Puedes ver quién va adelante, y tus minutos siguen contando en tu progreso.');
   }
   if (!state.settings.leaderboardOn) {
@@ -120,7 +120,7 @@ async function renderGlobal(mine, { you, season }) {
     return;
   }
   renderTable(rows);
-  const counting = BOARD.isJoined() && state.settings.leaderboardOn && BOARD.oldEnough(state.account && state.account.birth);
+  const counting = BOARD.isJoined() && state.settings.leaderboardOn && BOARD.eligible(state.account);
   if (counting && !rows.some((r) => r.isYou)) {
     $('#board').append(h('li', { class: 'board__label board__you', text: period === 'week'
       ? tr('Aún no sumas minutos esta semana: tus pomodoros con internet aparecen aquí.')

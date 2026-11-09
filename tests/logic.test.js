@@ -871,18 +871,88 @@ test('nombres de usuario: ya no se bloquean nombres inocentes (v3.9)', () => {
   }
 });
 
-test('ranking global: apagado por configuración no llama al servidor', async () => {
-  assert.equal(BOARD.enabled(), false); // config.leaderboard.mode = 'local'
+test('ranking global: sin unirse, los pomodoros no se envían', async () => {
   const r = await BOARD.startSession(Date.now(), 1500);
   assert.equal(r.ok, false);
+  assert.equal(r.kind, 'notjoined');
   assert.deepEqual(await BOARD.flush(), { ok: true, credited: 0 });
-  assert.equal((await BOARD.join({ username: 'Ana' })).kind, 'off');
+});
+
+test('cuentas en línea: lo que se sube no lleva la cuenta local ni la foto', async () => {
+  const SYNC = await import('../js/sync.js');
+  const st = S.defaultState();
+  st.profile.nick = 'Ana_23'; st.profile.onboarded = true;
+  st.profile.photo = 'data:image/png;base64,AAAA';
+  st.account = { username: 'Ana_23', hash: 'a'.repeat(64), salt: 'b'.repeat(32), iter: 210000, email: 'ana@example.com', online: true };
+  st.progress.xp = 321; st.progress.totals.studySec = 7200;
+  const snap = SYNC.snapshot(st);
+  assert.equal(snap.account, undefined, 'la huella de la contraseña nunca se sube');
+  assert.equal(snap.profile.photo, '', 'la foto nunca se sube');
+  assert.equal(snap.progress.xp, 321);
+  assert.equal(st.profile.photo.startsWith('data:'), true, 'el estado local no se toca');
+  assert.equal(SYNC.studied(snap), 7200);
+  // Traer: se conserva la cuenta y la foto de ESTE equipo
+  const local = S.defaultState();
+  local.account = { username: 'Ana_23', hash: 'c'.repeat(64), salt: 'd'.repeat(32), iter: 210000, email: 'ana@example.com', online: true };
+  local.profile.photo = 'data:image/png;base64,BBBB';
+  const back = SYNC.restore(snap, local);
+  assert.equal(back.progress.xp, 321);
+  assert.equal(back.account.hash, 'c'.repeat(64));
+  assert.equal(back.account.online, true);
+  assert.equal(back.profile.photo, 'data:image/png;base64,BBBB');
+  assert.equal(back.profile.onboarded, true);
+  // Si el nombre se cambió en otro equipo, también cambia aquí (y la cuenta de este equipo lo sigue)
+  const renamed = SYNC.restore({ ...snap, profile: { ...snap.profile, nick: 'Ana_nueva' } }, local);
+  assert.equal(renamed.profile.nick, 'Ana_nueva');
+  assert.equal(renamed.account.username, 'Ana_nueva');
+  assert.equal(renamed.account.hash, 'c'.repeat(64));
+  // Algo raro en la nube se limpia (validateState)
+  const weird = SYNC.restore({ ...snap, progress: { ...snap.progress, xp: 'muchísimo' }, profile: { ...snap.profile, photo: 'javascript:alert(1)' } }, null);
+  assert.equal(weird.progress.xp, 0);
+  assert.equal(weird.profile.photo, '');
+  assert.equal(weird.account, null);
+});
+
+test('cuentas en línea: una cuenta en línea cuenta como 13+ en el ranking', () => {
+  assert.equal(BOARD.eligible({ username: 'Ana_23', online: true }), true);
+  assert.equal(BOARD.eligible({ username: 'Peque', birth: '2020-01' }), false);
+  assert.equal(BOARD.eligible({ username: 'Sin_fecha' }), false);
 });
 
 test('cuenta: la fecha de nacimiento se guarda solo si es válida', () => {
   const base = { username: 'Ana_23', hash: 'a'.repeat(64), salt: 'b'.repeat(32), iter: 210000 };
-  const ok = S.validateState({ ...S.defaultState(), account: { ...base, birth: '2010-04' } });
+  const ok = S.validateState({ ...S.defaultState(), account: { ...base, birth: '2010-04', email: 'ana@example.com', online: true } });
   assert.equal(ok.account.birth, '2010-04');
+  assert.equal(ok.account.online, true);
+  const noMail = S.validateState({ ...S.defaultState(), account: { ...base, online: true } });
+  assert.equal(noMail.account.online, undefined, 'sin correo no puede ser cuenta en línea');
   const bad = S.validateState({ ...S.defaultState(), account: { ...base, birth: '2010-4' } });
   assert.equal(bad.account.birth, undefined);
+});
+
+test('cerrar sesión (v4.0.1): la foto se guarda aparte por cuenta, se conservan idioma y fotos, y ya no se guarda nada', () => {
+  const b = S.memoryBackend();
+  const store = S.createStore(b);
+  const id = (n) => `00000000-0000-4000-8000-00000000000${n}`;
+  const foto = 'data:image/webp;base64,AAAA';
+  assert.equal(store.keepPhoto('no-es-un-id', foto), false, 'solo con el id de una cuenta');
+  assert.equal(store.keepPhoto(id(1), 'javascript:alert(1)'), false, 'solo fotos de verdad');
+  for (const n of [1, 2, 3, 4]) store.keepPhoto(id(n), foto);
+  assert.equal(store.photoFor(id(1)), '', 'se guardan solo las 3 más recientes');
+  assert.equal(store.photoFor(id(4)), foto);
+  store.dropPhoto(id(3)); // al volver a entrar, la foto pasa a la cuenta y se quita de aquí
+  assert.equal(store.photoFor(id(3)), '');
+  b.setItem('st2_lang', 'en');
+  b.setItem('st2_state', '{}');
+  b.setItem('st2_board', '{}');
+  store.wipe({ keep: ['lang', 'photos'], final: true });
+  assert.equal(b.getItem('st2_lang'), 'en', 'el idioma es del equipo');
+  assert.equal(store.photoFor(id(4)), foto, 'la foto espera a que la cuenta vuelva');
+  assert.equal(b.getItem('st2_state'), null);
+  assert.equal(b.getItem('st2_board'), null);
+  // Lo que siga corriendo antes de recargar ya no puede volver a escribir la cuenta
+  assert.equal(store.save({ account: { username: 'x' } }), false);
+  store.pref.set('paywall_day', '2026-11-08');
+  assert.equal(b.getItem('st2_state'), null);
+  assert.equal(b.getItem('st2_paywall_day'), null);
 });

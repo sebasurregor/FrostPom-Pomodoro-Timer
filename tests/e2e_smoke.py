@@ -42,6 +42,9 @@ def state(pg):
 # Foto de prueba con datos ocultos (EXIF con modelo de teléfono y GPS) para comprobar que se borran.
 FOTO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_foto_prueba.jpg")
 from PIL import Image
+import os as _os, sys as _sys
+_sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+from _classic import classic, classic_text
 _img = Image.linear_gradient("L").resize((900, 600)).convert("RGB")  # con degradado: el zoom cambia la foto
 _exif = Image.Exif(); _exif[0x010F] = "TelefonoDePrueba"; _exif[0x8825] = {2: (6.0, 15.0, 0.0), 1: "N"}
 _img.save(FOTO, "JPEG", exif=_exif.tobytes())
@@ -58,6 +61,7 @@ with sync_playwright() as p:
     browser = p.chromium.launch(**launch)
     # color_scheme="dark": así lo ve quien tiene Windows o el teléfono en modo oscuro.
     ctx = browser.new_context(viewport={"width": 390, "height": 844}, timezone_id="America/Bogota", locale="es-CO", color_scheme="dark")
+    ctx.route('**/js/config.js', classic)
     pg = ctx.new_page()
     errors = []
     pg.on("pageerror", lambda e: errors.append(str(e)))
@@ -311,6 +315,7 @@ with sync_playwright() as p:
 
     # Registro saltando la foto: queda el animal al azar
     ctx3 = browser.new_context(viewport={"width": 1280, "height": 800}, color_scheme="light", locale="es-CO")
+    ctx3.route('**/js/config.js', classic)
     pg3 = ctx3.new_page(); errs3 = []
     pg3.on("pageerror", lambda e: errs3.append(str(e)))
     pg3.goto(URL); pg3.wait_for_timeout(800)
@@ -355,6 +360,7 @@ with sync_playwright() as p:
 
     # Paisaje animado aunque el sistema pida "reducir movimiento" (y quieto con el ajuste de la app)
     ctx2 = browser.new_context(viewport={"width": 1280, "height": 800}, reduced_motion="reduce", locale="es-CO")
+    ctx2.route('**/js/config.js', classic)
     pg2 = ctx2.new_page()
     pg2.goto(URL); pg2.wait_for_timeout(1200)
     pos = lambda: pg2.evaluate("[...document.querySelectorAll('.walker')].map(w => Math.round(w.getBoundingClientRect().left))")

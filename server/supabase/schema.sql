@@ -1,5 +1,6 @@
 -- =====================================================================
--- FrostPom: servidor del ranking global (Supabase / PostgreSQL 15+) — v3.9
+-- FrostPom: servidor del ranking global y de las cuentas en línea (Supabase / PostgreSQL 15+)
+-- v3.9: ranking global · v4.0: guardar el progreso de las cuentas con correo (sin la foto)
 --
 -- Por qué existe: si el ranking se calculara en el teléfono, cualquiera podría
 -- editar sus minutos. Aquí el SERVIDOR mide el tiempo y decide cuánto cuenta.
@@ -20,6 +21,9 @@
 --  7. La edad NO se guarda aquí: la app pregunta el mes y año de nacimiento, lo guarda solo en
 --     el dispositivo, y a los menores de 13 años ni siquiera los conecta con este servidor.
 --  8. Cada persona puede descargar y borrar sus datos.
+--  9. (v4.0) Las cuentas con correo guardan su progreso para entrar desde otro equipo. El
+--     servidor quita la foto y los datos de la cuenta local antes de guardarlo. Las cuentas
+--     anónimas (las del ranking) no pueden guardar progreso.
 --
 -- Cómo usarlo: Supabase > SQL Editor > pega este archivo > Run. Se puede volver a correr.
 -- Paso a paso completo: docs/RANKING-GLOBAL.md
@@ -168,10 +172,21 @@ create table if not exists private.transfer_codes (
   expires_at timestamptz not null
 );
 
+-- (v4.0) El progreso de cada cuenta con correo: un solo documento JSON, con versión para
+-- no pisar lo que otro equipo guardó.
+create table if not exists private.saves (
+  user_id    uuid primary key references auth.users (id) on delete cascade,
+  data       jsonb not null,
+  version    int not null default 1,
+  bytes      int not null default 0,
+  updated_at timestamptz not null default now()
+);
+
 alter table private.profiles       enable row level security;
 alter table private.study_sessions enable row level security;
 alter table private.daily_totals   enable row level security;
 alter table private.transfer_codes enable row level security;
+alter table private.saves          enable row level security;
 -- Sin políticas a propósito: el acceso es SOLO a través de las funciones de abajo.
 
 revoke all on all tables in schema private from public;
@@ -467,7 +482,8 @@ begin
   return jsonb_build_object(
     'profile', (select to_jsonb(p) - 'user_id' - 'hidden' from private.profiles p where p.user_id = uid),
     'daily_totals', coalesce((select jsonb_agg(to_jsonb(dt) - 'user_id' order by dt.day) from private.daily_totals dt where dt.user_id = uid), '[]'::jsonb),
-    'sessions', coalesce((select jsonb_agg(to_jsonb(s) - 'user_id' order by s.started_at) from private.study_sessions s where s.user_id = uid), '[]'::jsonb)
+    'sessions', coalesce((select jsonb_agg(to_jsonb(s) - 'user_id' order by s.started_at) from private.study_sessions s where s.user_id = uid), '[]'::jsonb),
+    'progress', (select sv.data from private.saves sv where sv.user_id = uid)
   );
 end $$;
 
@@ -482,6 +498,77 @@ begin
   delete from private.profiles where user_id = uid;   -- en cascada: sesiones y totales
   delete from private.transfer_codes where user_id = uid;
   delete from auth.users where id = uid and coalesce(is_anonymous, false);
+end $$;
+
+-- ---------------------------------------------------------------------
+-- Cuentas en línea (v4.0): guardar y traer el progreso
+-- ---------------------------------------------------------------------
+-- Exige una cuenta con correo (las anónimas del ranking no guardan progreso).
+create or replace function private.require_account() returns uuid
+language plpgsql stable security definer set search_path = '' as $$
+declare
+  uid uuid := private.require_user();
+begin
+  if exists (select 1 from auth.users u where u.id = uid and coalesce(u.is_anonymous, false)) then
+    raise exception 'account_required' using errcode = '42501';
+  end if;
+  return uid;
+end $$;
+
+-- Trae tu progreso guardado (ninguna fila si todavía no hay).
+create or replace function public.load_progress()
+returns table (data jsonb, version int, updated_at timestamptz)
+language plpgsql stable security definer set search_path = '' as $$
+#variable_conflict use_column
+declare
+  uid uuid := private.require_account();
+begin
+  return query select sv.data, sv.version, sv.updated_at from private.saves sv where sv.user_id = uid;
+end $$;
+
+-- Guarda tu progreso. p_base_version = la versión que tenía este equipo (0 si es la primera vez).
+-- Si otro equipo guardó después, falla con 'save_conflict' y la app decide qué copia queda.
+-- Devuelve la versión nueva. Máximo 1 MB. La foto y la cuenta local nunca se guardan.
+create or replace function public.save_progress(p_data jsonb, p_base_version int)
+returns int
+language plpgsql security definer set search_path = '' as $$
+declare
+  uid  uuid := private.require_account();
+  cur  int;
+  d    jsonb;
+  size int;
+begin
+  if p_data is null or jsonb_typeof(p_data) <> 'object' then
+    raise exception 'save_invalid' using errcode = '22023';
+  end if;
+  d := (p_data - 'account') #- '{profile,photo}';
+  size := octet_length(d::text);
+  if size > 1048576 then
+    raise exception 'save_too_big' using errcode = '54000';
+  end if;
+  select sv.version into cur from private.saves sv where sv.user_id = uid for update;
+  if cur is null then
+    insert into private.saves (user_id, data, version, bytes) values (uid, d, 1, size);
+    return 1;
+  end if;
+  if coalesce(p_base_version, 0) <> cur then
+    raise exception 'save_conflict' using errcode = '40001', detail = cur::text;
+  end if;
+  update private.saves set data = d, version = cur + 1, bytes = size, updated_at = now() where user_id = uid;
+  return cur + 1;
+end $$;
+
+-- Elimina tu cuenta en línea por completo: progreso, ranking y la cuenta misma (con correo o no).
+create or replace function public.delete_my_cloud_account()
+returns void
+language plpgsql security definer set search_path = '' as $$
+declare
+  uid uuid := private.require_user();
+begin
+  delete from private.saves where user_id = uid;
+  delete from private.profiles where user_id = uid;
+  delete from private.transfer_codes where user_id = uid;
+  delete from auth.users where id = uid;
 end $$;
 
 -- ---------------------------------------------------------------------
@@ -536,6 +623,9 @@ revoke execute on function public.create_transfer_code() from public;
 revoke execute on function public.redeem_transfer_code(text) from public;
 revoke execute on function public.export_my_data() from public;
 revoke execute on function public.delete_my_account() from public;
+revoke execute on function public.load_progress() from public;
+revoke execute on function public.save_progress(jsonb, int) from public;
+revoke execute on function public.delete_my_cloud_account() from public;
 
 do $$
 begin
@@ -544,5 +634,7 @@ begin
     execute 'revoke execute on function public.set_profile(text, text, text, text, boolean), public.set_board_visibility(boolean), public.start_session(int), public.finish_session(uuid, int, int), public.create_transfer_code(), public.redeem_transfer_code(text), public.export_my_data(), public.delete_my_account() from anon';
     execute 'grant execute on function public.username_available(text), public.get_leaderboard(text, int) to anon, authenticated';
     execute 'grant execute on function public.set_profile(text, text, text, text, boolean), public.set_board_visibility(boolean), public.start_session(int), public.finish_session(uuid, int, int), public.create_transfer_code(), public.redeem_transfer_code(text), public.export_my_data(), public.delete_my_account() to authenticated';
+    execute 'revoke execute on function public.load_progress(), public.save_progress(jsonb, int), public.delete_my_cloud_account() from anon';
+    execute 'grant execute on function public.load_progress(), public.save_progress(jsonb, int), public.delete_my_cloud_account() to authenticated';
   end if;
 end $$;

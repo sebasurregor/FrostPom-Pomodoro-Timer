@@ -19,6 +19,12 @@ export const TIMER_KEY = 'st2_timer';
 const PREFIX = 'st2_';
 const GUARD_KEY = 'st2_login_guard'; // intentos fallidos al iniciar sesión
 const REMEMBER_KEY = 'st2_remember'; // "mantener sesión iniciada" en este dispositivo
+// Fotos de las cuentas en línea que cerraron sesión en este equipo (v4.0.1). La foto nunca se sube:
+// se guarda aquí para devolverla si la misma cuenta vuelve a entrar en este equipo.
+const PHOTOS_KEY = 'st2_photos';
+const MAX_KEPT_PHOTOS = 3;
+const isPhoto = (p) => typeof p === 'string' && p.length <= 300000 && /^data:image\/(webp|jpeg|png);base64,[A-Za-z0-9+/]+=*$/.test(p);
+const isAccountId = (id) => typeof id === 'string' && /^[0-9a-f-]{36}$/i.test(id);
 const BACKUP_MAX_BYTES = 2 * 1024 * 1024;
 const LIMITS = { sessions: MAX_SESSIONS, dailyDays: 800, claimedDays: 14 };
 
@@ -58,7 +64,7 @@ export function defaultState() {
     // Premium: hoy solo existe el modo de prueba (sin cobro). Cuando la app esté en las tiendas,
     // el estado real vendrá de la compra validada en App Store / Google Play, no de este archivo.
     premium: { active: false, demo: true, since: null, bonusClaimed: false, giftPending: false },
-    account: null, // { username, hash, salt, iter, remember?, email?, emailLinked?, birth? } — la contraseña nunca se guarda, solo su hash
+    account: null, // { username, hash, salt, iter, remember?, email?, emailLinked?, birth?, online?, cloudPending? } — la contraseña nunca se guarda, solo su hash
     progress: {
       xp: 0, gems: 0, achievements: U.dict(), claimed: U.dict(), owned: ['clasico'], gifted: [],
       bestStreak: 0, combo: 0, bestCombo: 0, longestSessionSec: 0, cycle: 0, breakEarned: false, customized: false,
@@ -167,7 +173,7 @@ export function validateState(raw) {
   out.profile.onboarded = p.onboarded === true && !!out.profile.nick;
   out.profile.country = isCountry(p.country) ? p.country : '';
   // Foto de perfil: solo imágenes WebP, JPEG o PNG en base64 y de tamaño razonable (nada de SVG ni enlaces).
-  out.profile.photo = typeof p.photo === 'string' && p.photo.length <= 300000 && /^data:image\/(webp|jpeg|png);base64,[A-Za-z0-9+/]+=*$/.test(p.photo) ? p.photo : '';
+  out.profile.photo = isPhoto(p.photo) ? p.photo : '';
 
   const pm = obj(raw.premium);
   out.premium = { active: pm.active === true, demo: true, since: pm.active === true && isISO(pm.since) ? pm.since : null, bonusClaimed: pm.bonusClaimed === true, giftPending: pm.giftPending === true && pm.bonusClaimed === true };
@@ -187,6 +193,9 @@ export function validateState(raw) {
     // Mes y año de nacimiento (v3.9): solo para saber si puede estar en el ranking global.
     // Se queda en el dispositivo (la copia de seguridad no lleva la cuenta).
     if (typeof acc.birth === 'string' && /^(19|20)\d{2}-(0[1-9]|1[0-2])$/.test(acc.birth)) out.account.birth = acc.birth;
+    // Cuenta en línea (v4.0): el correo es también para entrar desde otro equipo.
+    if (acc.online === true && out.account.email) out.account.online = true;
+    if (acc.cloudPending === true && out.account.email && !out.account.online) out.account.cloudPending = true;
     out.profile.nick = acc.username;
   }
 
@@ -286,6 +295,7 @@ export function createStore(backendOverride, sessionOverride) {
   const backend = local || memoryBackend();
   const session = sessionOverride || usable('sessionStorage') || memoryBackend();
   let lastRaw = null; // el último st2_state que leímos o escribimos nosotros
+  let frozen = false; // después de borrar todo para recargar: no se vuelve a guardar nada
 
   function readJSON(key) {
     try {
@@ -296,6 +306,7 @@ export function createStore(backendOverride, sessionOverride) {
     }
   }
   function writeJSON(key, value) {
+    if (frozen) return false;
     try {
       backend.setItem(key, JSON.stringify(value));
       return true;
@@ -338,6 +349,7 @@ export function createStore(backendOverride, sessionOverride) {
       return this.load().state;
     },
     save(state) {
+      if (frozen) return false;
       try {
         const raw = JSON.stringify(state);
         backend.setItem(KEY, raw);
@@ -370,6 +382,7 @@ export function createStore(backendOverride, sessionOverride) {
         try { return backend.getItem(PREFIX + name); } catch { return null; }
       },
       set(name, value) {
+        if (frozen) return;
         try { backend.setItem(PREFIX + name, String(value)); } catch { /* sin almacenamiento */ }
       },
     },
@@ -385,15 +398,44 @@ export function createStore(backendOverride, sessionOverride) {
         try { session.removeItem(PREFIX + name); } catch { /* sin almacenamiento */ }
       },
     },
-    /** Borra TODO lo de FrostPom en este dispositivo (incluye datos de la v1). */
-    wipe() {
+    /** La foto que dejó en este equipo la cuenta en línea `id` al cerrar sesión ('' si no hay). */
+    photoFor(id) {
+      const m = obj(readJSON(PHOTOS_KEY));
+      return isAccountId(id) && isPhoto(m[id]) ? m[id] : '';
+    },
+    /** Guarda la foto de la cuenta `id` al cerrar sesión (solo las 3 más recientes). */
+    keepPhoto(id, photo) {
+      if (!isAccountId(id) || !isPhoto(photo)) return false;
+      const m = obj(readJSON(PHOTOS_KEY));
+      delete m[id];
+      const ids = Object.keys(m).filter((k) => isAccountId(k) && isPhoto(m[k])).slice(-(MAX_KEPT_PHOTOS - 1));
+      const next = {};
+      for (const k of ids) next[k] = m[k];
+      next[id] = photo;
+      return writeJSON(PHOTOS_KEY, next);
+    },
+    dropPhoto(id) {
+      const m = obj(readJSON(PHOTOS_KEY));
+      if (!(id in m)) return;
+      delete m[id];
+      if (Object.keys(m).length) writeJSON(PHOTOS_KEY, m);
+      else try { backend.removeItem(PHOTOS_KEY); } catch { /* sin almacenamiento */ }
+    },
+    /**
+     * Borra TODO lo de FrostPom en este dispositivo (incluye datos de la v1).
+     * `keep`: claves que se conservan (sin el prefijo), por ejemplo ['lang', 'photos'] al cerrar sesión.
+     * `final`: la app se va a recargar; lo que siga corriendo ya no puede volver a guardar el estado.
+     */
+    wipe({ keep = [], final = false } = {}) {
+      const kept = new Set(keep.map((k) => PREFIX + k));
       const keys = [];
       for (let i = 0; i < backend.length; i++) {
         const k = backend.key(i);
-        if (k && (k.startsWith(PREFIX) || k.startsWith('st_'))) keys.push(k);
+        if (k && !kept.has(k) && (k.startsWith(PREFIX) || k.startsWith('st_'))) keys.push(k);
       }
       keys.forEach((k) => backend.removeItem(k));
       lastRaw = null;
+      if (final) frozen = true;
       return keys.length;
     },
   };

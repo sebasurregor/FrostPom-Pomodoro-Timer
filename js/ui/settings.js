@@ -11,7 +11,8 @@ import { pic } from './pics.js';
 import * as FX from './effects.js';
 import { $, $$, h } from './dom.js';
 import { toast } from './feedback.js';
-import { onBoardToggle, downloadBoardData, deleteBoardData, renderBoardData } from './board-ui.js';
+import { onBoardToggle } from './board-ui.js';
+import { renderCloudSettings, onCloudButton } from './cloud-ui.js';
 import { renderSound } from './sound.js';
 import { renderReminders } from './reminders.js';
 import { updatePhase } from './hud.js';
@@ -23,7 +24,6 @@ import { t, tr, lang, setLang } from '../i18n.js';
 
 export function renderSettings() {
   renderSound();
-  renderBoardData();
   renderReminders();
   const reg = $('#setRegion');
   if (!reg.options.length) reg.append(...C.REGIONS.map((r) => h('option', { value: r.id, text: r.name })));
@@ -36,6 +36,7 @@ export function renderSettings() {
   $('#accMailText').textContent = mail ? CLOUD.maskEmail(mail) : tr('Sin correo: si olvidas la contraseña no podrás recuperarla.');
   $('#accMailBtn').textContent = tr(mail ? 'Cambiar correo' : 'Agregar correo');
   $('#accMailRemove').hidden = !mail;
+  renderCloudSettings(); // cuenta en línea (v4.0): conectar, salir de este equipo…
   $('#accLogoutBtn').hidden = !state.account;
   $('#rememberRow').hidden = !state.account;
   $('#setRemember').checked = isRemembered();
@@ -76,7 +77,7 @@ const TOGGLES = [
   ['#setVibrate', 'vibrate', (on) => { if (on) FX.buzz(40); }],
   ['#setAwake', 'keepAwake', (on) => wakeLock(on && session.running)],
   ['#setMotion', 'reduceMotion'],
-  ['#setBoard', 'leaderboardOn', (on) => onBoardToggle(on).then(renderBoardData)],
+  ['#setBoard', 'leaderboardOn', (on) => onBoardToggle(on).then(renderSettings)],
 ];
 
 function changeCap(delta) {
@@ -103,9 +104,6 @@ export function bindSettings() {
   }
   $$('#capStepper .stepper__btn').forEach((b) => b.addEventListener('click', () => changeCap(Number(b.dataset.cap))));
   $('#notifBtn').addEventListener('click', enableNotifications);
-  $('#boardDownload').addEventListener('click', downloadBoardData);
-  $('#boardDelete').addEventListener('click', () => deleteBoardData().then(renderSettings));
-  document.addEventListener('frostpom:board', renderBoardData);
   $('#setRegion').addEventListener('change', (e) => {
     mutate((s) => { s.settings.timeZone = e.target.value; });
     updatePhase();
@@ -133,4 +131,6 @@ export function bindSettings() {
   $('#setLang').addEventListener('change', (e) => setLang(e.target.value));
   $('#accMailBtn').addEventListener('click', emailFlow);
   $('#accMailRemove').addEventListener('click', removeEmailFlow);
+  $('#accCloudBtn').addEventListener('click', onCloudButton);
+  document.addEventListener('frostpom:cloud', renderCloudSettings);
 }

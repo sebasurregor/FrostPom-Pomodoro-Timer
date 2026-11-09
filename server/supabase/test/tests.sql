@@ -386,4 +386,75 @@ begin
   assert exists (select 1 from auth.users where id = '55555555-5555-5555-5555-555555555555'), 'FALLO: borró una cuenta con correo';
   raise notice 'OK  limpieza: % cuentas anónimas abandonadas borradas', r.deleted_users;
 end $$;
+
+-- ===================== (v4.0) Cuentas en línea: guardar el progreso =====================
+insert into auth.users (id, is_anonymous) values ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', false);
+set role authenticated;
+set request.jwt.claim.sub = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+do $$
+declare v int; r record;
+begin
+  select count(*) into v from public.load_progress();
+  assert v = 0, 'FALLO: una cuenta nueva no debería tener progreso';
+  v := public.save_progress('{"progress":{"xp":120},"profile":{"nick":"iris","photo":"data:image/png;base64,AAAA"},"account":{"hash":"secreto"}}', 0);
+  assert v = 1, 'FALLO: la primera versión debe ser 1';
+  select * into r from public.load_progress();
+  assert (r.data->'progress'->>'xp')::int = 120 and r.version = 1, 'FALLO: no se trajo lo guardado';
+  assert not (r.data->'profile' ? 'photo'), 'FALLO: la foto se guardó en el servidor';
+  assert not (r.data ? 'account'), 'FALLO: la cuenta local (huella de la contraseña) se guardó en el servidor';
+  v := public.save_progress('{"progress":{"xp":150}}', 1);
+  assert v = 2, 'FALLO: la segunda versión debe ser 2';
+  begin
+    perform public.save_progress('{"progress":{"xp":10}}', 1);  -- otro equipo con una copia vieja
+    raise exception 'FALLO: una copia vieja pisó a una más nueva';
+  exception when serialization_failure then null;
+  end;
+  begin
+    perform public.save_progress(jsonb_build_object('x', repeat('a', 1100000)), 2);
+    raise exception 'FALLO: aceptó un guardado de más de 1 MB';
+  exception when program_limit_exceeded then null;
+  end;
+  begin
+    perform public.save_progress('[1,2,3]', 2);
+    raise exception 'FALLO: aceptó algo que no es un objeto';
+  exception when invalid_parameter_value then null;
+  end;
+  raise notice 'OK  cuentas en línea: guardar y traer el progreso (sin foto ni contraseña), versiones y tamaño máximo';
+end $$;
+
+-- Las cuentas anónimas (las del ranking) no guardan progreso, y sin sesión tampoco
+set request.jwt.claim.sub = '33333333-3333-3333-3333-333333333333';
+do $$
+begin
+  begin
+    perform public.save_progress('{"progress":{}}', 0);
+    raise exception 'FALLO: una cuenta anónima guardó progreso';
+  exception when insufficient_privilege then null;
+  end;
+  raise notice 'OK  una cuenta anónima no puede guardar progreso';
+end $$;
+set role anon;
+set request.jwt.claim.sub = '';
+do $$
+begin
+  begin
+    perform public.load_progress();
+    raise exception 'FALLO: un visitante sin cuenta leyó progreso';
+  exception when insufficient_privilege then null;
+  end;
+  raise notice 'OK  sin sesión no se puede leer ni guardar progreso';
+end $$;
+
+-- Eliminar la cuenta en línea: se va todo, también la cuenta con correo
+set role authenticated;
+set request.jwt.claim.sub = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+do $$ begin perform public.set_profile('iris.v'); perform public.delete_my_cloud_account(); end $$;
+reset role;
+do $$
+begin
+  assert not exists (select 1 from auth.users where id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'), 'FALLO: quedó la cuenta con correo';
+  assert not exists (select 1 from private.saves where user_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'), 'FALLO: quedó el progreso';
+  assert not exists (select 1 from private.profiles where username = 'iris.v'), 'FALLO: quedó el perfil del ranking';
+  raise notice 'OK  eliminar la cuenta en línea borra el progreso, el ranking y la cuenta';
+end $$;
 \echo 'Todas las pruebas del servidor pasaron.'

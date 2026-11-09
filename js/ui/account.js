@@ -17,16 +17,54 @@ import { pic } from './pics.js';
 import { skipPaywallToday } from './premium.js';
 import * as BOARD from '../board.js';
 import { birthField, applyRename, adoptEmailSession, deleteBoardOnAccountDelete, errorText as boardErrorText } from './board-ui.js';
+import * as SYNC from '../sync.js';
+import { createOnline, afterOnlineCreated, signInFlow, deleteOnlineAccount, changeOnlinePassword, isOnline, signOutOnline, justSignedOut, reloadApp } from './cloud-ui.js';
 import { state, store, mutate, migrated } from './context.js';
 import { t, tr } from '../i18n.js';
 
 // ---------- Sesión desbloqueada (solo mientras la pestaña esté abierta) ----------
 export const isUnlocked = () => store.tab.get('unlocked') === '1';
-const markUnlocked = () => store.tab.set('unlocked', '1');
+export const markUnlocked = () => store.tab.set('unlocked', '1');
+/**
+ * Cerrar sesión. Con cuenta en línea, el progreso queda en la cuenta y se vuelve a "Inicia sesión"
+ * (cloud-ui.js). Con una cuenta solo de este dispositivo, la app se bloquea y pide la contraseña
+ * al abrirla; desde ahí también se puede usar otra cuenta.
+ */
 export function logout() {
+  if (isOnline()) { signOutOnline(); return; }
   forgetDevice(); // cerrar sesión también apaga "mantener sesión iniciada"
   store.tab.remove('unlocked');
   location.reload();
+}
+
+/**
+ * "Usar otra cuenta" en la pantalla de entrar. Devuelve true si se cerró la cuenta (la app se recarga).
+ *  - Cuenta en línea: se cierra la sesión; su progreso queda en la cuenta. No se borra nada de ella.
+ *  - Cuenta solo de este dispositivo: no hay otro lugar donde quede, así que se explica qué pasa y
+ *    cómo conectarla primero (13+) para no perder nada.
+ */
+async function otherAccountFlow() {
+  if (isOnline()) return signOutOnline({ title: '¿Usar otra cuenta?', confirmLabel: 'Usar otra cuenta' });
+  const name = state.account.username;
+  const minor = !!state.account.birth && !BOARD.oldEnough(state.account.birth);
+  const canConnect = SYNC.enabled() && !minor;
+  const res = await openDialog({
+    className: 'dlg--onb dlg--gate',
+    title: 'Esta cuenta está solo en este dispositivo',
+    body: [
+      h('p', { class: 'dlg__text', text: t('Para usar otra cuenta aquí, hay que borrar la de {name} con todo su progreso. No se puede deshacer.', { name }) }),
+      canConnect
+        ? h('p', { class: 'dlg__text', text: 'Para no perderla, toca «Volver», entra con tu contraseña y ve a Ajustes → Tu cuenta → «Conectar». Así tu progreso queda guardado en línea y puedes cerrar sesión cuando quieras sin borrar nada.' })
+        : minor ? h('p', { class: 'dlg__text', text: 'Las cuentas de menores de 13 años se guardan solo en este dispositivo.' }) : null,
+    ],
+    actions: [
+      { label: 'Borrar y usar otra cuenta', value: 'wipe', variant: 'btn--coral' },
+      { label: 'Volver', value: 'back', variant: 'btn--gold', primary: true },
+    ],
+  });
+  if (res !== 'wipe') return false;
+  store.wipe({ final: true });
+  return reloadApp();
 }
 
 // ---------- Mantener la sesión iniciada en este dispositivo ----------
@@ -59,7 +97,7 @@ async function enterRemembered() {
 }
 
 /** Casilla "Mantener mi sesión iniciada" (marcada por defecto). */
-function keepSignedInField(id) {
+export function keepSignedInField(id) {
   const box = h('input', { type: 'checkbox', id, checked: true });
   const field = h('label', { class: 'switch switch--compact', for: id }, box,
     h('span', { class: 'switch__ui', 'aria-hidden': 'true' }),
@@ -69,7 +107,7 @@ function keepSignedInField(id) {
 }
 
 /** Reglas de una contraseña nueva. Devuelve el motivo del error o '' si está bien. */
-function newPasswordError(pass1, pass2, username) {
+export function newPasswordError(pass1, pass2, username) {
   const pc = SEC.checkPassword(pass1);
   if (!pc.ok) return pc.reason;
   if (pass1 !== pass2) return 'Las dos contraseñas no coinciden.';
@@ -81,7 +119,7 @@ function newPasswordError(pass1, pass2, username) {
  * Comprueba usuario y contraseña respetando el bloqueo por intentos fallidos
  * (el mismo para iniciar sesión y para cambiar la contraseña).
  */
-async function verifyWithGuard(password, { username = state.account.username, wrong }) {
+export async function verifyWithGuard(password, { username = state.account.username, wrong }) {
   const guard = store.loadGuard();
   const wait = SEC.lockRemainingMs(guard);
   if (wait > 0) return { ok: false, message: t('Demasiados intentos. Espera {n} segundos.', { n: Math.ceil(wait / 1000) }) };
@@ -107,7 +145,9 @@ function accountFields({ withPassword = true, withEmail = false, withBirth = fal
   const pass2 = h('input', { type: 'password', class: 'acc-input', id: 'accPass2', maxlength: '64', autocomplete: 'new-password' });
   const email = h('input', { type: 'email', class: 'acc-input', id: 'accEmail', maxlength: '254', autocomplete: 'email', autocapitalize: 'off', spellcheck: 'false', inputmode: 'email', placeholder: 'tucorreo@ejemplo.com' });
   const showEmail = withEmail && CLOUD.isConfigured();
-  const birth = withBirth && BOARD.enabled() ? birthField('accBirth') : null;
+  // Mes y año: para el ranking global (v3.9) y para saber si puede tener cuenta en línea (v4.0)
+  const birth = withBirth && CLOUD.isConfigured() && (BOARD.enabled() || SYNC.enabled()) ? birthField('accBirth', '', { hint: false }) : null; // sin nota: la pantalla queda más corta
+  let session = null; // sesión de la cuenta en línea recién creada
   const err = h('p', { class: 'form-error', role: 'alert' });
   function check() {
     const r = checkUsername(name.value);
@@ -126,11 +166,13 @@ function accountFields({ withPassword = true, withEmail = false, withBirth = fal
       h('p', { class: 'acc-hint', text: 'Mínimo 8 caracteres, con letras y números.' }),
       h('label', { class: 'pin-label', for: 'accPass2', text: 'Repite la contraseña' }), pass2,
     ] : null,
-    showEmail ? [
+    birth ? birth.nodes : null,
+    showEmail && SYNC.enabled() ? [
+      h('label', { class: 'pin-label', for: 'accEmail', text: 'Correo' }), email,
+    ] : showEmail ? [
       h('label', { class: 'pin-label', for: 'accEmail', text: 'Correo (opcional)' }), email,
       h('p', { class: 'acc-hint', text: 'Solo para enviarte un código si olvidas la contraseña.' }),
     ] : null,
-    birth ? birth.nodes : null,
     err,
   ];
   /** Con el ranking global: ¿el nombre está libre? (si no hay internet, se sigue y se revisa al unirse) */
@@ -154,18 +196,29 @@ function accountFields({ withPassword = true, withEmail = false, withBirth = fal
     }
     const born = birth ? birth.value() : '';
     if (birth && !born) { err.textContent = tr('Elige el mes y el año en que naciste.'); birth.focus(); return null; }
+    // Cuenta en línea (v4.0): para mayores de 13, el correo es obligatorio (con él entran desde otro equipo)
+    const online = showEmail && SYNC.enabled() && !!born && BOARD.oldEnough(born);
+    if (online && !mail) { err.textContent = tr('Escribe tu correo: con él y tu contraseña entras desde cualquier equipo.'); email.focus(); return null; }
     if (birth) {
       err.textContent = tr('Comprobando…');
       if (!(await nameFree(r.value, born))) return null;
     }
+    let cloud = {};
+    if (online) {
+      err.textContent = tr('Creando tu cuenta…');
+      const c = await createOnline(mail, pass1.value);
+      if (c.ok) { session = c.session; cloud = { online: true }; }
+      else if (c.kind === 'offline') cloud = { cloudPending: true }; // se termina cuando haya internet
+      else { err.textContent = CLOUD.errorText(c); if (c.kind === 'exists') email.focus(); return null; }
+    }
     try {
       const rec = await SEC.hashPassword(pass1.value);
       err.textContent = '';
-      return { username: r.value, ...rec, ...(mail ? { email: mail } : {}), ...(born ? { birth: born } : {}) };
+      return { username: r.value, ...rec, ...(mail ? { email: mail } : {}), ...(born ? { birth: born } : {}), ...cloud };
     } catch (e) { err.textContent = e.message; return null; }
   }
   const setError = (msg) => { err.textContent = msg; };
-  return { nodes, validate, focus: () => name.focus(), setError };
+  return { nodes, validate, focus: () => name.focus(), setError, session: () => session };
 }
 
 /** Al abrir la app con cuenta, se pide la contraseña (una vez por pestaña). */
@@ -189,10 +242,10 @@ export async function loginGate() {
         h('button', { type: 'submit', hidden: true, tabindex: '-1' })),
       CLOUD.isConfigured()
         ? h('p', { class: 'dlg__note' }, h('button', { type: 'button', class: 'link-btn', id: 'forgotBtn', onclick: () => dlg.close('forgot') }, '¿Olvidaste la contraseña?'))
-        : h('p', { class: 'dlg__note', text: '¿Olvidaste la contraseña? Puedes empezar de nuevo.' }),
+        : h('p', { class: 'dlg__note', text: '¿Olvidaste la contraseña? Puedes usar otra cuenta.' }),
     ],
     actions: [
-      { label: 'Empezar de nuevo', value: 'reset' },
+      { label: 'Usar otra cuenta', value: 'other' },
       {
         label: 'Entrar', value: 'ok', variant: 'btn--gold', primary: true,
         validate: async () => {
@@ -211,9 +264,8 @@ export async function loginGate() {
     if (done) return;
     return loginGate();
   }
-  if (res === 'reset') {
-    const sure = await confirmDialog('¿Empezar de nuevo?', 'Se borra todo el progreso guardado en este dispositivo. No se puede deshacer.', 'Borrar y empezar');
-    if (sure) { store.wipe(); location.reload(); return; }
+  if (res === 'other') {
+    if (await otherAccountFlow()) return;
     return loginGate();
   }
   markUnlocked();
@@ -241,7 +293,8 @@ export async function createAccountFlow({ required = false } = {}) {
     markUnlocked();
     await rememberDevice();
     toast(t('Cuenta creada. ¡Bienvenido, {name}!', { name: rec.username }), 'good');
-    if (rec.email) linkEmailQuietly(rec.email);
+    if (rec.online) afterOnlineCreated(f.session());
+    else if (rec.email && !rec.cloudPending) linkEmailQuietly(rec.email);
   }
 }
 
@@ -286,6 +339,9 @@ export async function changePasswordFlow() {
         if (!v.ok) { err.textContent = v.message; return false; }
         const problem = newPasswordError(p1.value, p2.value, state.account.username);
         if (problem) { err.textContent = problem; return false; }
+        // Cuenta en línea: la contraseña cambia primero allá (necesita internet)
+        const c = await changeOnlinePassword(p1.value);
+        if (!c.ok) { err.textContent = c.message; return false; }
         try { rec = await SEC.hashPassword(p1.value); return true; } catch (e) { err.textContent = e.message; return false; }
       },
     }],
@@ -322,8 +378,11 @@ export async function deleteAccountFlow() {
         validate: async () => {
           if (!hasAccount) return true;
           const v = await verifyWithGuard(pass.value, { wrong: 'La contraseña no es correcta.' });
-          if (!v.ok) { err.textContent = v.message; pass.value = ''; }
-          return v.ok;
+          if (!v.ok) { err.textContent = v.message; pass.value = ''; return false; }
+          // Cuenta en línea: se borra completa en el servidor (progreso, ranking y la cuenta)
+          const d = await deleteOnlineAccount();
+          if (!d.ok) { err.textContent = d.message; return false; }
+          return true;
         },
       },
     ],
@@ -331,7 +390,7 @@ export async function deleteAccountFlow() {
   });
   if (res !== 'ok') return;
   await deleteBoardOnAccountDelete(); // el ranking global también (si hay internet)
-  store.wipe();
+  store.wipe({ final: true });
   location.reload();
 }
 
@@ -344,6 +403,12 @@ export async function deleteAccountFlow() {
  * La duración de las sesiones se elige después, en Enfocar.
  */
 export async function onboarding() {
+  // Acaba de cerrar sesión en una cuenta en línea: primero "Inicia sesión" (con la flecha se crea una cuenta)
+  const left = SYNC.enabled() ? justSignedOut() : null;
+  if (left !== null) {
+    skipPaywallToday();
+    if (await signInFlow(left, { signedOut: true })) return;
+  }
   // Si viene de la versión anterior conserva su animal; si es nuevo, uno al azar.
   const avatar = state.profile.nick && state.profile.avatar ? state.profile.avatar : makeNickname().avatar;
   const acc = accountFields({ withEmail: true, withBirth: true, initialName: '' });
@@ -351,7 +416,7 @@ export async function onboarding() {
   let country = state.profile.country || '';
   const r = G.rankForXp(state.progress.xp);
   const keep = keepSignedInField('onbKeep');
-  await openDialog({
+  const res = await openDialog({
     className: 'dlg--onb dlg--gate',
     dismissable: false,
     title: migrated ? '¡Tu app subió de nivel!' : '¡Hola! Crea tu cuenta de estudio',
@@ -362,10 +427,20 @@ export async function onboarding() {
       h('p', { class: 'onb__label', text: 'Tu nacionalidad (opcional)' }),
       countryPicker(country, (v) => { country = v; }),
       keep.field,
+      // Cuentas en línea (v4.0): quien ya tiene cuenta entra con su correo desde aquí
+      SYNC.enabled() && !migrated
+        ? h('p', { class: 'signin-switch' }, h('button', { type: 'button', class: 'link-btn', id: 'toSignIn', onclick: () => dlg.close('signin') }, '¿Ya tienes cuenta? Inicia sesión'))
+        : null,
     ],
     actions: [{ label: 'Crear cuenta', value: 'ok', variant: 'btn--gold btn--xl', primary: true, validate: async () => { accRec = await acc.validate(); return !!accRec; } }],
     onOpen: acc.focus,
   });
+  if (res === 'signin') {
+    skipPaywallToday();
+    if (await signInFlow()) return; // entró con su cuenta y trajo su progreso
+    return onboarding(); // tocó la flecha para volver
+  }
+  if (res !== 'ok' || !accRec) return onboarding();
   skipPaywallToday();
   // La cuenta se guarda YA: si la app se cierra en el paso de la foto, no se pierde nada.
   mutate((s) => {
@@ -377,7 +452,8 @@ export async function onboarding() {
   });
   markUnlocked();
   if (keep.box.checked) await rememberDevice();
-  if (accRec.email) linkEmailQuietly(accRec.email);
+  if (accRec.online) afterOnlineCreated(acc.session()); // cuenta en línea: guarda la sesión y sube el progreso
+  else if (accRec.email && !accRec.cloudPending) linkEmailQuietly(accRec.email);
   const photo = await photoStep(accRec.username, avatar);
   if (photo) {
     mutate((s) => { s.profile.photo = photo; });
@@ -440,6 +516,8 @@ function photoStep(username, avatar) {
 const keepEmail = (acc) => ({
   ...(acc && acc.email ? { email: acc.email, emailLinked: acc.emailLinked === true } : {}),
   ...(acc && acc.birth ? { birth: acc.birth } : {}),
+  ...(acc && acc.online ? { online: true } : {}),
+  ...(acc && acc.cloudPending ? { cloudPending: true } : {}),
 });
 
 /** Registra el correo en Supabase sin interrumpir (al crear la cuenta). */
@@ -509,7 +587,7 @@ async function forgotPasswordFlow() {
     await openDialog({
       className: 'dlg--onb dlg--gate',
       title: 'Esta cuenta no tiene correo',
-      body: [h('p', { class: 'dlg__text', text: 'Sin un correo de recuperación no hay forma de comprobar que la cuenta es tuya. Puedes volver a intentarlo o empezar de nuevo.' })],
+      body: [h('p', { class: 'dlg__text', text: 'Sin un correo de recuperación no hay forma de comprobar que la cuenta es tuya. Puedes volver a intentarlo o usar otra cuenta.' })],
       actions: [{ label: 'Volver', value: 'back', variant: 'btn--gold', primary: true }],
     });
     return false;
@@ -596,8 +674,12 @@ async function forgotPasswordFlow() {
           if (problem) { err2.textContent = problem; p1.focus(); return false; }
           err2.textContent = tr('Comprobando…');
           try {
-            const ses = await CLOUD.verifyRecoveryCode(acc.email, code.value, { keep: BOARD.enabled() });
-            adoptEmailSession(ses); // con el ranking global: tu lugar queda en la cuenta con correo
+            const ses = await CLOUD.verifyRecoveryCode(acc.email, code.value, { keep: BOARD.enabled() || isOnline() });
+            if (isOnline() && ses && typeof ses === 'object') {
+              // Cuenta en línea: la contraseña nueva también sirve para entrar desde otros equipos
+              await CLOUD.updatePassword(ses.access, p1.value);
+              await BOARD.adoptSession(ses);
+            } else adoptEmailSession(ses); // con el ranking global: tu lugar queda en la cuenta con correo
           } catch (x) { err2.textContent = CLOUD.errorText(x); code.focus(); return false; }
           try { rec = await SEC.hashPassword(p1.value); return true; } catch (x) { err2.textContent = x.message; return false; }
         },

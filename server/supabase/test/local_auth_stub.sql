@@ -7,7 +7,7 @@ begin
 end $$;
 create schema auth;
 -- Como en Supabase: las cuentas anónimas tienen is_anonymous = true.
-create table auth.users (id uuid primary key, is_anonymous boolean not null default false, created_at timestamptz not null default now());
+create table auth.users (id uuid primary key, email text, is_anonymous boolean not null default false, created_at timestamptz not null default now());
 create function auth.uid() returns uuid
 language sql stable as $$
   select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid

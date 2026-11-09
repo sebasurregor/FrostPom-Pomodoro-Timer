@@ -1,7 +1,7 @@
 /*
  * FrostPom — avisos: toasts, notificaciones del sistema y diálogos (uno a la vez).
  */
-import { $, h } from './dom.js';
+import { $, h, svg } from './dom.js';
 import { tr } from '../i18n.js';
 
 export function toast(text, tone = 'info', { icon, ms = 3800 } = {}) {
@@ -41,13 +41,25 @@ let dialogChain = Promise.resolve();
  * actions: [{ label, value, variant, primary, validate }]. validate() puede ser async y
  * devolver false para dejar el diálogo abierto. Resuelve con el value elegido o 'cancel'.
  */
-export function openDialog({ title, body = [], actions = [], className = '', dismissable = true, onOpen }) {
+/** Flecha para volver (el SVG que diseñó el autor; el color sale de CSS con currentColor). */
+export function backArrow() {
+  return svg('svg', { width: 18, height: 18, viewBox: '0 0 18 18', fill: 'none', 'aria-hidden': 'true', focusable: 'false' },
+    svg('path', { d: 'M3.80042 8.55124H16.64', stroke: 'currentColor', 'stroke-width': 2, 'stroke-linecap': 'round' }),
+    svg('path', { d: 'M8.71799 2.1983L2.48682 8.42947L8.71799 14.6607', stroke: 'currentColor', 'stroke-width': 2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }));
+}
+
+/**
+ * back = valor con el que se cierra la ventana al tocar la flecha de volver (arriba a la
+ * izquierda). Sin back, no hay flecha.
+ */
+export function openDialog({ title, body = [], actions = [], className = '', dismissable = true, onOpen, back = null }) {
   const run = () => new Promise((resolve) => {
     dlg.className = `dlg ${className}`;
     // Entrar / crear cuenta: detrás se ve el paisaje del ártico con la fogata (no la app)
     if (/\bdlg--gate\b/.test(className)) document.documentElement.classList.add('gate-open');
     dlg.replaceChildren(
-      h('div', { class: 'dlg__box' },
+      h('div', { class: `dlg__box${back ? ' dlg__box--back' : ''}` },
+        back ? h('button', { type: 'button', class: 'dlg__back', id: 'dlgBack', 'aria-label': 'Volver', title: 'Volver', onclick: () => dlg.close(back) }, backArrow()) : null,
         title ? h('h2', { class: 'dlg__title', id: 'dlgTitle', text: title }) : null,
         h('div', { class: 'dlg__body' }, body),
         actions.length ? h('div', { class: 'dlg__actions' }, actions.map((a) => h('button', {

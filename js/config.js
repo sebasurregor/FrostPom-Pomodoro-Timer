@@ -4,13 +4,19 @@
  * teléfono o al navegador lo puede leer cualquiera. Ver docs/SEGURIDAD.md.
  */
 export const config = Object.freeze({
-  version: '3.9.1',
+  version: '4.0.1',
   // Supabase (solo para recuperar la contraseña por correo; ver docs/RECUPERAR-CONTRASENA.md).
   // La clave publicable puede ir aquí. La clave secreta (service_role / sb_secret_…) NUNCA.
   // Si dejas url vacía, la app oculta todo lo del correo.
   cloud: Object.freeze({
     url: 'https://tcxdmziakgppabwyrydd.supabase.co',
     key: 'sb_publishable_P3zAO_4mbYu-190JTAHqjA_HezuxMeb',
+  }),
+  accounts: Object.freeze({
+    // (v4.0) Cuentas en línea: los mayores de 13 entran desde cualquier equipo con correo y
+    // contraseña, y su progreso (menos la foto) se guarda en Supabase. Necesita el SQL de
+    // server/supabase/schema.sql. Paso a paso: docs/CUENTAS-EN-LINEA.md
+    online: true,
   }),
   leaderboard: Object.freeze({
     // 'local'  = solo tu marca en este dispositivo y el aviso "llega pronto".

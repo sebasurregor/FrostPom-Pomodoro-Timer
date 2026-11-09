@@ -7,7 +7,7 @@
  *  - Solo se guarda en caché lo de este mismo sitio y respuestas correctas. Nunca respuestas de APIs
  *    ni de otros dominios (podrían contener datos personales).
  */
-const VERSION = '3.9.1';
+const VERSION = '4.0.1';
 const CACHE = `frostpom-${VERSION}`;
 const PRECACHE = [
   './',
@@ -27,6 +27,8 @@ const PRECACHE = [
   './js/ui/gate-snow.js',
   './js/ui/board-ui.js',
   './js/board.js',
+  './js/sync.js',
+  './js/ui/cloud-ui.js',
   './js/util.js',
   './js/game.js',
   './js/catalog.js',

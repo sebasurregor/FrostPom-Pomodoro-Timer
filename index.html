@@ -374,6 +374,10 @@
               <button class="btn btn--gold btn--sm" type="button" id="accPassBtn"><img class="pic pic--llave" src="assets/icons/llave.png" width="20" height="20" alt="" aria-hidden="true"><span id="accPassLabel">Cambiar contraseña</span></button>
               <button class="btn btn--paper btn--sm" type="button" id="accLogoutBtn">Cerrar sesión</button>
             </div>
+            <div class="acc-cloud" id="accCloudRow" hidden>
+              <p class="acc-cloud__text" id="accCloudText"></p>
+              <div class="btn-row"><button class="btn btn--paper btn--sm" type="button" id="accCloudBtn">Conectar</button></div>
+            </div>
             <div class="acc-mail" id="accMailRow" hidden>
               <p class="acc-mail__text"><b>Correo de recuperación</b> <span id="accMailText"></span></p>
               <div class="acc-mail__actions">
@@ -467,13 +471,6 @@
               </div>
             </div>
             <label class="switch"><input type="checkbox" id="setBoard"><span class="switch__ui" aria-hidden="true"></span><span class="switch__text"><b>Aparecer en el ranking</b></span></label>
-            <div class="board-data" id="boardData" hidden>
-              <p class="board-data__text">Tus datos del ranking global</p>
-              <div class="btn-row">
-                <button type="button" class="btn btn--paper btn--sm" id="boardDownload">Descargar</button>
-                <button type="button" class="btn btn--paper btn--sm" id="boardDelete">Borrar</button>
-              </div>
-            </div>
           </section>
           </div>
 

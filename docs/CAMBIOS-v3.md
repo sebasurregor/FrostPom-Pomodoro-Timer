@@ -1,5 +1,29 @@
 # Cambios de la v2 a la v3
 
+## v4.0.1: cerrar sesión sin borrar la cuenta
+
+- **Antes:** al cerrar sesión, la pantalla "¡Hola de nuevo!" solo dejaba entrar a la misma cuenta; para salir de ella había que tocar "Empezar de nuevo", que **borraba todo**. No debía ser así.
+- **Cuenta en línea:** **"Cerrar sesión"** ahora sube lo pendiente, cierra la sesión y lleva a **"Inicia sesión"** con el correo ya escrito y el aviso "Cerraste sesión. Tu progreso sigue guardado en tu cuenta". Con la flecha ← se puede crear otra cuenta. La cuenta y su progreso **no se borran**. Si no hay internet y quedó algo sin subir, avisa antes de cerrar.
+- **La foto vuelve:** como la foto nunca se sube, al cerrar sesión se guarda aparte en ese equipo (máximo 3 cuentas) y regresa cuando la misma cuenta entra otra vez. El idioma elegido también se conserva.
+- **"Empezar de nuevo" ahora es "Usar otra cuenta":** con cuenta en línea cierra la sesión sin borrar nada. Con una cuenta solo de este dispositivo (menores de 13 o cuentas de antes sin conectar) explica qué pasa antes de borrar, con "Volver" como opción principal, y a los de 13+ les dice cómo conectarla primero.
+- **"Salir de este equipo" desapareció:** hacía lo mismo que el nuevo "Cerrar sesión".
+- **"Crea tu cuenta" más corta:** se quitaron las notas debajo de "¿Cuándo naciste?" y de "Correo" (lo explica la política de privacidad, y si alguien de 13+ deja el correo vacío, el aviso de error le dice para qué es). El aviso de error ya no ocupa espacio cuando está vacío, así que el correo queda cerca de "Tu nacionalidad", y cada campo deja el mismo aire con el siguiente.
+- **Arreglo:** al salir desde la pantalla de entrar, la app alcanzaba a volver a guardar la cuenta antes de recargarse. Ahora, después de borrar, ya no se guarda nada.
+- **Pruebas:** `tests/e2e_cuentas.py` pasa de 47 a 60 comprobaciones; 1 prueba unitaria nueva (69 en total).
+
+## v4.0: cuentas en línea
+
+- **Cuentas en línea (13+):** al crear la cuenta, quien tiene 13 años o más escribe su **correo** (ahora obligatorio para ellos) y la cuenta se crea también en Supabase con la misma contraseña. Desde cualquier equipo entra con **correo + contraseña** y su progreso llega con él. Se guarda **todo menos la foto** (y la fecha de nacimiento, que nunca sale del dispositivo). Guía: `docs/CUENTAS-EN-LINEA.md`.
+- **Volver a iniciar sesión desde "Crea tu cuenta":** el registro tiene **"¿Ya tienes cuenta? Inicia sesión"**, y la pantalla de entrar tiene la **flecha ←** (tu SVG, `#AFAFAF`) para volver a crear cuenta. La flecha también está en "Recupera tu contraseña" y "Revisa tu correo".
+- **Sincronización** (`js/sync.js`, `js/ui/cloud-ui.js`): el progreso se sube unos 8 segundos después de cada cambio, al esconder la app y al volver el internet; al abrir, se trae lo más nuevo. Si dos equipos guardan a la vez, gana la copia con más tiempo estudiado. El nombre de usuario viaja con el progreso.
+- **Ajustes → Tu cuenta:** muestra la cuenta en línea y el último guardado, con **"Salir de este equipo"** (en la v4.0.1 se unió con "Cerrar sesión"). A quien ya tenía cuenta le aparece **"Conectar"** (si el correo ya existía en Supabase, confirma con un código y elige con qué progreso seguir). Cambiar la contraseña también la cambia en línea, y **"Eliminar mi cuenta"** borra también la cuenta en línea.
+- **Menores de 13:** su cuenta sigue solo en su dispositivo; el correo es opcional y solo sirve para recuperar la contraseña.
+- **Ranking con la misma cuenta:** quien tiene cuenta en línea ya no crea una cuenta anónima para el ranking; si ya estaba en el ranking, su lugar pasa a la cuenta en línea.
+- **Bienestar y ranking más simple:** se quitaron **"Descargar"** y **"Borrar"** (generaban un archivo JSON que casi nadie entendía). Al apagar **"Aparecer en el ranking"** sale una ventana con la casilla **"Borrar también mis minutos del ranking"**. Quien quiera una copia de sus datos la pide por correo.
+- **Servidor** (`server/supabase/schema.sql`): tabla `private.saves` y funciones `load_progress`, `save_progress` (versiones, máximo 1 MB, quita la foto y la cuenta) y `delete_my_cloud_account`. Hay que correrlo en Supabase **antes** de subir la v4.0. 27 comprobaciones en PostgreSQL.
+- **Privacidad:** `privacidad.html` (ES/EN) explica las cuentas en línea, qué se guarda en Supabase, Brevo para los correos, cómo borrar (todo, solo este equipo o solo el ranking) y cómo pedir una copia.
+- **Pruebas:** `tests/e2e_cuentas.py` (47 comprobaciones con Supabase simulado), 2 pruebas unitarias nuevas (68 en total). `store_check.py` usa el Supabase simulado cuando revisa en local.
+
 ## v3.9: ranking global (listo, apagado hasta que lo enciendas)
 
 - **Servidor nuevo** (`server/supabase/schema.sql`): el nombre público es el nombre de usuario (revisado con las mismas reglas que la app y único); todos los de 13+ aparecen por defecto y se puede salir; semana de lunes 00:00 UTC y temporada de 3 meses; XP acotada; ocultar nombres (`private.hide_name`); pasar tu lugar a tu cuenta con correo con un código de un solo uso; descargar y borrar; limpieza (`private.cleanup`). Probado en PostgreSQL: 23 comprobaciones.

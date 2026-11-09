@@ -16,54 +16,59 @@
     <h1>Política de privacidad de FrostPom</h1>
     <p class="legal__date">Última actualización: 8 de noviembre de 2026 · <a href="#english">English version</a></p>
 
-    <p class="legal__summary"><strong>En resumen:</strong> casi todo lo que haces en FrostPom se guarda <strong>solo en tu dispositivo</strong>. Hay dos excepciones, y en las dos el servicio es Supabase: el <strong>correo de recuperación</strong> (opcional), para enviarte un código si olvidas la contraseña, y el <strong>ranking global</strong>, que guarda tu nombre de usuario, tu país, tu animal y tus minutos de estudio. En el ranking aparece quien tenga 13 años o más, y cualquiera puede salir cuando quiera. La app no tiene anuncios, no usa analítica ni rastreadores y no vende tu información.</p>
+    <p class="legal__summary"><strong>En resumen:</strong> si tienes <strong>13 años o más</strong>, tu cuenta es una <strong>cuenta en línea</strong>: entras con tu correo y tu contraseña desde cualquier equipo, y tu progreso (todo menos tu foto) se guarda en <strong>Supabase</strong>. Si tienes <strong>menos de 13 años</strong>, todo se queda <strong>solo en tu dispositivo</strong>. El <strong>ranking global</strong> guarda tu nombre de usuario, tu país, tu animal y tus minutos de estudio; en él aparece quien tenga 13 años o más, y cualquiera puede salir cuando quiera. La app no tiene anuncios, no usa analítica ni rastreadores y no vende tu información.</p>
 
     <h2>1. Qué datos guarda la app</h2>
     <ul>
-      <li><strong>Tu cuenta:</strong> el nombre de usuario que eliges y tu contraseña. La contraseña nunca se guarda tal cual: solo se guarda una huella cifrada (hash PBKDF2-SHA256 con sal aleatoria).</li>
+      <li><strong>Tu cuenta:</strong> el nombre de usuario que eliges y tu contraseña. En el dispositivo, la contraseña nunca se guarda tal cual: solo una huella cifrada (hash PBKDF2-SHA256 con sal aleatoria).</li>
       <li><strong>Tu perfil (opcional):</strong> el país que elijas, tu animal o tu foto de perfil. La foto se recorta, se reduce a 256 × 256 píxeles y se le quitan los datos ocultos (como la ubicación GPS o el modelo del teléfono).</li>
       <li><strong>Tu estudio:</strong> cuántos minutos estudias cada día y la hora de inicio y fin de cada sesión. <strong>Nunca</strong> se guarda qué materia o tema estudias.</li>
       <li><strong>Tu progreso y ajustes:</strong> rango, XP, gemas, logros, temporadas, la barriguita de tu compañero, sonidos, recordatorios y demás preferencias.</li>
     </ul>
     <ul>
-      <li><strong>Correo de recuperación (opcional):</strong> si lo escribes al crear la cuenta o en Ajustes, sirve únicamente para enviarte un código cuando olvides la contraseña. No lo usamos para publicidad ni boletines.</li>
-      <li><strong>Mes y año de nacimiento:</strong> si el ranking global está activo, la app te los pregunta solo para saber si puedes aparecer en él (13 años o más). <strong>Se quedan en tu dispositivo</strong>: nunca se envían.</li>
+      <li><strong>Tu correo:</strong> si tienes 13 años o más, es el correo de tu cuenta en línea: con él y tu contraseña entras desde otro equipo, y a él te enviamos un código si olvidas la contraseña. Si tienes menos de 13 años es opcional y sirve únicamente para recuperar la contraseña. Nunca lo usamos para publicidad ni boletines.</li>
+      <li><strong>Mes y año de nacimiento:</strong> la app te los pregunta solo para saber si puedes tener cuenta en línea y aparecer en el ranking global (13 años o más). <strong>Se quedan en tu dispositivo</strong>: nunca se envían.</li>
     </ul>
     <p>No pedimos tu nombre real, tu teléfono ni tu ubicación. Te recomendamos usar un nombre de usuario que no revele quién eres.</p>
 
     <h2>2. Dónde se guardan</h2>
-    <p>En el almacenamiento local de la app en tu dispositivo. Tu progreso, tu foto y tu contraseña no salen de ahí. Si borras los datos de la app, cambias de dispositivo o la desinstalas, ese progreso no se puede recuperar.</p>
-    <p>El correo de recuperación, si lo agregas, se guarda además en <strong>Supabase</strong>, el servicio que usamos para enviar los códigos. Allí solo queda el correo (con una contraseña aleatoria que nadie conoce): <strong>tu contraseña de FrostPom nunca se envía</strong>. Los códigos llegan por correo electrónico y vencen pasado un tiempo.</p>
+    <p><strong>Cuenta en línea (13 años o más).</strong> Tu progreso se guarda en tu dispositivo y también en tu cuenta en <strong>Supabase</strong>, para que no lo pierdas si cambias de equipo. Se guarda todo lo del punto 1 <strong>menos tu foto de perfil y tu fecha de nacimiento</strong>, que se quedan en el dispositivo. Tu correo y tu contraseña quedan en el sistema de cuentas de Supabase, que guarda la contraseña cifrada (nunca tal cual). Cada vez que estudias, el progreso se sube unos segundos después; sin internet, la app funciona igual y lo sube cuando vuelve la conexión.</p>
+    <p><strong>Cuenta solo en este dispositivo</strong> (menores de 13 años, o cuentas de antes que todavía no se conectan). Todo se queda en el almacenamiento local de la app: tu progreso, tu foto y tu contraseña no salen de ahí. Si borras los datos de la app, cambias de dispositivo o la desinstalas, ese progreso no se puede recuperar. Si agregas un correo de recuperación, en Supabase solo queda el correo (con una contraseña aleatoria que nadie conoce): tu contraseña de FrostPom no se envía.</p>
+    <p>Los códigos para recuperar la contraseña llegan por correo electrónico, los envía <strong>Brevo</strong> (el servicio de correo que usa Supabase) y vencen pasado un tiempo.</p>
 
     <h2>3. Ranking global</h2>
     <p>Cuando el ranking global está activo, quienes tienen 13 años o más aparecen en él <strong>por defecto</strong>, y cualquiera puede salir en <strong>Ajustes → Aparecer en el ranking</strong>. Para que nadie pueda hacer trampa, el servidor mide el tiempo de cada pomodoro. Esto es lo que se envía a Supabase:</p>
     <ul>
-      <li>Un <strong>identificador anónimo</strong> de tu dispositivo (o el de tu correo de recuperación, si lo agregaste), para saber que tus minutos son tuyos.</li>
+      <li>El <strong>identificador de tu cuenta en línea</strong> (o, si tu cuenta es solo de este dispositivo, un identificador anónimo), para saber que tus minutos son tuyos.</li>
       <li>Tu <strong>nombre de usuario</strong>, tu <strong>país</strong> (si lo elegiste), tu <strong>animal</strong>, tu zona horaria (para el tope de 4 horas al día) y tu XP de la temporada (para mostrar tu emblema).</li>
       <li>La <strong>hora de inicio y de fin</strong> de cada pomodoro y los minutos que cuentan.</li>
     </ul>
-    <p>Los demás ven solo tu nombre de usuario, tu país, tu animal, tu emblema y tus minutos. <strong>Nunca</strong> se envían tu contraseña, tu foto, tu fecha de nacimiento ni qué estudias. Los pomodoros que empiezas sin internet no cuentan en el ranking global (sí en tu progreso). Si un nombre es ofensivo, podemos ocultarlo del ranking.</p>
+    <p>Los demás ven solo tu nombre de usuario, tu país, tu animal, tu emblema y tus minutos. <strong>Nunca</strong> se muestran tu correo, tu foto, tu fecha de nacimiento ni qué estudias. Los pomodoros que empiezas sin internet no cuentan en el ranking global (sí en tu progreso). Si un nombre es ofensivo, podemos ocultarlo del ranking.</p>
 
     <h2>4. Con quién se comparten</h2>
-    <p>Con nadie más. La app no incluye publicidad, analítica ni redes sociales. El único servicio externo es Supabase (para el correo de recuperación y el ranking global). Si algún día compras Premium, el pago lo procesa <strong>Microsoft Store</strong> con tu cuenta Microsoft: FrostPom nunca recibe los datos de tu tarjeta. Las fuentes, imágenes y sonidos van incluidos dentro de la app.</p>
+    <p>Con nadie más. La app no incluye publicidad, analítica ni redes sociales. Los únicos servicios externos son <strong>Supabase</strong> (cuentas en línea, correo de recuperación y ranking global) y <strong>Brevo</strong> (solo para enviar los correos con los códigos). Si algún día compras Premium, el pago lo procesa <strong>Microsoft Store</strong> con tu cuenta Microsoft: FrostPom nunca recibe los datos de tu tarjeta. Las fuentes, imágenes y sonidos van incluidos dentro de la app.</p>
 
     <h2>5. Notificaciones</h2>
     <p>Si las activas, la app te avisa cuando termina un bloque o a la hora de tus recordatorios. Son avisos locales: no pasan por ningún servidor.</p>
 
     <h2>6. Cuánto tiempo se guardan</h2>
     <p>Hasta que elimines tu cuenta. Además, al empezar cada temporada de estudio (cada 3 meses), la app borra sola el historial detallado de sesiones de las temporadas anteriores y solo conserva el total de minutos de cada día.</p>
-    <p>En el servidor del ranking, las sesiones de hace más de 400 días se borran solas, y las cuentas anónimas que llevan 90 días sin actividad se eliminan con todo lo suyo.</p>
+    <p>Tu cuenta en línea y su progreso se guardan en Supabase hasta que la elimines. En el servidor del ranking, las sesiones de hace más de 400 días se borran solas, y las cuentas anónimas que llevan 90 días sin actividad se eliminan con todo lo suyo.</p>
 
     <h2>7. Cómo borrar tus datos</h2>
-    <p>En <strong>Ajustes → Tu cuenta → Eliminar mi cuenta</strong>. Se borran de inmediato y para siempre tu cuenta, tu progreso, tu foto y tus ajustes, y también tus datos del ranking global si hay conexión. Desinstalar la app borra lo que hay en el dispositivo.</p>
-    <p>Para borrar solo tus datos del ranking global, ve a <strong>Ajustes → Tus datos del ranking global → Borrar</strong>. Ahí mismo puedes <strong>descargarlos</strong>.</p>
-    <p>Para borrar tu correo de recuperación de Supabase, escríbenos desde ese correo a la dirección de contacto y lo eliminamos en un plazo máximo de 15 días hábiles. En Ajustes también puedes quitarlo de este dispositivo.</p>
+    <ul>
+      <li><strong>Todo:</strong> en <strong>Ajustes → Tu cuenta → Eliminar mi cuenta</strong>. Se borran de inmediato y para siempre tu cuenta, tu progreso, tu foto y tus ajustes de este dispositivo, y también tu cuenta en línea (correo incluido), el progreso guardado en ella y tus datos del ranking global. Para borrar una cuenta en línea se necesita internet.</li>
+      <li><strong>Solo de este equipo:</strong> en una cuenta en línea, <strong>Ajustes → Tu cuenta → Cerrar sesión</strong> borra el progreso de ese equipo; tu cuenta y tu progreso siguen guardados en línea. Tu foto se queda guardada en ese equipo para cuando vuelvas a entrar (para quitarla, usa «Eliminar mi cuenta» o borra los datos de la app).</li>
+      <li><strong>Solo tus datos del ranking:</strong> apaga <strong>Ajustes → Aparecer en el ranking</strong> y marca <strong>«Borrar también mis minutos del ranking»</strong>.</li>
+      <li><strong>El correo de recuperación</strong> de una cuenta solo de este dispositivo: escríbenos desde ese correo a la dirección de contacto y lo eliminamos en un plazo máximo de 15 días hábiles. En Ajustes también puedes quitarlo de este dispositivo.</li>
+    </ul>
+    <p>Desinstalar la app borra lo que hay en el dispositivo, pero no tu cuenta en línea: para eso usa «Eliminar mi cuenta» o escríbenos.</p>
 
     <h2>8. Niños y niñas</h2>
-    <p>FrostPom es para todas las edades y no muestra publicidad. <strong>Si tienes menos de 13 años, la app no te conecta con el ranking global:</strong> puedes verlo, pero tu nombre y tus minutos no se envían. Si tienes entre 13 y 17 años, apareces en el ranking con tu nombre de usuario; te recomendamos que ese nombre no sea tu nombre real, y puedes salir cuando quieras en Ajustes. El correo de recuperación es opcional: si eres menor de edad, agrégalo solo con el permiso de tu madre, padre o tutor (o usa el correo de ellos). Tu foto de perfil nunca se publica.</p>
+    <p>FrostPom es para todas las edades y no muestra publicidad. <strong>Si tienes menos de 13 años, la app no te crea una cuenta en línea ni te conecta con el ranking global:</strong> tu progreso se queda solo en tu dispositivo, y puedes ver el ranking, pero tu nombre y tus minutos no se envían. Si tienes entre 13 y 17 años, tu cuenta es en línea y apareces en el ranking con tu nombre de usuario; te recomendamos que ese nombre no sea tu nombre real, y puedes salir del ranking cuando quieras en Ajustes. Si eres menor de edad, usa tu correo solo con el permiso de tu madre, padre o tutor (o usa el correo de ellos). Tu foto de perfil nunca se publica ni se sube.</p>
 
     <h2>9. Tus derechos</h2>
-    <p>Tus datos están en tu dispositivo, así que tú los controlas: puedes verlos y cambiarlos en la app, y borrarlos cuando quieras. Los del ranking global los puedes descargar, salir del ranking y borrarlos desde Ajustes. Sobre el correo de recuperación puedes pedirnos conocerlo, corregirlo o borrarlo en la dirección de contacto. Esto aplica, entre otras, a la Ley 1581 de 2012 de Colombia y a las normas de protección de datos de tu país.</p>
+    <p>Tú controlas tus datos: puedes verlos y cambiarlos en la app, salir del ranking y borrarlos cuando quieras (punto 7). Si quieres <strong>una copia</strong> de lo que está guardado en el servidor (tu cuenta en línea, tu progreso o tus datos del ranking), o quieres corregir o borrar algo, escríbenos desde el correo de tu cuenta a la dirección de contacto y te respondemos en un plazo máximo de 15 días hábiles. Esto aplica, entre otras, a la Ley 1581 de 2012 de Colombia y a las normas de protección de datos de tu país.</p>
 
     <h2>10. Cambios a esta política</h2>
     <p>Si cambia algo importante, lo publicaremos en esta página y lo avisaremos dentro de la app.</p>
@@ -73,38 +78,46 @@
     <hr>
     <h1 id="english" lang="en">FrostPom privacy policy (English)</h1>
     <div lang="en">
-    <p class="legal__summary"><strong>In short:</strong> almost everything you do in FrostPom is stored <strong>only on your device</strong>. There are two exceptions, both using Supabase: the optional <strong>recovery email</strong>, to send you a code if you forget your password, and the <strong>global leaderboard</strong>, which stores your username, country, animal and study minutes. People aged 13 and up appear on the leaderboard, and anyone can leave it at any time. The app has no ads, no analytics or trackers, and never sells your information.</p>
+    <p class="legal__summary"><strong>In short:</strong> if you are <strong>13 or older</strong>, your account is an <strong>online account</strong>: you sign in with your email and password from any device, and your progress (everything except your photo) is stored with <strong>Supabase</strong>. If you are <strong>under 13</strong>, everything stays <strong>only on your device</strong>. The <strong>global leaderboard</strong> stores your username, country, animal and study minutes; people aged 13 and up appear on it, and anyone can leave at any time. The app has no ads, no analytics or trackers, and never sells your information.</p>
     <h2>1. What the app stores</h2>
     <ul>
-      <li><strong>Your account:</strong> the username you choose and your password. The password is never stored as is: only an encrypted fingerprint (PBKDF2-SHA256 hash with a random salt).</li>
+      <li><strong>Your account:</strong> the username you choose and your password. On the device, the password is never stored as is: only an encrypted fingerprint (PBKDF2-SHA256 hash with a random salt).</li>
       <li><strong>Your profile (optional):</strong> the country you choose, your animal or your profile photo. The photo is cropped, reduced to 256 × 256 pixels and stripped of hidden data (such as GPS location or phone model).</li>
       <li><strong>Your study:</strong> how many minutes you study each day and the start and end time of each session. What subject you study is <strong>never</strong> stored.</li>
       <li><strong>Your progress and settings:</strong> rank, XP, gems, achievements, seasons, your buddy’s tummy, sounds, reminders and other preferences.</li>
-      <li><strong>Recovery email (optional):</strong> only used to send you a code when you forget your password. Never used for ads or newsletters.</li>
-      <li><strong>Birth month and year:</strong> when the global leaderboard is active, the app asks for them only to know if you can appear on it (ages 13 and up). <strong>They stay on your device</strong> and are never sent.</li>
+      <li><strong>Your email:</strong> if you are 13 or older, it is the email of your online account: with it and your password you sign in from another device, and we send you a code there if you forget your password. If you are under 13 it is optional and only used to recover your password. Never used for ads or newsletters.</li>
+      <li><strong>Birth month and year:</strong> the app asks for them only to know if you can have an online account and appear on the global leaderboard (ages 13 and up). <strong>They stay on your device</strong> and are never sent.</li>
     </ul>
     <h2>2. Where it is stored</h2>
-    <p>In the app’s local storage on your device. Your progress, photo and password never leave it. The recovery email, if you add it, is also stored with <strong>Supabase</strong>, the service we use to send codes. Only the email is kept there (with a random password nobody knows): <strong>your FrostPom password is never sent</strong>.</p>
+    <p><strong>Online account (13 and up).</strong> Your progress is stored on your device and also in your account with <strong>Supabase</strong>, so you don’t lose it if you change devices. Everything in point 1 is stored <strong>except your profile photo and your birth date</strong>, which stay on the device. Your email and password are kept in Supabase’s account system, which stores the password encrypted (never as is). Each time you study, your progress is uploaded a few seconds later; offline, the app works the same and uploads it when you’re back online.</p>
+    <p><strong>Device-only account</strong> (under 13, or older accounts not connected yet). Everything stays in the app’s local storage: your progress, photo and password never leave it. If you clear the app’s data, change devices or uninstall it, that progress can’t be recovered. If you add a recovery email, only the email is kept with Supabase (with a random password nobody knows): your FrostPom password is not sent.</p>
+    <p>Password recovery codes arrive by email, are sent by <strong>Brevo</strong> (the email service Supabase uses) and expire after a while.</p>
     <h2>3. Global leaderboard</h2>
-    <p>When the global leaderboard is active, people aged 13 and up appear on it <strong>by default</strong>, and anyone can leave in <strong>Settings → Appear on the leaderboard</strong>. So that nobody can cheat, the server measures the time of each pomodoro. This is what is sent to Supabase:</p>
+    <p>When the global leaderboard is active, people aged 13 and up appear on it <strong>by default</strong>, and anyone can leave in <strong>Settings → Show me on the leaderboard</strong>. So that nobody can cheat, the server measures the time of each pomodoro. This is what is sent to Supabase:</p>
     <ul>
-      <li>An <strong>anonymous ID</strong> for your device (or the one of your recovery email, if you added it), so we know your minutes are yours.</li>
+      <li>Your <strong>online account’s ID</strong> (or, for a device-only account, an anonymous ID), so we know your minutes are yours.</li>
       <li>Your <strong>username</strong>, your <strong>country</strong> (if you chose one), your <strong>animal</strong>, your time zone (for the 4-hours-a-day cap) and your season XP (to show your emblem).</li>
       <li>The <strong>start and end time</strong> of each pomodoro and the minutes that count.</li>
     </ul>
-    <p>Others only see your username, country, animal, emblem and minutes. Your password, photo, birth date and what you study are <strong>never</strong> sent. Pomodoros started offline don’t count on the global leaderboard (they do count toward your progress). If a name is offensive, we may hide it from the leaderboard.</p>
+    <p>Others only see your username, country, animal, emblem and minutes. Your email, photo, birth date and what you study are <strong>never</strong> shown. Pomodoros started offline don’t count on the global leaderboard (they do count toward your progress). If a name is offensive, we may hide it from the leaderboard.</p>
     <h2>4. Who it is shared with</h2>
-    <p>No one else. The only external service is Supabase (for the recovery email and the global leaderboard). If you ever buy Premium, the payment is processed by the <strong>Microsoft Store</strong> with your Microsoft account: FrostPom never receives your card details.</p>
+    <p>No one else. The only external services are <strong>Supabase</strong> (online accounts, recovery email and global leaderboard) and <strong>Brevo</strong> (only to send the emails with codes). If you ever buy Premium, the payment is processed by the <strong>Microsoft Store</strong> with your Microsoft account: FrostPom never receives your card details.</p>
     <h2>5. Notifications</h2>
     <p>If you turn them on, the app lets you know when a block ends or at your reminder time. They are local and don’t go through any server.</p>
     <h2>6. How long it is kept</h2>
-    <p>Until you delete your account. At the start of each study season (every 3 months), the detailed session history of past seasons is deleted and only the daily minute totals are kept. On the leaderboard server, sessions older than 400 days are deleted automatically, and anonymous accounts with no activity for 90 days are removed with all their data.</p>
+    <p>Until you delete your account. At the start of each study season (every 3 months), the detailed session history of past seasons is deleted and only the daily minute totals are kept. Your online account and its progress are kept with Supabase until you delete it. On the leaderboard server, sessions older than 400 days are deleted automatically, and anonymous accounts with no activity for 90 days are removed with all their data.</p>
     <h2>7. How to delete your data</h2>
-    <p>Go to <strong>Settings → Your account → Delete my account</strong>: this also deletes your global leaderboard data if you’re online. To delete only your leaderboard data, go to <strong>Settings → Your global leaderboard data → Delete</strong>; you can <strong>download</strong> it there too. To delete your recovery email from Supabase, write to us from that email at the contact address below and we will delete it within 15 business days.</p>
+    <ul>
+      <li><strong>Everything:</strong> <strong>Settings → Your account → Delete my account</strong>. Your account, progress, photo and settings on this device are deleted right away and forever, together with your online account (email included), the progress stored in it and your global leaderboard data. Deleting an online account needs an internet connection.</li>
+      <li><strong>Only from this device:</strong> on an online account, <strong>Settings → Your account → Log out</strong> deletes that device’s progress; your account and progress stay saved online. Your photo stays saved on that device for when you sign in again (to remove it, use “Delete my account” or clear the app’s data).</li>
+      <li><strong>Only your leaderboard data:</strong> turn off <strong>Settings → Show me on the leaderboard</strong> and check <strong>“Also delete my leaderboard minutes”</strong>.</li>
+      <li><strong>The recovery email</strong> of a device-only account: write to us from that email at the contact address below and we will delete it within 15 business days.</li>
+    </ul>
+    <p>Uninstalling the app deletes what is on the device, but not your online account: for that, use “Delete my account” or write to us.</p>
     <h2>8. Children</h2>
-    <p>FrostPom is for all ages and shows no ads. <strong>If you are under 13, the app doesn’t connect you to the global leaderboard:</strong> you can see it, but your name and minutes are not sent. If you are 13 to 17, you appear on the leaderboard with your username; we recommend that it isn’t your real name, and you can leave anytime in Settings. The recovery email is optional: if you are a minor, add it only with permission from a parent or guardian (or use their email). Your profile photo is never published.</p>
+    <p>FrostPom is for all ages and shows no ads. <strong>If you are under 13, the app doesn’t create an online account for you or connect you to the global leaderboard:</strong> your progress stays only on your device, and you can see the leaderboard, but your name and minutes are not sent. If you are 13 to 17, your account is online and you appear on the leaderboard with your username; we recommend that it isn’t your real name, and you can leave the leaderboard anytime in Settings. If you are a minor, use your email only with permission from a parent or guardian (or use their email). Your profile photo is never published or uploaded.</p>
     <h2>9. Your rights</h2>
-    <p>You control the data on your device. You can download your leaderboard data, leave the leaderboard and delete it from Settings. For the recovery email, you can ask us to access, correct or delete it. This includes your rights under Colombia’s Law 1581 of 2012 and the data protection laws of your country.</p>
+    <p>You control your data: you can see and change it in the app, leave the leaderboard and delete it whenever you want (point 7). If you want <strong>a copy</strong> of what is stored on the server (your online account, your progress or your leaderboard data), or want to correct or delete something, write to us from your account’s email at the contact address below and we will reply within 15 business days. This includes your rights under Colombia’s Law 1581 of 2012 and the data protection laws of your country.</p>
     <h2>10. Changes</h2>
     <p>If anything important changes, we will publish it on this page and let you know in the app.</p>
     <h2>11. Contact</h2>

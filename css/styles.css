@@ -1449,6 +1449,10 @@ select:disabled { opacity: 0.6; }
 .acc-hint { font-size: 0.82rem; font-weight: 700; color: var(--on-paper-muted); margin: 4px 0 8px; }
 .acc-hint.is-ok { color: #0E8A63; }
 .onb__acc { flex: 1; min-width: 0; display: grid; }
+/* Crear cuenta: sin error, el aviso no ocupa espacio (el correo queda cerca de la nacionalidad) */
+.onb__acc .form-error:empty { min-height: 0; }
+/* Un campo que viene justo después de otro (sin nota en medio) deja un poco de aire */
+.onb__acc > :is(input, .birth) + .pin-label { margin-top: 10px; }
 .onb__who { align-items: flex-start; }
 .field--spaced { margin-top: 16px; }
 @media (max-width: 520px) { .onb__who { flex-direction: column; align-items: stretch; } .onb__who > .avatar { align-self: center; } }
@@ -2422,3 +2426,20 @@ html[data-theme="dark"] .custom { border-color: #8A6D1F; }
 .board-data__text { margin: 0; font-weight: 800; font-size: 0.92rem; color: var(--text); }
 .board__retry { list-style: none; justify-self: center; margin-top: 8px; }
 .board__empty, .board__you { white-space: normal; text-align: center; justify-self: center; max-width: 60ch; line-height: 1.4; padding: 8px 14px; }
+.check-row { display: flex; align-items: flex-start; gap: 10px; margin: 6px 0 4px; font-weight: 700; color: var(--text); cursor: pointer; line-height: 1.35; }
+.check-row input { width: 20px; height: 20px; flex: none; margin-top: 1px; accent-color: #E0484F; }
+
+/* =====================================================================
+   v4.0 — Cuentas en línea: flecha para volver e iniciar sesión
+   ===================================================================== */
+.dlg__box--back { position: relative; }
+.dlg__box--back > .dlg__title { padding-left: 40px; }
+.dlg__back {
+  position: absolute; top: 18px; left: 16px; width: 34px; height: 34px; display: grid; place-items: center;
+  border: 0; border-radius: 50%; background: transparent; color: #AFAFAF; cursor: pointer;
+}
+.dlg__back:hover { background: var(--card-soft, rgba(0, 0, 0, 0.06)); color: var(--text); }
+.dlg__back:focus-visible { outline: 3px solid #4C8DF6; outline-offset: 2px; }
+.signin-switch { text-align: center; margin: 10px 0 0; font-weight: 700; color: var(--text); }
+.acc-cloud { margin-top: 14px; display: grid; gap: 8px; }
+.acc-cloud__text { margin: 0; color: var(--text); line-height: 1.4; }

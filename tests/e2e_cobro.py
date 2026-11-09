@@ -10,6 +10,9 @@ import os
 import sys
 
 from playwright.sync_api import sync_playwright
+import os as _os, sys as _sys
+_sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+from _classic import classic, classic_text
 
 URL = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:8000/"
 failures = []
@@ -48,7 +51,7 @@ FAKE_STORE = """
 
 def enable_charges(route):
     resp = route.fetch()
-    body = resp.text().replace("chargesEnabled: false", "chargesEnabled: true")
+    body = classic_text(resp.text()).replace("chargesEnabled: false", "chargesEnabled: true")
     route.fulfill(response=resp, body=body)
 
 

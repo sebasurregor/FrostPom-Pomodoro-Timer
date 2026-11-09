@@ -1,4 +1,4 @@
-# FrostPom: Pomodoro Timer (v3.9)
+# FrostPom: Pomodoro Timer (v4.0.1)
 
 > Antes se llamaba **StudyTimer**. Publicada en **https://sebasurregor.github.io/FrostPom-Pomodoro-Timer/**
 
@@ -37,10 +37,10 @@ Diseño: paisaje polar simple (montañas en #2d68bc, #749eda y #93c0ed) con ping
 | **Enfocar** | Temporizador con modos (Mini 15+5, Clásico 25+5, Enfoque 45+10, Profundo 50+10, Largo 60+15) y **Mi ritmo**, donde eliges tus minutos de estudio y descanso. El descanso largo llega solo cada 4 pomodoros. Solo registra *cuánto* estudiaste, no *qué*. |
 | **Premium 👑** | Corona en la barra superior. Modo prueba sin cobro: duración libre, todos los temas, sonidos y tonos, y recordatorios de enfoque. **Regalo de bienvenida (una sola vez):** 1000 gemas para alimentar a la mascota y una mascota de edición limitada que el usuario elige. |
 | **Progreso** | Salud de tu polo, rango (Bronce → Leyenda), racha, misiones diarias, **Tu estudio** (pestañas: gráfica de los últimos 7 días o calendario del mes con los minutos de cada día) e historial (las 5 últimas sesiones, con "Ver más"). |
-| **Ranking** | **Ranking global listo (v3.9), apagado hasta que lo enciendas** (`docs/RANKING-GLOBAL.md`): podio y tabla de la semana y la temporada, el servidor mide el tiempo, máximo 4 h al día, aparecen los de 13+ con su nombre de usuario y se puede salir. Mientras está apagado: tu marca y el aviso "llega pronto". |
+| **Ranking** | **Ranking global** (`docs/RANKING-GLOBAL.md`): podio y tabla de la semana y la temporada, el servidor mide el tiempo, máximo 4 h al día, aparecen los de 13+ con su nombre de usuario y se puede salir (y borrar los minutos). Con `mode: 'local'`: tu marca y el aviso "llega pronto". |
 | **Tienda (en Enfocar)** | El ícono de la bolsa junto al compañero del reloj abre la bandeja de comida. **Arrastra** la comida hasta tu compañero con el mouse o con el dedo (con el teclado: Tab + Enter). 12 comidas de 2 a 8 gemas; la barriguita baja un poco cada hora y cada animal tiene favoritas. Es solo por cariño: no da XP. |
 | **Perfil** | Tu personaje, resumen de estadísticas, **compañeros de edición limitada** (se ganan con logros), **foto de perfil** (opcional, solo en tu dispositivo), temas del temporizador (con gemas o Premium), **temporadas** (barra con los días que faltan, (i) con la explicación y tus medallas) y logros. Desde aquí se entra a **Ajustes**. |
-| **Ajustes** | Cuenta, región y "Eliminar mi cuenta", Premium, sonidos de concentración y tonos, recordatorios, temporizador ("Menos animaciones"), límite saludable diario, ranking y **guardado automático**. |
+| **Ajustes** | Cuenta (en línea: último guardado, y "Cerrar sesión" sin borrar nada; de antes: "Conectar"), región y "Eliminar mi cuenta", Premium, sonidos de concentración y tonos, recordatorios, temporizador ("Menos animaciones"), límite saludable diario, ranking y **guardado automático**. |
 
 ### Cómo se gana
 
@@ -99,7 +99,10 @@ js/                     Lógica pura: sin DOM, se prueba en Node
   ui/feeding.js         Bandeja de comida en Enfocar: arrastrar y soltar (Pointer Events)
   ui/photo.js           Foto de perfil: recorte, zoom y sin datos ocultos (EXIF)
   security.js           Contraseña de la cuenta (PBKDF2 + bloqueo por intentos)
-  leaderboard.js        Ranking (local hoy, sin bots; interfaz lista para el servidor)
+  leaderboard.js        Ranking local (tu marca, sin bots)
+  board.js              Ranking global: sesión de Supabase, pomodoros medidos por el servidor
+  sync.js               Cuentas en línea: qué se sube (todo menos la foto) y qué se trae
+  cloud.js              Supabase: cuentas, recuperar la contraseña y llamadas al servidor
   main.js               Arranque, navegación y eventos globales
   ui/                   Interfaz (un archivo por vista o pieza)
     context.js          Dueño del estado en pantalla: state, mutate(), session
@@ -108,10 +111,11 @@ js/                     Lógica pura: sin DOM, se prueba en Node
     focus.js            Enfocar (temporizador)        progress.js / activity.js  Progreso
     profile.js          Perfil                        ranking.js                 Ranking
     settings.js         Ajustes                       account.js                 Cuenta e inicio
+    cloud-ui.js         Iniciar sesión, conectar, cerrar sesión            board-ui.js   Ventanas del ranking
     premium.js, sound.js, reminders.js, hud.js, celebrations.js
     effects.js, emblems.js, companions.js, scenery.js   Sonidos, emblemas, arte y paisaje
 assets/                 Fuentes (licencia OFL, incluidas) e íconos
-server/supabase/        Base de datos del ranking global + pruebas
+server/supabase/        Base de datos del ranking global y de las cuentas en línea + pruebas
 tests/                  Pruebas automáticas
 docs/                   Seguridad, cambios y hoja de ruta
 ```
@@ -125,11 +129,12 @@ python tests/e2e_ingles.py http://localhost:8000/    # toda la app en inglés: a
 python tests/e2e_recuperar.py http://localhost:8000/ # recuperar contraseña por correo (simula Supabase)
 python tests/e2e_cobro.py http://localhost:8000/     # cobro de Premium con Microsoft Store (simulado)
 python tests/e2e_ranking.py http://localhost:8000/   # ranking global con un Supabase simulado
+python tests/e2e_cuentas.py http://localhost:8000/   # cuentas en línea con un Supabase simulado
 python tests/store_check.py http://localhost:8000/   # lista para Microsoft Store: manifiesto, instalable,
                                                      # sin conexión, 8 tamaños de ventana y accesibilidad (axe)
 ```
 
-Para las pruebas del servidor del ranking necesitas PostgreSQL: `server/supabase/test/run_local.sh` (23 comprobaciones).
+Para las pruebas del servidor del ranking necesitas PostgreSQL: `server/supabase/test/run_local.sh` (27 comprobaciones).
 
 ## Publicar en Microsoft Store
 
@@ -138,6 +143,7 @@ Sigue `docs/MICROSOFT-STORE.md`: GitHub Pages, cuenta individual en Partner Cent
 ## Documentación
 
 - [`docs/PROXIMOS-PASOS.md`](docs/PROXIMOS-PASOS.md): **qué hacer ahora**, en orden, hasta tener la app en Microsoft Store.
+- [`docs/CUENTAS-EN-LINEA.md`](docs/CUENTAS-EN-LINEA.md): **cuentas en línea (v4.0)**: qué correr en Supabase antes de publicar, cómo probarlas y cómo atender pedidos de copia o borrado de datos.
 - [`docs/RANKING-GLOBAL.md`](docs/RANKING-GLOBAL.md): **encender el ranking global** paso a paso (Supabase, SQL, moderación y limpieza).
 - [`docs/SEGURIDAD.md`](docs/SEGURIDAD.md): cómo se protegen los datos hoy y qué hacer antes de lanzar.
 - [`docs/CAMBIOS-v3.md`](docs/CAMBIOS-v3.md): reorganización del código y errores corregidos en la v3.

@@ -30,6 +30,7 @@ import { t, translateDom, isEnglish } from './i18n.js';
 import { applyTheme } from './ui/theme.js';
 import { mountGateSnow } from './ui/gate-snow.js';
 import { bootBoard } from './ui/board-ui.js';
+import { bootCloud } from './ui/cloud-ui.js';
 
 // =====================================================================
 // Pintar
@@ -196,7 +197,8 @@ function boot() {
   setInterval(checkReminder, 20 * 1000);
   if (session.isDue()) onDue();
   checkNewDay();
-  Promise.resolve(greet()).then(bootBoard).catch(() => {}).finally(checkSeason); // ranking global (v3.9)
+  // Cuentas en línea (v4.0) primero: si hay progreso más nuevo en la nube, se trae antes del ranking
+  Promise.resolve(greet()).then(bootCloud).then(bootBoard).catch(() => {}).finally(checkSeason);
   syncStorePremium(); // con cobro real: Premium sigue a la suscripción de Microsoft Store
   hintReducedMotion();
   registerServiceWorker();

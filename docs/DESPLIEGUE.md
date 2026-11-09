@@ -1,8 +1,15 @@
-# Despliegue de FrostPom, de principio a fin (v3.9)
+# Despliegue de FrostPom, de principio a fin (v4.0.1)
 
-Esta guía junta **todo lo que hemos hecho** hasta la v3.9 y lo lleva a internet y a Microsoft Store. Está en orden: cada paso dice **qué hacer**, **dónde** y **cómo saber que quedó bien** (✅). Si ya hiciste un paso antes, revisa el ✅ y sigue con el siguiente.
+Esta guía junta **todo lo que hemos hecho** hasta la v4.0 y lo lleva a internet y a Microsoft Store. Está en orden: cada paso dice **qué hacer**, **dónde** y **cómo saber que quedó bien** (✅). Si ya hiciste un paso antes, revisa el ✅ y sigue con el siguiente.
 
-**Lo que vas a publicar:** temporizador con rangos, misiones y compañeros (el pingüino viene incluido); Progreso estilo racha; tarjetas claras con modo oscuro; español e inglés; entrada con el paisaje ártico y la fogata animada; recuperar la contraseña por correo (Supabase + Brevo); Premium en modo prueba (el cobro real se enciende después con `docs/COBRO-PREMIUM.md`); el ranking global listo pero apagado (se enciende después con `docs/RANKING-GLOBAL.md`).
+**Lo que vas a publicar:** temporizador con rangos, misiones y compañeros (el pingüino viene incluido); Progreso estilo racha; tarjetas claras con modo oscuro; español e inglés; entrada con el paisaje ártico y la fogata animada; recuperar la contraseña por correo (Supabase + Brevo); Premium en modo prueba (el cobro real se enciende después con `docs/COBRO-PREMIUM.md`); el ranking global encendido; y, desde la v4.0, **cuentas en línea** con correo y contraseña para mayores de 13 (`docs/CUENTAS-EN-LINEA.md`).
+
+> **Si vienes de la v3.9.1 (tu caso), solo te faltan 5 cosas, en este orden:**
+> 1. Correr el `server/supabase/schema.sql` nuevo en Supabase (paso 1 de `CUENTAS-EN-LINEA.md`). **Antes** de subir el código.
+> 2. Revisar la configuración de correo de Supabase (paso 2 de `CUENTAS-EN-LINEA.md`).
+> 3. Probar en tu PC (paso 1 de esta guía y paso 3 de `CUENTAS-EN-LINEA.md`).
+> 4. Subir el código con tu cuenta (paso 2 de esta guía, con el mensaje de la v4.0).
+> 5. En Partner Center: cuestionario de edad, descripciones y notas para certificación nuevas (paso 9). **No** hace falta paquete nuevo.
 
 ---
 
@@ -13,13 +20,13 @@ Esta guía junta **todo lo que hemos hecho** hasta la v3.9 y lo lleva a internet
 - [ ] **Microsoft Edge**.
 - [ ] Tu proyecto de **Supabase** (`tcxdmziakgppabwyrydd`) y tu cuenta de **Brevo** con la clave SMTP.
 - [ ] Una **cuenta Microsoft personal** (Outlook/Hotmail o una creada con tu Gmail). **No** la cuenta de trabajo `.onmicrosoft.com`.
-- [ ] El zip `frostpom-v3.9.zip`.
+- [ ] El zip `frostpom-v4.0.1.zip`.
 
 ---
 
-## Paso 1. Probar la v3.9 en tu computador
+## Paso 1. Probar la v4.0 en tu computador
 
-1. Descomprime `frostpom-v3.9.zip` en una carpeta nueva.
+1. Descomprime `frostpom-v4.0.1.zip` en una carpeta nueva.
 2. Abre una terminal en esa carpeta y ejecuta:
 
    ```
@@ -33,8 +40,11 @@ Esta guía junta **todo lo que hemos hecho** hasta la v3.9 y lo lleva a internet
    - **Ajustes → Idioma · Language → English**, y vuelve a Español;
    - **Perfil → Compañeros**: el Pingüino ya aparece desbloqueado;
    - **Ranking**: el globo con birrete se mueve;
+   - en "Crea tu cuenta", **¿Ya tienes cuenta? Inicia sesión** abre la pantalla de entrar y la **flecha ←** te devuelve;
+   - **Ajustes → Bienestar y ranking** ya no tiene "Descargar" ni "Borrar";
+   - con una cuenta en línea, **Cerrar sesión** te lleva a "Inicia sesión" sin borrar tu cuenta, y al volver a entrar regresan tu progreso y tu foto;
    - los sonidos de concentración salen solo con su nombre.
-5. Opcional (si tienes Node y Playwright): `npm test` debe decir **pass 66, fail 0**.
+5. Opcional (si tienes Node y Playwright): `npm test` debe decir **pass 69, fail 0**.
 
 ✅ **Quedó bien si** todo lo anterior se ve y la terminal no muestra errores en rojo.
 
@@ -43,19 +53,19 @@ Esta guía junta **todo lo que hemos hecho** hasta la v3.9 y lo lleva a internet
 ## Paso 2. Subir el código a GitHub (tú haces el commit)
 
 1. Abre la carpeta donde está clonado `FrostPom-Pomodoro-Timer`.
-2. Copia **el contenido** de la carpeta de la v3.9 encima y acepta reemplazar. **No borres la carpeta oculta `.git`.**
+2. Copia **el contenido** de la carpeta de la v4.0 encima y acepta reemplazar. **No borres la carpeta oculta `.git`.**
 3. Si todavía existe **`README.txt`**, bórralo (son instrucciones de la v1).
 4. En la terminal, dentro de la carpeta del repositorio:
 
    ```
    git add -A
-   git commit -m "v3.9: ranking global listo (apagado), modo oscuro, nevada y fogata en la entrada, íconos nuevos y cobro de Premium listo"
+   git commit -m "v4.0.1: cuentas en línea con correo y contraseña, cerrar sesión sin borrar la cuenta, volver a iniciar sesión desde crear cuenta y ajustes del ranking más simples"
    git push
    ```
 
    (Con GitHub Desktop: escribe el mismo mensaje, **Commit to main** y **Push origin**.)
 
-✅ **Quedó bien si** en github.com/sebasurregor/FrostPom-Pomodoro-Timer ves `docs/RANKING-GLOBAL.md`, `js/board.js` y `js/ui/gate-snow.js`.
+✅ **Quedó bien si** en github.com/sebasurregor/FrostPom-Pomodoro-Timer ves `docs/CUENTAS-EN-LINEA.md`, `js/sync.js` y `js/ui/cloud-ui.js`.
 
 ---
 
@@ -86,7 +96,7 @@ La guía larga es `docs/RECUPERAR-CONTRASENA.md`. Resumen:
    | Contraseña | la **clave SMTP completa** de Brevo |
 
 3. **Authentication → Emails → Templates → Reset Password:** pega la plantilla que trae `{{ .Token }}` (está en la guía).
-4. **Authentication → Sign In / Providers → Email:** apaga **Confirm email**.
+4. **Authentication → Sign In / Providers → Email:** apaga **Confirm email** (las cuentas en línea de la v4.0 también lo necesitan así; ver `CUENTAS-EN-LINEA.md`, paso 2).
 5. **Authentication → URL Configuration → Site URL:** `https://sebasurregor.github.io/FrostPom-Pomodoro-Timer/`.
 6. **Authentication → Rate Limits:** correos por hora en `30`.
 7. En Brevo **no** actives el bloqueo de IP para claves SMTP.
@@ -160,7 +170,7 @@ En Partner Center → tu app → **Start your submission**. Los textos están en
    - Categoría: **Education** (secundaria: Productivity);
    - Privacy policy: `https://sebasurregor.github.io/FrostPom-Pomodoro-Timer/privacidad.html`;
    - Support: `startupprometeus@gmail.com`.
-3. **Age ratings:** responde con la tabla de `FICHA.md`. Declara que la app pide un **correo opcional**. En "compras digitales" responde **No** mientras Premium siga en modo prueba.
+3. **Age ratings:** responde con la tabla de `FICHA.md` (v4.0): la app pide el **correo** para las cuentas en línea (13+), guarda el progreso en un servidor y tiene un ranking con nombres de usuario. En "compras digitales" responde **No** mientras Premium siga en modo prueba.
 4. **Packages:** sube el `.msixbundle` y el `.classic.appxbundle`.
 5. **Store listings:**
    - **Español:** descripción, características y palabras clave de `FICHA.md`; las capturas de `docs/microsoft-store/capturas-es/`; el logo `docs/microsoft-store/logo-300.png`.
@@ -175,10 +185,10 @@ En Partner Center → tu app → **Start your submission**. Los textos están en
 ## Paso 10. Cuando la app ya esté en la tienda
 
 1. Instálala desde Microsoft Store en tu PC y ábrela.
-2. Al final de **Ajustes** debe decir **versión 3.9.0**.
+2. Al final de **Ajustes** debe decir **versión 4.0.1**.
 3. Guarda la URL de la tienda: va en `js/config.js` → `premium.storeUrl` cuando enciendas el cobro.
 
-✅ **Quedó bien si** la app de la tienda abre, guarda tu progreso y muestra la versión 3.9.0.
+✅ **Quedó bien si** la app de la tienda abre, guarda tu progreso y muestra la versión 4.0.1.
 
 ---
 
@@ -189,7 +199,8 @@ En Partner Center → tu app → **Start your submission**. Los textos están en
 | Código (HTML, CSS, JS, imágenes) | Sube la versión en `js/config.js` y en `service-worker.js` (`VERSION`), y haz `git push`. Les llega sola a los usuarios: **no** hace falta paquete nuevo. |
 | Capturas, descripción o idiomas de la ficha | Partner Center → **Update** → *Store listings* → **Submit to the Store**. |
 | `manifest.webmanifest` (nombre, ícono, atajos) | Paquete nuevo en PWABuilder con número mayor (`1.0.1`, `1.0.2`…) y súbelo en **Update** → *Packages*. |
-| Encender el ranking global | Sigue `docs/RANKING-GLOBAL.md`. |
+| Encender el ranking global | Sigue `docs/RANKING-GLOBAL.md` (ya lo hiciste en la v3.9.1). |
+| Cambios en el servidor (`server/supabase/schema.sql`) | Córrelo en el **SQL Editor** de Supabase **antes** de hacer `git push`. Se puede correr las veces que quieras. |
 | Encender el cobro de Premium | Sigue `docs/COBRO-PREMIUM.md`. |
 | Algo de privacidad (datos nuevos) | Actualiza `privacidad.html` **antes** y vuelve a responder el cuestionario de edad. |
 
@@ -207,5 +218,6 @@ En Partner Center → tu app → **Start your submission**. Los textos están en
 - [ ] Paso 8: paquete de PWABuilder probado
 - [ ] Paso 9: enviada a certificación (ES + EN)
 - [ ] Paso 10: instalada desde la tienda
-- [ ] Después: ranking global (`docs/RANKING-GLOBAL.md`)
+- [x] Ranking global encendido (`docs/RANKING-GLOBAL.md`, v3.9.1)
+- [ ] v4.0: SQL nuevo corrido en Supabase **antes** del `git push` (`docs/CUENTAS-EN-LINEA.md`)
 - [ ] Después: cobro de Premium (`docs/COBRO-PREMIUM.md`)
