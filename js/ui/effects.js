@@ -1,5 +1,6 @@
 /*
- * FrostPom — efectos: sonidos sintetizados (sin archivos), vibración, confeti y textos flotantes.
+ * FrostPom — efectos: tonos de aviso sintetizados, sonidos de concentración (grabados y
+ * sintetizados), vibración, confeti y textos flotantes.
  * Todo respeta las preferencias: sonido apagado, vibración apagada y "reducir movimiento".
  */
 
@@ -64,9 +65,78 @@ const sfx = {
   error() { tone(220, 0, 0.18, { type: 'sawtooth', gain: 0.025, raw: true }); },
 };
 
-// ---------------- Sonidos de concentración (ruido generado en el dispositivo) ----------------
-// No usan archivos: se sintetizan con la Web Audio API. Suenan mientras estudias.
-const ambient = { id: '', nodes: [], timers: [], master: null };
+// ---------------- Sonidos de concentración ----------------
+// v4.0.2: la mayoría son GRABACIONES (assets/sounds/, de Pixabay) que suenan en bucle sin cortes.
+// Viento polar y Ruido rosa se siguen generando en el dispositivo. Si una grabación todavía no se
+// ha descargado y no hay internet, suena la versión generada (RECIPES) para que nunca quede mudo.
+const ambient = { id: '', nodes: [], timers: [], master: null, volume: 50 };
+
+/*
+ * Cada archivo trae 1 s de más al principio y al final, copiado del mismo bucle. El bucle va de
+ * loopStart a loopEnd: aunque el decodificador de MP3 corra el audio unos milisegundos, en la
+ * unión siempre se encuentra el mismo sonido y no se oye el corte. Los archivos se prepararon con
+ * tools/preparar_sonidos.py (todos a -20 LUFS: suenan igual de fuerte; la fogata un poco menos).
+ */
+export const RECORDED = {
+  blanco:  { file: 'blanco.mp3',  loopStart: 1, loopEnd: 31 },
+  lluvia:  { file: 'lluvia.mp3',  loopStart: 1, loopEnd: 61 },
+  marron:  { file: 'marron.mp3',  loopStart: 1, loopEnd: 31 },
+  olas:    { file: 'olas.mp3',    loopStart: 1, loopEnd: 92 },
+  fogata:  { file: 'fogata.mp3',  loopStart: 1, loopEnd: 39.5 },
+  pajaros: { file: 'pajaros.mp3', loopStart: 1, loopEnd: 91, fallback: 'lluvia' },
+};
+const SOUNDS_DIR = 'assets/sounds/';
+// Los generados pasan por (volumen/100 × 0,35). Las grabaciones ya vienen a su volumen: se
+// compensa ese 0,35 para que con el volumen al 100 % suenen tal cual (sin pasarse de 0 dBFS).
+const RECORDED_GAIN = 1 / 0.35;
+// Nivel de los generados para que suenen parecido a las grabaciones (medido en LUFS).
+const SYNTH_LEVEL = { blanco: 0.55, marron: 1.8, lluvia: 0.8, olas: 2.55, fogata: 1.65, rosa: 1.45, viento: 2.5 };
+
+// Solo se guarda decodificada la última grabación (una de 90 s ocupa unos 35 MB en memoria).
+let decoded = { id: '', buffer: null };
+let loading = null; // { id, promise }
+function loadRecorded(c, id) {
+  if (decoded.id === id && decoded.buffer) return Promise.resolve(decoded.buffer);
+  if (loading && loading.id === id) return loading.promise;
+  const promise = fetch(SOUNDS_DIR + RECORDED[id].file)
+    .then((res) => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.arrayBuffer(); })
+    .then((data) => new Promise((resolve, reject) => {
+      // Safari viejo solo acepta la versión con funciones (sin promesa)
+      const p = c.decodeAudioData(data, resolve, reject);
+      if (p && typeof p.then === 'function') p.then(resolve, reject);
+    }))
+    .then((buffer) => {
+      decoded = { id, buffer };
+      return buffer;
+    })
+    .finally(() => { if (loading && loading.id === id) loading = null; });
+  loading = { id, promise };
+  return promise;
+}
+/** Descarga (y guarda sin conexión) una grabación antes de que haga falta. No suena. */
+export function prefetchAmbient(id) {
+  if (!RECORDED[id]) return;
+  try { fetch(SOUNDS_DIR + RECORDED[id].file).catch(() => {}); } catch { /* sin red */ }
+}
+function playRecorded(c, out, rec, buffer) {
+  const s = c.createBufferSource();
+  s.buffer = buffer;
+  s.loop = true;
+  s.loopStart = rec.loopStart;
+  s.loopEnd = Math.min(rec.loopEnd, buffer.duration);
+  const g = c.createGain();
+  g.gain.value = RECORDED_GAIN;
+  s.connect(g).connect(out);
+  s.start(0, rec.loopStart);
+  return [s, g];
+}
+/** Versión generada (sin archivo), al volumen parecido al de las grabaciones. */
+function playSynth(c, out, id) {
+  const g = c.createGain();
+  g.gain.value = SYNTH_LEVEL[id] || 1;
+  g.connect(out);
+  return [g, ...RECIPES[id](c, g)];
+}
 function noiseBuffer(c, color) {
   const len = c.sampleRate * 4;
   const buf = c.createBuffer(1, len, c.sampleRate);
@@ -158,16 +228,34 @@ function playAmbient(id, volume = 50) {
   if (ambient.id === id && ambient.master) { setAmbientVolume(volume); return; }
   stopAmbient();
   const c = context();
-  if (!c || !RECIPES[id]) return;
+  const rec = RECORDED[id];
+  if (!c || (!rec && !RECIPES[id])) return;
   const master = c.createGain();
   master.gain.value = 0;
   master.connect(c.destination);
   ambient.master = master;
   ambient.id = id;
-  ambient.nodes = RECIPES[id](c, master);
-  master.gain.linearRampToValueAtTime((volume / 100) * 0.35, c.currentTime + 1.2);
+  const fadeIn = () => {
+    master.gain.cancelScheduledValues(c.currentTime);
+    master.gain.setValueAtTime(0, c.currentTime);
+    master.gain.linearRampToValueAtTime((ambient.volume / 100) * 0.35, c.currentTime + 1.2);
+  };
+  ambient.volume = volume;
+  if (!rec) { ambient.nodes = playSynth(c, master, id); fadeIn(); return; }
+  const still = () => ambient.master === master; // ¿sigue siendo este sonido? (se pudo cambiar mientras cargaba)
+  const ready = decoded.id === id && decoded.buffer;
+  if (ready) { ambient.nodes = playRecorded(c, master, rec, decoded.buffer); fadeIn(); return; }
+  loadRecorded(c, id)
+    .then((buffer) => { if (still()) { ambient.nodes = playRecorded(c, master, rec, buffer); fadeIn(); } })
+    .catch(() => {
+      // Sin internet y todavía sin descargar (o el equipo no pudo leerla): suena la versión generada
+      if (!still()) return;
+      const alt = RECIPES[id] ? id : rec.fallback;
+      if (alt && RECIPES[alt]) { ambient.nodes = playSynth(c, master, alt); fadeIn(); }
+    });
 }
 function setAmbientVolume(volume) {
+  ambient.volume = volume;
   if (ambient.master && ctx) ambient.master.gain.setTargetAtTime((volume / 100) * 0.35, ctx.currentTime, 0.1);
 }
 

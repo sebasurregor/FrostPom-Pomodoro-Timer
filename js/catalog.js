@@ -159,6 +159,7 @@ export const AMBIENTS = [
   { id: 'rosa',   name: tr('Ruido rosa'),   icon: '🌸', premium: true },
   { id: 'olas',   name: tr('Olas del mar'), icon: '🌊', premium: true },
   { id: 'fogata', name: tr('Fogata'),       icon: '🔥', premium: true },
+  { id: 'pajaros', name: tr('Lluvia y pájaros'), icon: '🐦', premium: true }, // v4.0.2
 ];
 export const AMBIENT_BY_ID = U.byId(AMBIENTS);
 export const DEFAULT_AMBIENT = 'lluvia';

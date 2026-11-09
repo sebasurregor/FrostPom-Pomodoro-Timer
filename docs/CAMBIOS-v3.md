@@ -1,5 +1,16 @@
 # Cambios de la v2 a la v3
 
+## v4.0.2: sonidos de concentración grabados
+
+- **Sonidos nuevos (grabaciones de Pixabay):** Ruido blanco, Lluvia, Ruido marrón, Olas del mar y Fogata ya no se generan en el dispositivo: ahora son grabaciones reales. Y hay uno nuevo, **Lluvia y pájaros** (Premium; en inglés "Rain and birds").
+- **Bucle sin corte:** cada archivo es un pedazo tranquilo de la grabación (30 a 91 s) cuyo final se funde con su comienzo. La app lo repite entre `loopStart` y `loopEnd` con la Web Audio API; el archivo trae 1 s extra a cada lado para que, aunque el decodificador de MP3 corra el audio unos milisegundos, no se oiga el corte. Una prueba lo comprueba con el Chrome de verdad.
+- **Mismo volumen:** todos quedaron a -20 LUFS (la fogata a -22, para no aplastar sus chasquidos). Viento polar y Ruido rosa, que siguen generados, se subieron para sonar parecido; antes, al pasar de un sonido a otro, el volumen cambiaba hasta 13 dB.
+- **Livianos y sin internet:** 5,2 MB en total (MP3; las olas en mono). Lluvia y Ruido blanco (los gratis) se guardan al instalar; los Premium, la primera vez que suenan o al abrir la app si son los elegidos. Si una grabación todavía no se ha descargado y no hay internet, suena la versión generada: nunca queda mudo.
+- **Memoria:** solo se guarda decodificada la grabación que está sonando.
+- **Créditos:** "Acerca de" menciona a Pixabay (su licencia permite usarlos en la app sin mencionar al autor, pero se agradece). Autores en Pixabay (como aparecen en los nombres de los archivos): themediaguy (ruido blanco, n.º 378857), cosmic-scapes (ruido marrón, 299934), dragon-studio (lluvia, 437305, y olas, 372489), soundreality (fogata, 334130) y whitenoisesleepers (lluvia y pájaros, 194011).
+- **`tools/preparar_sonidos.py`:** el programa que recorta, vuelve bucle e iguala el volumen, explicado paso a paso, por si quieres cambiar o agregar sonidos.
+- **Pruebas:** `tests/e2e_sonidos.py` (28 comprobaciones) y 1 prueba unitaria nueva (70 en total).
+
 ## v4.0.1: cerrar sesión sin borrar la cuenta
 
 - **Antes:** al cerrar sesión, la pantalla "¡Hola de nuevo!" solo dejaba entrar a la misma cuenta; para salir de ella había que tocar "Empezar de nuevo", que **borraba todo**. No debía ser así.

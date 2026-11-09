@@ -1,4 +1,4 @@
-# FrostPom: Pomodoro Timer (v4.0.1)
+# FrostPom: Pomodoro Timer (v4.0.2)
 
 > Antes se llamaba **StudyTimer**. Publicada en **https://sebasurregor.github.io/FrostPom-Pomodoro-Timer/**
 
@@ -63,6 +63,7 @@ Diseño: paisaje polar simple (montañas en #2d68bc, #749eda y #93c0ed) con ping
   - `oso-malvavisco` (5 cuadros de 389 × 320, sin la fogata);
   - `fogata-llama` y `fogata-lenos`: la fogata del mismo dibujo, separada para que la llama titile.
 - `assets/food/` tiene las 12 comidas de la Tienda (WebP sin fondo).
+- `assets/sounds/` tiene los sonidos de concentración grabados (v4.0.2, de Pixabay: no exige mencionar al autor, pero se agradece en "Acerca de"): Ruido blanco, Lluvia, Ruido marrón, Olas del mar, Fogata y Lluvia y pájaros. Cada uno es un bucle sin corte, todos al mismo volumen (-20 LUFS). Se preparan con `python tools/preparar_sonidos.py CARPETA_CON_LOS_ORIGINALES` (necesita ffmpeg, numpy y scipy); el programa explica paso a paso qué hace. Viento polar y Ruido rosa se generan en el dispositivo (`js/ui/effects.js`).
 - Para sumar un compañero nuevo: agrega su arte en `assets/companions/`, su entrada en `js/catalog.js → COMPANIONS` (con el logro que lo desbloquea) y su imagen en `js/ui/companions.js → BUILTIN_IMAGES`.
 
 ### Cambiar la imagen de un compañero
@@ -114,7 +115,8 @@ js/                     Lógica pura: sin DOM, se prueba en Node
     cloud-ui.js         Iniciar sesión, conectar, cerrar sesión            board-ui.js   Ventanas del ranking
     premium.js, sound.js, reminders.js, hud.js, celebrations.js
     effects.js, emblems.js, companions.js, scenery.js   Sonidos, emblemas, arte y paisaje
-assets/                 Fuentes (licencia OFL, incluidas) e íconos
+assets/                 Fuentes (licencia OFL, incluidas), íconos, arte y sonidos (assets/sounds/)
+tools/                  preparar_sonidos.py: recorta, vuelve bucle e iguala el volumen de los sonidos
 server/supabase/        Base de datos del ranking global y de las cuentas en línea + pruebas
 tests/                  Pruebas automáticas
 docs/                   Seguridad, cambios y hoja de ruta
@@ -130,6 +132,7 @@ python tests/e2e_recuperar.py http://localhost:8000/ # recuperar contraseña por
 python tests/e2e_cobro.py http://localhost:8000/     # cobro de Premium con Microsoft Store (simulado)
 python tests/e2e_ranking.py http://localhost:8000/   # ranking global con un Supabase simulado
 python tests/e2e_cuentas.py http://localhost:8000/   # cuentas en línea con un Supabase simulado
+python tests/e2e_sonidos.py http://localhost:8000/   # sonidos grabados: bucle sin corte y sin internet
 python tests/store_check.py http://localhost:8000/   # lista para Microsoft Store: manifiesto, instalable,
                                                      # sin conexión, 8 tamaños de ventana y accesibilidad (axe)
 ```

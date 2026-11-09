@@ -89,11 +89,11 @@ Sube los cambios con tu cuenta (los pasos exactos están en `DESPLIEGUE.md`):
 
 ```
 git add -A
-git commit -m "v4.0.1: cuentas en línea con correo y contraseña; cerrar sesión sin borrar la cuenta"
+git commit -m "v4.0.2: sonidos grabados, cuentas en línea con correo y contraseña; cerrar sesión sin borrar la cuenta"
 git push
 ```
 
-Como cambió `VERSION` (4.0.1), a los usuarios les llega sola la versión nueva. **No hace falta un paquete nuevo de PWABuilder.**
+Como cambió `VERSION` (4.0.2), a los usuarios les llega sola la versión nueva. **No hace falta un paquete nuevo de PWABuilder.**
 
 Qué ve cada persona:
 

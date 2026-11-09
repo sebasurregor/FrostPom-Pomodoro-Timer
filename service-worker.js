@@ -7,7 +7,7 @@
  *  - Solo se guarda en caché lo de este mismo sitio y respuestas correctas. Nunca respuestas de APIs
  *    ni de otros dominios (podrían contener datos personales).
  */
-const VERSION = '4.0.1';
+const VERSION = '4.0.2';
 const CACHE = `frostpom-${VERSION}`;
 const PRECACHE = [
   './',
@@ -115,6 +115,10 @@ const PRECACHE = [
   './assets/food/pollo.webp',
   './assets/food/jamon.webp',
   './assets/food/almeja.webp',
+  // Sonidos de concentración gratis (Lluvia es el de siempre). Los Premium se guardan la primera
+  // vez que suenan (o al abrir la app, si son los elegidos): así la instalación pesa menos.
+  './assets/sounds/lluvia.mp3',
+  './assets/sounds/blanco.mp3',
 ];
 
 self.addEventListener('install', (event) => {

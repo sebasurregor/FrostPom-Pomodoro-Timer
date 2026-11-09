@@ -86,6 +86,8 @@ export function renderSound() {
 }
 
 export function bindSound() {
+  // La grabación elegida se descarga al abrir la app, para que después suene también sin internet
+  FX.prefetchAmbient(state.settings.ambient || state.settings.lastAmbient);
   $('#ambientBtn').addEventListener('click', toggleSilence);
   $('#ambientVol').addEventListener('input', (e) => FX.setAmbientVolume(Number(e.target.value)));
   $('#ambientVol').addEventListener('change', (e) => mutate((st) => { st.settings.ambientVolume = U.clamp(Number(e.target.value), 0, 100); }));

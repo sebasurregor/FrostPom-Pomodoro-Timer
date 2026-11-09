@@ -21,7 +21,7 @@ Elige cuánto quieres estudiar (25 + 5, 50 + 10 o tu propio ritmo) y concéntrat
 • Dale de comer a tu compañero: arrastra la comida con el mouse o con el dedo.
 • Mira tu progreso en un calendario y en la gráfica de los últimos 7 días.
 • Un paisaje polar vivo, que sigue la hora de tu país: nieva, cambia el clima y de noche el oso asa malvaviscos junto a la fogata.
-• Sonidos para concentrarte (lluvia, viento, ruido blanco) y descansos guiados.
+• Sonidos para concentrarte (lluvia, lluvia con pájaros, olas, fogata, ruido blanco y más) y descansos guiados.
 • Un límite saludable diario, para premiar la constancia y no el desvelo.
 • Modo oscuro para estudiar de noche.
 • Funciona sin internet.
@@ -136,7 +136,7 @@ Pick how long you want to study (25 + 5, 50 + 10 or your own pace) and focus whi
 • Feed your buddy: drag food with your mouse or finger.
 • See your progress in a calendar and a 7-day chart.
 • A living polar landscape that follows your local time: it snows, the weather changes and at night the bear roasts marshmallows by the campfire.
-• Focus sounds (rain, wind, white noise) and guided breaks.
+• Focus sounds (rain, rain and birds, ocean waves, campfire, white noise and more) and guided breaks.
 • A healthy daily limit that rewards consistency, not all-nighters.
 • Dark mode for late-night studying.
 • Works offline. Available in English and Spanish.

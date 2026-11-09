@@ -10,6 +10,8 @@ import * as T from '../js/timer.js';
 import * as E from '../js/engine.js';
 import * as S from '../js/storage.js';
 import * as L from '../js/leaderboard.js';
+import { RECORDED } from '../js/ui/effects.js';
+import { readFileSync, existsSync } from 'node:fs';
 import { createSession } from '../js/session.js';
 import * as SEA from '../js/season.js';
 import * as W from '../js/weather.js';
@@ -828,7 +830,7 @@ test('sesión recordada: la cuenta solo guarda la huella y el token se valida al
 // v3.9 — Ranking global
 // ---------------------------------------------------------------------
 import * as BOARD from '../js/board.js';
-import { readFileSync } from 'node:fs';
+// (readFileSync y existsSync se importan arriba)
 
 test('ranking global: la edad se calcula con mes y año (13 años o más)', () => {
   const now = new Date(2026, 10, 15); // 15 de noviembre de 2026
@@ -955,4 +957,22 @@ test('cerrar sesión (v4.0.1): la foto se guarda aparte por cuenta, se conservan
   store.pref.set('paywall_day', '2026-11-08');
   assert.equal(b.getItem('st2_state'), null);
   assert.equal(b.getItem('st2_paywall_day'), null);
+});
+
+test('sonidos grabados (v4.0.2): cada uno existe, está en el catálogo y el bucle tiene sentido', () => {
+  const ids = catalog.AMBIENTS.map((a) => a.id);
+  assert.ok(ids.includes('pajaros'), 'está "Lluvia y pájaros"');
+  assert.equal(catalog.AMBIENT_BY_ID.pajaros.premium, true);
+  assert.equal(catalog.AMBIENT_BY_ID.lluvia.premium, undefined, 'Lluvia sigue gratis');
+  const sw = readFileSync(new URL('../service-worker.js', import.meta.url), 'utf8');
+  for (const [id, rec] of Object.entries(RECORDED)) {
+    assert.ok(ids.includes(id), `${id} está en el catálogo`);
+    assert.ok(existsSync(new URL(`../assets/sounds/${rec.file}`, import.meta.url)), `existe assets/sounds/${rec.file}`);
+    assert.ok(rec.loopStart >= 0.5 && rec.loopEnd - rec.loopStart >= 20, `${id}: el bucle deja margen y dura al menos 20 s`);
+    if (!catalog.AMBIENT_BY_ID[id].premium) assert.ok(sw.includes(`./assets/sounds/${rec.file}`), `${id} (gratis) queda guardado para usarlo sin internet`);
+  }
+  assert.ok(catalog.AMBIENTS.find((a) => a.id === catalog.DEFAULT_AMBIENT), 'el sonido de siempre existe');
+  // El sonido nuevo se valida como cualquier otro
+  const st = S.validateState({ settings: { ambient: 'pajaros' } });
+  assert.equal(st.settings.ambient, 'pajaros');
 });
