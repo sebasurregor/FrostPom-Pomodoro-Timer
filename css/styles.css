@@ -2443,3 +2443,8 @@ html[data-theme="dark"] .custom { border-color: #8A6D1F; }
 .signin-switch { text-align: center; margin: 10px 0 0; font-weight: 700; color: var(--text); }
 .acc-cloud { margin-top: 14px; display: grid; gap: 8px; }
 .acc-cloud__text { margin: 0; color: var(--text); line-height: 1.4; }
+
+/* CAPTCHA de Cloudflare Turnstile (v4.0.3): casi siempre invisible; si Cloudflare duda,
+   la casilla aparece aquí, dentro de la ventana, encima de los botones. */
+.captcha-box { display: flex; justify-content: center; margin: 4px 0 8px; min-height: 0; }
+.captcha-box:empty { display: none; }

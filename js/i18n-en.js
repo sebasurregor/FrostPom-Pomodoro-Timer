@@ -857,4 +857,6 @@ export default Object.freeze({
   "Para usar otra cuenta aquí, hay que borrar la de {name} con todo su progreso. No se puede deshacer.": "To use another account here, {name}’s account has to be deleted with all its progress. This can’t be undone.",
   "Para no perderla, toca «Volver», entra con tu contraseña y ve a Ajustes → Tu cuenta → «Conectar». Así tu progreso queda guardado en línea y puedes cerrar sesión cuando quieras sin borrar nada.": "To keep it, tap “Back”, sign in with your password and go to Settings → Your account → “Connect”. That way your progress is saved online and you can log out anytime without deleting anything.",
   "Borrar y usar otra cuenta": "Delete and use another account",
+  // v4.0.3: CAPTCHA
+  "No pudimos comprobar que eres una persona. Revisa tu conexión e inténtalo de nuevo.": "We couldn’t check that you’re a person. Check your connection and try again.",
 });

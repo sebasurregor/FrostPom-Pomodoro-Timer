@@ -15,6 +15,7 @@
  */
 import { config } from './config.js';
 import { tr } from './i18n.js';
+import * as CAPTCHA from './captcha.js';
 
 const cfg = () => config.cloud || {};
 export const isConfigured = () => !!(cfg().url && cfg().key);
@@ -41,6 +42,8 @@ class CloudError extends Error {
 function classify(status, data) {
   const code = String(data.error_code || data.code || data.error || '').toLowerCase();
   const msg = String(data.msg || data.message || data.error_description || '').toLowerCase();
+  // CAPTCHA encendido en Supabase y el token faltó o no sirvió (va primero: el mensaje dice "invalid")
+  if (code.includes('captcha') || msg.includes('captcha')) return 'captcha';
   // Sin SMTP propio, Supabase solo envía correos al equipo del proyecto
   if (code.includes('not_authorized') || msg.includes('not authorized')) return 'notallowed';
   if (code.includes('invalid_credentials') || msg.includes('invalid login credentials')) return 'badlogin';
@@ -55,8 +58,19 @@ function classify(status, data) {
   return 'server';
 }
 
+// Lo que Supabase protege con CAPTCHA cuando está encendido: crear cuentas (también las
+// anónimas del ranking), entrar con contraseña y pedir códigos. Renovar la sesión y comprobar
+// el código del correo no lo necesitan.
+const needsCaptcha = (path, method) => method === 'POST'
+  && (path === '/signup' || path === '/recover' || path.startsWith('/token?grant_type=password'));
+
 async function call(path, { body, token, method = 'POST' } = {}) {
   if (!isConfigured()) throw new CloudError('off');
+  if (body && CAPTCHA.enabled() && needsCaptcha(path, method)) {
+    // Si Cloudflare no responde se intenta igual: con el CAPTCHA apagado en Supabase funciona,
+    // y con el CAPTCHA encendido Supabase responde 'captcha' y la app lo explica.
+    try { body = { ...body, gotrue_meta_security: { captcha_token: await CAPTCHA.getToken() } }; } catch { /* sin token */ }
+  }
   const headers = { apikey: cfg().key, 'Content-Type': 'application/json' };
   if (token) headers.Authorization = `Bearer ${token}`;
   let res;
@@ -240,6 +254,7 @@ export function errorText(err) {
     case 'weak': return tr('Esa contraseña es muy fácil de adivinar. Prueba con otra más larga.');
     case 'confirm': return tr('Revisa tu correo para confirmar la cuenta y vuelve a intentarlo.');
     case 'off': return tr('La recuperación por correo no está configurada en esta versión.');
+    case 'captcha': return tr('No pudimos comprobar que eres una persona. Revisa tu conexión e inténtalo de nuevo.');
     default: return tr('Algo falló al hablar con el servidor. Inténtalo de nuevo en un rato.');
   }
 }

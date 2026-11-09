@@ -117,6 +117,10 @@ with sync_playwright() as p:
     check(pg.inner_text("#clock") == "1:00:00", "Mi ritmo 60 + 15 se aplica al reloj")
     pg.click('.preset[data-preset="clasico"]'); pg.clock.run_for(200)
     check(state(pg)["settings"]["customStudyMin"] == 60, "el modo personalizado se conserva al cambiar de modo")
+    # Aviso de Chrome (pestaña Issues): "A form field element should have an id or name attribute".
+    sin_nombre = pg.evaluate("""[...document.querySelectorAll('input, select, textarea')]
+        .filter(e => !e.id && !e.name).map(e => e.outerHTML.slice(0, 90))""")
+    check(not sin_nombre, "todos los campos tienen id o name (sin avisos de autocompletado en Chrome)" + (f": {sin_nombre}" if sin_nombre else ""))
 
     # Dos sesiones de 25 min con su descanso: debe subir a Bronce II.
     pg.click("#mainBtn")

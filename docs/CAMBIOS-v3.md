@@ -1,5 +1,18 @@
 # Cambios de la v2 a la v3
 
+## v4.0.3: CAPTCHA (Cloudflare Turnstile)
+
+- **Nuevo `js/captcha.js`:** la app sabe pedir un token de Cloudflare Turnstile antes de crear una cuenta (también la anónima del ranking), entrar con contraseña y pedir el código de recuperación, y lo envía a Supabase (`gotrue_meta_security.captcha_token`). Un token nuevo por llamada. Renovar la sesión y comprobar el código no lo piden.
+- **Apagado hasta que pongas la clave:** `config.captcha.siteKey` vacío = como antes, sin cargar nada de Cloudflare. Paso a paso para encenderlo (Cloudflare → la clave en la app → publicar → Supabase): `docs/CAPTCHA.md`.
+- **Casi invisible:** si Cloudflare duda, la casilla aparece dentro de la ventana abierta, encima de los botones. Si Cloudflare no responde, la app lo explica ("No pudimos comprobar que eres una persona…") en vez de quedarse pegada.
+- **Seguridad:** la CSP permite solo `https://challenges.cloudflare.com` (script y marco), con una regla de Trusted Types propia (`st-captcha`) que acepta únicamente la dirección del script.
+- **Menores de 13:** nunca cargan Turnstile.
+- **Privacidad:** `privacidad.html` (ES/EN) menciona a Cloudflare Turnstile y qué datos recibe.
+- **Brevo:** recordatorio de **no** activar el bloqueo de IP de las claves SMTP (los códigos dejarían de llegar).
+- **Pruebas:** `tests/e2e_captcha.py` (24 comprobaciones, con Supabase y Turnstile simulados). El Supabase simulado puede exigir el CAPTCHA como el real.
+- **Arreglo tras la prueba del autor con Cloudflare real (9 nov):** cuando Turnstile fallaba (en `localhost` con la llave real, código 110200), a los 8 s Turnstile intentaba reiniciar una casilla que la app ya había quitado y dejaba el error rojo "Uncaught TurnstileError: Nothing to reset found for provided container". Ahora la app pide `retry: 'never'` (ella misma maneja el error), quita la casilla un instante después del aviso y escribe en la consola el código de Cloudflare para saber qué pasó.
+- **Aviso de Chrome corregido:** los dos campos de minutos de "Personalizar" (estudio y descanso) no tenían `id` ni `name`, y Chrome lo marcaba en la pestaña *Issues* ("A form field element should have an id or name attribute"). Ahora tienen `id`/`name` (`customStudyMin`, `customBreakMin`) y `autocomplete="off"`, para que el navegador no sugiera números viejos. `e2e_smoke` comprueba que ningún campo quede sin `id` ni `name`.
+
 ## v4.0.2: sonidos de concentración grabados
 
 - **Sonidos nuevos (grabaciones de Pixabay):** Ruido blanco, Lluvia, Ruido marrón, Olas del mar y Fogata ya no se generan en el dispositivo: ahora son grabaciones reales. Y hay uno nuevo, **Lluvia y pájaros** (Premium; en inglés "Rain and birds").

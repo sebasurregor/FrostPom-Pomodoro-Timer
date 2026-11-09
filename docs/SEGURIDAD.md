@@ -26,6 +26,14 @@ Este documento explica qué protege la app hoy, cuáles son sus límites honesto
 - "Eliminar mi cuenta" llama a `delete_my_cloud_account()`, que borra el progreso, el ranking y el usuario de `auth.users` (todo con `on delete cascade`).
 - Límite honesto: como "Confirm email" está apagado, alguien podría crear una cuenta con un correo que no es suyo. El dueño real la recupera con el código que llega a su correo ("¿Olvidaste la contraseña?"). Para cerrarlo del todo habría que encender "Confirm email" y agregar ese paso a la app.
 
+## 1e. CAPTCHA (v4.0.3)
+
+- **Cloudflare Turnstile** protege crear cuentas (con correo y anónimas), entrar con contraseña y pedir códigos (`js/captcha.js`, `js/cloud.js`). Supabase verifica cada token con la clave secreta, que vive solo en Supabase.
+- Se carga solo cuando hace falta y solo desde `https://challenges.cloudflare.com` (CSP: `script-src` y `frame-src`; Trusted Types: la regla `st-captcha` acepta únicamente esa dirección).
+- Cada token sirve una vez: la app pide uno nuevo por llamada. Renovar la sesión y `/verify` no lo necesitan.
+- Las cuentas de menores de 13 nunca cargan Turnstile.
+- Junto con el CAPTCHA, **no** actives el bloqueo de IP de las claves SMTP en Brevo: Supabase envía desde direcciones que cambian, y los códigos dejarían de llegar.
+
 ## 1d. Cobro de Premium (v3.8, apagado por ahora)
 
 - El pago lo hace **Microsoft Store** (Digital Goods API + Payment Request API, `js/billing.js`). La app nunca ve la tarjeta.
@@ -72,7 +80,7 @@ Está hecho para Supabase (PostgreSQL), y sus reglas se probaron en un PostgreSQ
 
 - La clave **publicable** (`sb_publishable_…`) puede ir en la app: es pública por diseño. La clave **secreta** (`sb_secret_…` o `service_role`) **NUNCA** puede ir en la app, ni en el repositorio, ni en capturas de pantalla.
 - El dominio de Supabase ya está en `connect-src` de la *Content Security Policy* (`index.html` y `_headers`).
-- No actives el CAPTCHA de Supabase todavía: la app aún no lo envía y nadie podría unirse al ranking.
+- CAPTCHA (v4.0.3): la app ya envía el token de Cloudflare Turnstile. Para encenderlo, sigue `docs/CAPTCHA.md` **en orden**: primero la clave del sitio y publicar, después encenderlo en Supabase.
 
 ## 4. Si la publicas en la web
 

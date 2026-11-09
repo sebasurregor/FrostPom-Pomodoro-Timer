@@ -4,7 +4,7 @@
  * teléfono o al navegador lo puede leer cualquiera. Ver docs/SEGURIDAD.md.
  */
 export const config = Object.freeze({
-  version: '4.0.2',
+  version: '4.0.3',
   // Supabase (solo para recuperar la contraseña por correo; ver docs/RECUPERAR-CONTRASENA.md).
   // La clave publicable puede ir aquí. La clave secreta (service_role / sb_secret_…) NUNCA.
   // Si dejas url vacía, la app oculta todo lo del correo.
@@ -17,6 +17,13 @@ export const config = Object.freeze({
     // contraseña, y su progreso (menos la foto) se guarda en Supabase. Necesita el SQL de
     // server/supabase/schema.sql. Paso a paso: docs/CUENTAS-EN-LINEA.md
     online: true,
+  }),
+  captcha: Object.freeze({
+    // (v4.0.3) CAPTCHA de Cloudflare Turnstile: frena a los programas que crean cuentas en masa.
+    // siteKey = la clave del SITIO (pública, empieza por 0x…). Vacía = apagado.
+    // La clave SECRETA va solo en Supabase. Orden: primero esta clave y publicar; después
+    // encenderlo en Supabase. Paso a paso: docs/CAPTCHA.md
+    siteKey: '0x4AAAAAAF6Reo5ZUf_d9-AG',
   }),
   leaderboard: Object.freeze({
     // 'local'  = solo tu marca en este dispositivo y el aviso "llega pronto".

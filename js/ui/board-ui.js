@@ -27,6 +27,7 @@ export function errorText(kind) {
     case 'name_invalid':
     case 'name_blocked': return tr('Ese nombre no está permitido. Elige uno respetuoso para todos.');
     case 'notready': return tr('El ranking global todavía no está disponible.');
+    case 'captcha': return tr('No pudimos comprobar que eres una persona. Revisa tu conexión e inténtalo de nuevo.');
     case 'rate': return tr('Demasiados intentos seguidos. Espera un momento y vuelve a intentarlo.');
     case 'code_invalid':
     case 'badcode': return tr('El código no es correcto o ya venció. Revisa el correo o pide uno nuevo.');

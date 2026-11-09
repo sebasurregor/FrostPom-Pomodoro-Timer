@@ -24,6 +24,9 @@ class FakeSupabase:
         self.calls = []      # (fn, args, uid)
         self.abort = set()   # funciones (o 'signup', 'token') que fallan "sin internet"
         self.saves = {}      # uid -> {data, version}
+        self.require_captcha = False   # como "Enable CAPTCHA protection" en Supabase
+        self.captcha_tokens = []       # (ruta, token) recibidos
+        self.used_tokens = set()       # cada token de Turnstile sirve una sola vez
         seeds = [('Zorro.lector', 'MX', '🦊', 180, None), ('Luna_K', 'ES', '🦉', 95, 'luna@example.com'),
                  ('pingu.sabio', 'CL', '🐧', 60, None), ('Ana_23', 'AR', '🦭', 30, None)]
         for i, (name, country, av, mins, email) in enumerate(seeds):
@@ -70,6 +73,16 @@ class FakeSupabase:
 
         def ok(data, status=200):
             route.fulfill(status=status, content_type='application/json', body=json.dumps(data))
+
+        # CAPTCHA: crear cuentas, entrar con contraseña y pedir códigos (no renovar ni /verify)
+        guarded = path in ('/auth/v1/signup', '/auth/v1/recover') or (path == '/auth/v1/token' and 'grant_type=password' in req.url)
+        if guarded and req.method == 'POST':
+            tok = (body.get('gotrue_meta_security') or {}).get('captcha_token')
+            self.captcha_tokens.append((path, tok))
+            if self.require_captcha and (not tok or not str(tok).startswith('tok-') or tok in self.used_tokens):
+                return ok({'code': 400, 'error_code': 'captcha_failed', 'msg': 'captcha protection: request disallowed (captcha verification process failed)'}, 400)
+            if tok:
+                self.used_tokens.add(tok)
 
         if path == '/auth/v1/signup':
             if 'signup' in self.abort:

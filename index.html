@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <!-- Política de seguridad: solo se ejecuta y carga código de este mismo sitio. -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://tcxdmziakgppabwyrydd.supabase.co; manifest-src 'self'; worker-src 'self'; media-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'; trusted-types st-sw">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://tcxdmziakgppabwyrydd.supabase.co; manifest-src 'self'; worker-src 'self'; media-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'; trusted-types st-sw st-captcha">
   <meta name="referrer" content="no-referrer">
   <title>FrostPom</title>
   <meta name="description" content="Pomodoro polar con rangos, misiones y compañeros kawaii: cada minuto que estudias mantiene limpio tu polo.">
@@ -200,7 +200,7 @@
                 <span class="stepper__label" id="lbl-customStudyMin">Estudiar</span>
                 <div class="stepper__ctl">
                   <button type="button" class="stepper__btn" data-delta="-1" aria-label="Menos minutos de estudio">−</button>
-                  <input class="stepper__input" type="number" inputmode="numeric" min="1" max="180" aria-labelledby="lbl-customStudyMin">
+                  <input class="stepper__input" id="customStudyMin" name="customStudyMin" type="number" inputmode="numeric" min="1" max="180" autocomplete="off" aria-labelledby="lbl-customStudyMin">
                   <button type="button" class="stepper__btn" data-delta="1" aria-label="Más minutos de estudio">+</button>
                 </div>
                 <span class="stepper__unit">min</span>
@@ -209,7 +209,7 @@
                 <span class="stepper__label" id="lbl-customBreakMin">Descansar</span>
                 <div class="stepper__ctl">
                   <button type="button" class="stepper__btn" data-delta="-1" aria-label="Menos minutos de descanso">−</button>
-                  <input class="stepper__input" type="number" inputmode="numeric" min="1" max="60" aria-labelledby="lbl-customBreakMin">
+                  <input class="stepper__input" id="customBreakMin" name="customBreakMin" type="number" inputmode="numeric" min="1" max="60" autocomplete="off" aria-labelledby="lbl-customBreakMin">
                   <button type="button" class="stepper__btn" data-delta="1" aria-label="Más minutos de descanso">+</button>
                 </div>
                 <span class="stepper__unit">min</span>

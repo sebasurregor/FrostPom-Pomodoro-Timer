@@ -38,7 +38,7 @@ Cada persona del ranking tiene una cuenta **anónima** en Supabase: no pide corr
 
 ✅ **Quedó bien si** el interruptor queda encendido después de recargar la página.
 
-> **No actives el CAPTCHA** (Attack Protection) por ahora: la app todavía no lo envía y nadie podría unirse. Para frenar abusos ya hay límites: Supabase deja crear 30 cuentas anónimas por hora desde la misma conexión, y el servidor del ranking acepta máximo 60 sesiones al día por persona.
+> **CAPTCHA (Attack Protection):** desde la v4.0.3 la app ya lo envía. Enciéndelo siguiendo `CAPTCHA.md`, en orden (primero la clave del sitio y publicar, después Supabase); si lo enciendes antes, nadie podría unirse. Además hay límites: Supabase deja crear 30 cuentas anónimas por hora desde la misma conexión, y el servidor del ranking acepta máximo 60 sesiones al día por persona.
 
 ---
 

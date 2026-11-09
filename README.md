@@ -1,4 +1,4 @@
-# FrostPom: Pomodoro Timer (v4.0.2)
+# FrostPom: Pomodoro Timer (v4.0.3)
 
 > Antes se llamaba **StudyTimer**. Publicada en **https://sebasurregor.github.io/FrostPom-Pomodoro-Timer/**
 
@@ -104,6 +104,7 @@ js/                     Lógica pura: sin DOM, se prueba en Node
   board.js              Ranking global: sesión de Supabase, pomodoros medidos por el servidor
   sync.js               Cuentas en línea: qué se sube (todo menos la foto) y qué se trae
   cloud.js              Supabase: cuentas, recuperar la contraseña y llamadas al servidor
+  captcha.js            CAPTCHA de Cloudflare Turnstile (apagado hasta poner la clave del sitio)
   main.js               Arranque, navegación y eventos globales
   ui/                   Interfaz (un archivo por vista o pieza)
     context.js          Dueño del estado en pantalla: state, mutate(), session
@@ -133,6 +134,7 @@ python tests/e2e_cobro.py http://localhost:8000/     # cobro de Premium con Micr
 python tests/e2e_ranking.py http://localhost:8000/   # ranking global con un Supabase simulado
 python tests/e2e_cuentas.py http://localhost:8000/   # cuentas en línea con un Supabase simulado
 python tests/e2e_sonidos.py http://localhost:8000/   # sonidos grabados: bucle sin corte y sin internet
+python tests/e2e_captcha.py http://localhost:8000/   # CAPTCHA con Supabase y Turnstile simulados
 python tests/store_check.py http://localhost:8000/   # lista para Microsoft Store: manifiesto, instalable,
                                                      # sin conexión, 8 tamaños de ventana y accesibilidad (axe)
 ```
@@ -146,6 +148,9 @@ Sigue `docs/MICROSOFT-STORE.md`: GitHub Pages, cuenta individual en Partner Cent
 ## Documentación
 
 - [`docs/PROXIMOS-PASOS.md`](docs/PROXIMOS-PASOS.md): **qué hacer ahora**, en orden, hasta tener la app en Microsoft Store.
+- [`docs/COPIA-DE-SEGURIDAD.md`](docs/COPIA-DE-SEGURIDAD.md): **copia de seguridad manual** de Supabase (plan gratis) desde Windows, y cómo restaurarla.
+- [`docs/CAPTCHA.md`](docs/CAPTCHA.md): **encender el CAPTCHA** (Cloudflare Turnstile) en orden, sin dejar a nadie por fuera.
+- [`docs/TIENDAS-MOVILES.md`](docs/TIENDAS-MOVILES.md): **llevar FrostPom a Google Play y App Store** paso a paso (Capacitor, costos, prueba cerrada de 12 personas, revisión de Apple).
 - [`docs/CUENTAS-EN-LINEA.md`](docs/CUENTAS-EN-LINEA.md): **cuentas en línea (v4.0)**: qué correr en Supabase antes de publicar, cómo probarlas y cómo atender pedidos de copia o borrado de datos.
 - [`docs/RANKING-GLOBAL.md`](docs/RANKING-GLOBAL.md): **encender el ranking global** paso a paso (Supabase, SQL, moderación y limpieza).
 - [`docs/SEGURIDAD.md`](docs/SEGURIDAD.md): cómo se protegen los datos hoy y qué hacer antes de lanzar.

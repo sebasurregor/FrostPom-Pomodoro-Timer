@@ -1,4 +1,4 @@
-# Despliegue de FrostPom, de principio a fin (v4.0.2)
+# Despliegue de FrostPom, de principio a fin (v4.0.3)
 
 Esta guía junta **todo lo que hemos hecho** hasta la v4.0 y lo lleva a internet y a Microsoft Store. Está en orden: cada paso dice **qué hacer**, **dónde** y **cómo saber que quedó bien** (✅). Si ya hiciste un paso antes, revisa el ✅ y sigue con el siguiente.
 
@@ -20,13 +20,13 @@ Esta guía junta **todo lo que hemos hecho** hasta la v4.0 y lo lleva a internet
 - [ ] **Microsoft Edge**.
 - [ ] Tu proyecto de **Supabase** (`tcxdmziakgppabwyrydd`) y tu cuenta de **Brevo** con la clave SMTP.
 - [ ] Una **cuenta Microsoft personal** (Outlook/Hotmail o una creada con tu Gmail). **No** la cuenta de trabajo `.onmicrosoft.com`.
-- [ ] El zip `frostpom-v4.0.2.zip`.
+- [ ] El zip `frostpom-v4.0.3.zip`.
 
 ---
 
 ## Paso 1. Probar la v4.0 en tu computador
 
-1. Descomprime `frostpom-v4.0.2.zip` en una carpeta nueva.
+1. Descomprime `frostpom-v4.0.3.zip` en una carpeta nueva.
 2. Abre una terminal en esa carpeta y ejecuta:
 
    ```
@@ -59,7 +59,7 @@ Esta guía junta **todo lo que hemos hecho** hasta la v4.0 y lo lleva a internet
 
    ```
    git add -A
-   git commit -m "v4.0.2: sonidos de concentración grabados (y Lluvia y pájaros), cuentas en línea con correo y contraseña, cerrar sesión sin borrar la cuenta y ajustes del ranking más simples"
+   git commit -m "v4.0.3: CAPTCHA listo (Turnstile), sonidos grabados (y Lluvia y pájaros), cuentas en línea, cerrar sesión sin borrar la cuenta y ajustes del ranking más simples"
    git push
    ```
 
@@ -185,10 +185,10 @@ En Partner Center → tu app → **Start your submission**. Los textos están en
 ## Paso 10. Cuando la app ya esté en la tienda
 
 1. Instálala desde Microsoft Store en tu PC y ábrela.
-2. Al final de **Ajustes** debe decir **versión 4.0.2**.
+2. Al final de **Ajustes** debe decir **versión 4.0.3**.
 3. Guarda la URL de la tienda: va en `js/config.js` → `premium.storeUrl` cuando enciendas el cobro.
 
-✅ **Quedó bien si** la app de la tienda abre, guarda tu progreso y muestra la versión 4.0.2.
+✅ **Quedó bien si** la app de la tienda abre, guarda tu progreso y muestra la versión 4.0.3.
 
 ---
 
@@ -220,4 +220,5 @@ En Partner Center → tu app → **Start your submission**. Los textos están en
 - [ ] Paso 10: instalada desde la tienda
 - [x] Ranking global encendido (`docs/RANKING-GLOBAL.md`, v3.9.1)
 - [ ] v4.0: SQL nuevo corrido en Supabase **antes** del `git push` (`docs/CUENTAS-EN-LINEA.md`)
+- [ ] v4.0.3: CAPTCHA encendido en orden (`docs/CAPTCHA.md`) y bloqueo de IP de Brevo **desactivado**
 - [ ] Después: cobro de Premium (`docs/COBRO-PREMIUM.md`)
