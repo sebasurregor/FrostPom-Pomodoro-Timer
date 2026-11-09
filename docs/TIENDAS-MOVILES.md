@@ -2,6 +2,8 @@
 
 FrostPom hoy es una **PWA**: una página web que se instala como app. Microsoft Store acepta PWAs casi tal cual (con PWABuilder), pero **Google Play y sobre todo App Store piden una app de verdad** para el celular. Esta guía explica cómo llegar a las dos tiendas sin reescribir FrostPom: se "envuelve" el mismo código en una app nativa.
 
+> **Estado (v4.1):** la **Fase 1** (preparar FrostPom) está hecha para Google Play, y el proyecto de Android ya viene listo. El paso a paso actualizado para publicar en Google Play está en **`docs/GOOGLE-PLAY.md`**: úsalo en lugar de la Fase 2 de esta guía. Para App Store falta el ícono de 1024 × 1024 sin transparencia y probar en un iPhone.
+
 Cada paso dice **qué hacer**, **dónde** y **cómo saber que quedó bien** (✅). Revisado el 9 de noviembre de 2026; las tiendas cambian sus reglas seguido, así que antes de cada paso grande vale la pena mirar los enlaces de la última sección.
 
 ---
@@ -220,11 +222,12 @@ Hay que firmar el **Paid Apps Agreement** en App Store Connect, con datos bancar
 ## 6. Lista de chequeo
 
 **Fase 1: preparar FrostPom (lo hago yo)**
-- [ ] `eliminar-cuenta.html` (ES/EN)
-- [ ] Reportar nombre y "No ver más a esta persona" en el ranking, más las normas de la comunidad
-- [ ] Modo app: sin service worker, notificaciones locales, vibración nativa, botón atrás de Android
-- [ ] Ícono de 1024 sin transparencia, imagen destacada de 1024 × 500 y capturas de teléfono
-- [ ] Política de privacidad actualizada
+- [x] `eliminar-cuenta.html` (ES/EN) (v4.1)
+- [x] Reportar nombre y "No ver más a esta persona" en el ranking, más las normas de la comunidad (v4.1)
+- [x] Modo app: sin service worker, notificaciones locales, vibración nativa, botón atrás de Android (v4.1)
+- [x] Imagen destacada de 1024 × 500 y capturas de teléfono para Google Play (v4.1, `docs/google-play/`)
+- [ ] Ícono de 1024 sin transparencia (solo para App Store)
+- [x] Política de privacidad actualizada (v4.1)
 
 **Fase 2: Google Play**
 - [ ] Cuenta personal en Play Console (US$25) y teléfono verificado

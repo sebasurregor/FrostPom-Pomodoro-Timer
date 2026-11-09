@@ -2448,3 +2448,33 @@ html[data-theme="dark"] .custom { border-color: #8A6D1F; }
    la casilla aparece aquí, dentro de la ventana, encima de los botones. */
 .captcha-box { display: flex; justify-content: center; margin: 4px 0 8px; min-height: 0; }
 .captcha-box:empty { display: none; }
+
+/* =====================================================================
+   (v4.1) Reportar y ocultar nombres del ranking, y aceptar las normas
+   ===================================================================== */
+.row.has-more { grid-template-columns: 2.2em auto 1fr auto auto auto; }
+.row__more {
+  min-width: 40px; min-height: 40px; margin: -6px -6px -6px 0; padding: 0 6px;
+  border: 0; border-radius: var(--r-sm); background: transparent; color: inherit;
+  font-size: 1.35rem; font-weight: 900; line-height: 1; cursor: pointer;
+}
+.row__more:hover { background: rgba(13, 35, 70, 0.1); }
+.podium__spot .row__more { min-height: 32px; margin: -4px 0; color: var(--on-night); text-shadow: 0 2px 0 var(--ink); }
+.podium__spot .row__more:hover { background: rgba(255, 255, 255, 0.15); }
+.board__hidden { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.board__hidden .link-btn { color: inherit; }
+.report-reasons { display: grid; gap: 8px; margin: 10px 0 4px; }
+.report-reason {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px; min-height: 44px;
+  border: 2.5px solid var(--ink); border-radius: var(--r-md); background: var(--surface);
+  color: var(--text); font-weight: 700; cursor: pointer;
+}
+.report-reason input { width: 20px; height: 20px; margin: 0; accent-color: var(--coral); flex: none; }
+.report-reason:has(input:checked) { box-shadow: inset 0 0 0 2px var(--coral); }
+.consent { margin: 12px 0 0; text-align: center; font-size: 0.85rem; font-weight: 700; color: var(--on-paper-muted); }
+.consent .link-btn { font-weight: 800; }
+@media (max-width: 420px) {
+  .row.has-more { grid-template-columns: 2em auto 1fr auto auto; }
+}
+html[data-theme="dark"] .row__more:hover { background: rgba(255, 255, 255, 0.12); }
+html[data-theme="dark"] .report-reason { border-color: var(--card-line, #3B5175); }

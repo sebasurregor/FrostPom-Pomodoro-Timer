@@ -976,3 +976,13 @@ test('sonidos grabados (v4.0.2): cada uno existe, está en el catálogo y el buc
   const st = S.validateState({ settings: { ambient: 'pajaros' } });
   assert.equal(st.settings.ambient, 'pajaros');
 });
+
+test('las reglas de seguridad de _headers son las mismas de index.html (más frame-ancestors)', () => {
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const meta = html.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/)[1];
+  const hdr = readFileSync(new URL('../_headers', import.meta.url), 'utf8').match(/Content-Security-Policy: (.+)/)[1];
+  const parts = (csp) => csp.split(';').map((d) => d.trim()).filter(Boolean);
+  const fromHeaders = parts(hdr).filter((d) => !d.startsWith('frame-ancestors'));
+  assert.deepEqual(fromHeaders, parts(meta), 'si cambias la CSP de index.html, cámbiala también en _headers');
+  assert.ok(parts(hdr).includes("frame-ancestors 'none'"), '_headers impide que otros sitios metan la app en un marco');
+});

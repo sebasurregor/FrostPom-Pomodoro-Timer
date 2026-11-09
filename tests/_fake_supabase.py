@@ -27,6 +27,7 @@ class FakeSupabase:
         self.require_captcha = False   # como "Enable CAPTCHA protection" en Supabase
         self.captcha_tokens = []       # (ruta, token) recibidos
         self.used_tokens = set()       # cada token de Turnstile sirve una sola vez
+        self.reports = []              # (v4.1) (quien reporta, uid reportado, motivo)
         seeds = [('Zorro.lector', 'MX', '🦊', 180, None), ('Luna_K', 'ES', '🦉', 95, 'luna@example.com'),
                  ('pingu.sabio', 'CL', '🐧', 60, None), ('Ana_23', 'AR', '🦭', 30, None)]
         for i, (name, country, av, mins, email) in enumerate(seeds):
@@ -140,7 +141,7 @@ class FakeSupabase:
             name = str(body.get('p_username', '')).lower()
             return ok(not any(p['username'].lower() == name and k != uid for k, p in self.profiles.items()))
         if fn == 'get_leaderboard':
-            rows = [(k, p, self.minutes.get(k, 0)) for k, p in self.profiles.items() if p['show'] and self.minutes.get(k, 0) > 0]
+            rows = [(k, p, self.minutes.get(k, 0)) for k, p in self.profiles.items() if p['show'] and not p.get('hidden') and self.minutes.get(k, 0) > 0]
             rows.sort(key=lambda r: (-r[2], r[1]['username'].lower()))
             out, pos, prev = [], 0, None
             for i, (k, p, m) in enumerate(rows):
@@ -158,6 +159,18 @@ class FakeSupabase:
             prev = self.profiles.get(uid, {})
             self.profiles[uid] = {'username': name, 'country': body.get('p_country'), 'avatar': body.get('p_avatar') or '🐧', 'show': body.get('p_show', True), 'xp': prev.get('xp', 0)}
             return ok([{'username': name, 'show_on_board': self.profiles[uid]['show']}])
+        if fn == 'report_name':  # (v4.1) mismas reglas que server/supabase/schema.sql
+            if body.get('p_reason') not in ('ofensivo', 'suplantacion', 'datos', 'otro'):
+                return ok({'code': '22023', 'message': 'Motivo no válido'}, 400)
+            if sum(1 for r in self.reports if r[0] == uid) >= 20:
+                return ok({'code': '54000', 'message': 'too_many_reports'}, 400)
+            name = str(body.get('p_username', '')).strip().lower()
+            target = next((k for k, p in self.profiles.items() if p['username'].lower() == name and p['show'] and not p.get('hidden')), None)
+            if target and target != uid and not any(r[0] == uid and r[1] == target for r in self.reports):
+                self.reports.append((uid, target, body['p_reason']))
+                if len({r[0] for r in self.reports if r[1] == target}) >= 3:
+                    self.profiles[target]['hidden'] = True
+            return route.fulfill(status=204, body='')
         if fn == 'set_board_visibility':
             self.profiles[uid]['show'] = bool(body.get('p_show'))
             return route.fulfill(status=204, body='')

@@ -1,1 +1,9 @@
 node_modules/
+# App de Android (v4.1)
+www/
+*.jks
+*.keystore
+keystore.properties
+*.aab
+*.apk
+android/app/release/

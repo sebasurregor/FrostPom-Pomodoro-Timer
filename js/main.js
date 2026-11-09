@@ -31,6 +31,7 @@ import { applyTheme } from './ui/theme.js';
 import { mountGateSnow } from './ui/gate-snow.js';
 import { bootBoard } from './ui/board-ui.js';
 import { bootCloud } from './ui/cloud-ui.js';
+import { initNative, isNative } from './ui/native-ui.js';
 
 // =====================================================================
 // Pintar
@@ -90,7 +91,8 @@ function route(fromUser) {
 // Service worker (con Trusted Types: solo se permite esta URL exacta)
 // =====================================================================
 function registerServiceWorker() {
-  if (!('serviceWorker' in navigator) || !window.isSecureContext) return;
+  // En la app de Android los archivos ya están dentro del teléfono: no hace falta (v4.1)
+  if (isNative() || !('serviceWorker' in navigator) || !window.isSecureContext) return;
   let url = './service-worker.js';
   if (window.trustedTypes && window.trustedTypes.createPolicy) {
     const policy = window.trustedTypes.createPolicy('st-sw', {
@@ -186,6 +188,7 @@ function boot() {
   translateDom(); // textos fijos del HTML en el idioma elegido (antes de pintar)
   mountGateSnow(); // nevada suave de la pantalla de entrada
   configure({ render: renderAll, play });
+  initNative(); // solo dentro de la app de Android: botón atrás, avisos, vibración
   bindHUD();
   updatePhase();
   setInterval(() => { updatePhase(); checkNewDay(); checkSeason(); }, 60 * 1000);

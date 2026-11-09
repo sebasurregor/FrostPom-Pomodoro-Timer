@@ -4,7 +4,12 @@
  * teléfono o al navegador lo puede leer cualquiera. Ver docs/SEGURIDAD.md.
  */
 export const config = Object.freeze({
-  version: '4.0.3',
+  version: '4.1.0',
+  // Dirección pública de la app. La app de Android abre aquí las normas, la privacidad y la
+  // página para eliminar la cuenta (en el navegador del teléfono). Ver js/native.js.
+  publicUrl: 'https://sebasurregor.github.io/FrostPom-Pomodoro-Timer/',
+  // Correo de soporte (también para reportar un nombre sin cuenta en línea).
+  supportEmail: 'startupprometeus@gmail.com',
   // Supabase (solo para recuperar la contraseña por correo; ver docs/RECUPERAR-CONTRASENA.md).
   // La clave publicable puede ir aquí. La clave secreta (service_role / sb_secret_…) NUNCA.
   // Si dejas url vacía, la app oculta todo lo del correo.

@@ -288,6 +288,30 @@ export function nextWeekReset(now = new Date()) {
 }
 
 // ---------------------------------------------------------------------
+// (v4.1) Reportar un nombre (normas de la comunidad; lo piden Google Play y App Store)
+// ---------------------------------------------------------------------
+export const REPORT_REASONS = Object.freeze(['ofensivo', 'suplantacion', 'datos', 'otro']);
+
+/** ¿Este equipo puede reportar por el servidor? (necesita una sesión: con correo o anónima). */
+export const canReport = () => enabled() && !!load().refresh;
+
+/**
+ * Reporta un nombre del ranking. { ok: true } o { ok: false, kind } con kind = 'nosession'
+ * (sin sesión: hay que escribir por correo) | 'rate' (demasiados hoy) | 'offline' | 'notready'…
+ * El servidor no dice si el nombre existe ni si ya se ocultó.
+ */
+export async function reportName(nick, reason) {
+  if (!REPORT_REASONS.includes(reason) || typeof nick !== 'string' || !nick.trim()) return { ok: false, kind: 'invalid' };
+  if (!canReport()) return { ok: false, kind: 'nosession' };
+  try {
+    await call('report_name', { p_username: nick.trim(), p_reason: reason });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, kind: e.kind || 'server' };
+  }
+}
+
+// ---------------------------------------------------------------------
 // Tus datos
 // ---------------------------------------------------------------------
 /** Borra tus datos del ranking en el servidor y olvida la sesión en este dispositivo. */

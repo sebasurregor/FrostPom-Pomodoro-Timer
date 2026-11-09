@@ -14,3 +14,9 @@ h2 { font-size: 1.3rem; margin: 28px 0 6px; }
 ul { padding-left: 1.2em; }
 li { margin-bottom: 6px; }
 @media (max-width: 600px) { .legal { margin: 0; border-radius: 0; border-width: 0; box-shadow: none; } }
+/* Botón para escribirnos (página para eliminar la cuenta) */
+.legal__action { margin: 14px 0; }
+.legal__btn { display: inline-block; padding: 12px 20px; border-radius: 14px; background: #FFC531; color: #0D2346; border: 3px solid #0D2346; box-shadow: 0 4px 0 #0D2346; text-decoration: none; font-family: "Lilita One", "Nunito", sans-serif; font-weight: 400; font-size: 1.1rem; }
+.legal__btn:hover { background: #FFD45E; }
+.legal__btn:focus-visible { outline: 3px solid #1E4F96; outline-offset: 3px; }
+ol { padding-left: 1.4em; }

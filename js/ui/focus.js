@@ -9,6 +9,7 @@ import * as E from '../engine.js';
 import * as FX from './effects.js';
 import { $, $$, h } from './dom.js';
 import { toast, notify } from './feedback.js';
+import { askOnFirstSession } from './native-ui.js';
 import { penguin, companion, say } from './companions.js';
 import { pickVoice, COMPANION_KIND } from '../voices.js';
 import { currentPetId, fullness } from '../pet.js';
@@ -49,6 +50,7 @@ export function startOrToggle() {
   if (action === 'start') {
     FX.buzz(25);
     buddySays();
+    askOnFirstSession(); // app de Android: pide permiso para avisarte del final (una sola vez)
     if (session.state.mode === 'study') onStudyStart(session.state); // ranking global: el servidor anota la hora
   }
   timerChanged();

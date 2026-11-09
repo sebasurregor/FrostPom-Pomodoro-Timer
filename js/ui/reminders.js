@@ -9,6 +9,7 @@ import { toast, notify } from './feedback.js';
 import { state, store, mutate, today, session, isPremium } from './context.js';
 import { premiumDialog } from './premium.js';
 import { t, tr, isEnglish } from '../i18n.js';
+import { isNative, enableFromSettings, syncReminders } from './native-ui.js';
 
 const DAYS = isEnglish
   ? [['M', 1, 'Monday'], ['T', 2, 'Tuesday'], ['W', 3, 'Wednesday'], ['T', 4, 'Thursday'], ['F', 5, 'Friday'], ['S', 6, 'Saturday'], ['S', 0, 'Sunday']]
@@ -20,6 +21,7 @@ function toggleDay(d) {
     if (set.has(d)) set.delete(d); else set.add(d);
     st.settings.reminders.days = [...set].sort();
   });
+  syncReminders();
 }
 
 export function renderReminders() {
@@ -38,10 +40,12 @@ export function renderReminders() {
 async function toggleReminders(e) {
   const want = e.target.checked;
   if (!isPremium()) { e.target.checked = false; premiumDialog(); return; }
-  if (want && 'Notification' in window && Notification.permission === 'default') {
+  if (want && isNative()) await enableFromSettings(); // app de Android: permiso del sistema
+  else if (want && 'Notification' in window && Notification.permission === 'default') {
     try { await Notification.requestPermission(); } catch { /* sin permiso */ }
   }
   mutate((st) => { st.settings.reminders.on = want; });
+  syncReminders();
   if (want) toast(t('Te recordaremos a las {time}.', { time: state.settings.reminders.time }), 'good', { icon: '⏰' });
 }
 
@@ -63,5 +67,5 @@ export function checkReminder() {
 
 export function bindReminders() {
   $('#remOn').addEventListener('change', toggleReminders);
-  $('#remTime').addEventListener('change', (e) => { if (/^\d{2}:\d{2}$/.test(e.target.value)) mutate((st) => { st.settings.reminders.time = e.target.value; }); });
+  $('#remTime').addEventListener('change', (e) => { if (/^\d{2}:\d{2}$/.test(e.target.value)) { mutate((st) => { st.settings.reminders.time = e.target.value; }); syncReminders(); } });
 }

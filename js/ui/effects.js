@@ -3,6 +3,7 @@
  * sintetizados), vibración, confeti y textos flotantes.
  * Todo respeta las preferencias: sonido apagado, vibración apagada y "reducir movimiento".
  */
+import { isNative, vibrate } from '../native.js';
 
 let prefs = { sound: true, vibrate: true, reduceMotion: false, tonePack: 'clasico' };
 // El movimiento lo controla "Menos animaciones" en Ajustes (main.js avisa si el sistema lo pide).
@@ -261,7 +262,9 @@ function setAmbientVolume(volume) {
 
 // ---------------- Vibración (Android; iOS la ignora) ----------------
 function buzz(pattern) {
-  if (!prefs.vibrate || !navigator.vibrate) return;
+  if (!prefs.vibrate) return;
+  if (isNative()) { vibrate(pattern); return; } // app de Android: el motor del teléfono (v4.1)
+  if (!navigator.vibrate) return;
   // Antes del primer toque el navegador bloquea la vibración (y lo anota como error).
   if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return;
   try { navigator.vibrate(pattern); } catch { /* sin vibración */ }

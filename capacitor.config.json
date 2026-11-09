@@ -1,0 +1,25 @@
+{
+  "appId": "com.startupprometeus.frostpom",
+  "appName": "FrostPom",
+  "webDir": "www",
+  "server": {
+    "hostname": "sebasurregor.github.io",
+    "androidScheme": "https",
+    "allowNavigation": [
+      "challenges.cloudflare.com"
+    ]
+  },
+  "android": {
+    "allowMixedContent": false
+  },
+  "plugins": {
+    "SystemBars": {
+      "insetsHandling": "css",
+      "initialViewportFitValueHint": "cover"
+    },
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_frostpom",
+      "iconColor": "#2D68BC"
+    }
+  }
+}

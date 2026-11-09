@@ -34,6 +34,12 @@ Este documento explica qué protege la app hoy, cuáles son sus límites honesto
 - Las cuentas de menores de 13 nunca cargan Turnstile.
 - Junto con el CAPTCHA, **no** actives el bloqueo de IP de las claves SMTP en Brevo: Supabase envía desde direcciones que cambian, y los códigos dejarían de llegar.
 
+## 1f. Reportar nombres y app de Android (v4.1)
+
+- **Reportes:** `report_name()` exige sesión, acepta solo 4 motivos, guarda uno por persona y nombre, permite 20 al día y **no revela** si el nombre existe ni si ya se ocultó. Con 3 personas distintas el nombre se oculta hasta que el dueño lo revise (`private.report_summary()`, `private.hide_name()`). La tabla no se puede leer desde afuera (probado).
+- **Ocultar a una persona** se guarda solo en el dispositivo (`st2_board_hidden`), sin avisarle a nadie.
+- **App de Android:** el mismo código y la misma CSP. El puente de Capacitor entra antes que la página (`addDocumentStartJavaScript`), sin necesitar `unsafe-inline`; `@capacitor/core` va copiado en `js/vendor/` (sin `eval` ni `innerHTML`) y solo se carga dentro de la app. Solo se puede navegar dentro de la app a `challenges.cloudflare.com` (`allowNavigation`); todo lo demás se abre en el navegador del teléfono. La llave de firma (`.jks`) nunca va al repositorio (`.gitignore`).
+
 ## 1d. Cobro de Premium (v3.8, apagado por ahora)
 
 - El pago lo hace **Microsoft Store** (Digital Goods API + Payment Request API, `js/billing.js`). La app nunca ve la tarjeta.
@@ -63,13 +69,13 @@ Este documento explica qué protege la app hoy, cuáles son sus límites honesto
 
 ## 3. Servidor del ranking global (`server/supabase/schema.sql`, v3.9)
 
-Está hecho para Supabase (PostgreSQL), y sus reglas se probaron en un PostgreSQL real con `server/supabase/test/tests.sql` (27 comprobaciones, con las de las cuentas en línea). La guía para encenderlo es `docs/RANKING-GLOBAL.md`.
+Está hecho para Supabase (PostgreSQL), y sus reglas se probaron en un PostgreSQL real con `server/supabase/test/tests.sql` (37 comprobaciones, con las de las cuentas en línea y los reportes). La guía para encenderlo es `docs/RANKING-GLOBAL.md`.
 
 1. **Las tablas no se pueden tocar directamente.** Viven en un esquema privado, con *Row Level Security* y sin políticas. El único acceso son funciones con reglas. La prueba verifica que leer o escribir las tablas directamente falla.
 2. **El servidor mide el tiempo con su propio reloj.** Al terminar una sesión se acredita el *menor* entre lo que dice la app, lo planeado y el tiempo real que pasó. Cambiar la hora del teléfono o decir "estudié 25 min" a los 10 segundos no sirve, y terminar dos veces la misma sesión tampoco. Esas trampas están probadas.
 3. **Hay un límite diario igual para todos (4 h)**, y un máximo de 60 sesiones iniciadas en 24 horas para frenar abusos.
 4. **La XP que manda la app se acota.** Solo decide el emblema que se ve en el ranking, y el servidor no acepta más de lo posible con los minutos que él mismo midió (la prueba intenta mandar 1.000.000).
-5. **El nombre público es el nombre de usuario**, revisado en el servidor con las *mismas* reglas que en la app: formato y lista de groserías (una prueba unitaria verifica que las dos listas sean idénticas). No se repite, sin importar mayúsculas. El dueño puede ocultar un nombre con `private.hide_name()`.
+5. **El nombre público es el nombre de usuario**, revisado en el servidor con las *mismas* reglas que en la app: formato y lista de groserías (una prueba unitaria verifica que las dos listas sean idénticas). No se repite, sin importar mayúsculas. El dueño puede ocultar un nombre con `private.hide_name()`, y desde la v4.1 cualquiera con sesión puede reportarlo (con 3 personas se oculta solo).
 6. **Todos (13+) aparecen por defecto y cualquiera puede salir** (`show_on_board`). El ranking nunca devuelve identificadores internos.
 7. **La edad no sale del dispositivo.** La app pregunta el mes y año de nacimiento, lo guarda solo en el dispositivo y a los menores de 13 ni siquiera los conecta con el servidor. Pueden ver el ranking (sin sesión), pero no aparecen.
 8. **Identidad:** con cuenta en línea (v4.0), el ranking usa esa misma cuenta. Las cuentas solo de este dispositivo usan una cuenta **anónima** de Supabase; si agregan su correo de recuperación (o recuperan la contraseña), su lugar pasa a la cuenta con correo mediante un código de un solo uso que dura 10 minutos. Solo quien tiene las dos sesiones puede hacerlo.

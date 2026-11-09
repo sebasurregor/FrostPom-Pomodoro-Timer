@@ -21,6 +21,8 @@ import { changePasswordFlow, logout, deleteAccountFlow, rememberDevice, forgetDe
 import * as CLOUD from '../cloud.js';
 import { state, store, mutate, today, session, lastSavedAt } from './context.js';
 import { t, tr, lang, setLang } from '../i18n.js';
+import { notificationPermission } from '../native.js';
+import { isNative, enableFromSettings } from './native-ui.js';
 
 export function renderSettings() {
   renderSound();
@@ -47,12 +49,16 @@ export function renderSettings() {
   $('#setAwake').disabled = !('wakeLock' in navigator);
 
   const nb = $('#notifBtn');
-  const notice = !('Notification' in window) ? 'Notificaciones no disponibles'
-    : Notification.permission === 'granted' ? 'Notificaciones activadas'
-      : Notification.permission === 'denied' ? 'Notificaciones bloqueadas en el navegador' : null;
-  if (notice) {
-    nb.disabled = true;
-    nb.textContent = tr(notice);
+  if (isNative()) {
+    renderNativeNotif(nb); // app de Android: el permiso del teléfono (v4.1)
+  } else {
+    const notice = !('Notification' in window) ? 'Notificaciones no disponibles'
+      : Notification.permission === 'granted' ? 'Notificaciones activadas'
+        : Notification.permission === 'denied' ? 'Notificaciones bloqueadas en el navegador' : null;
+    if (notice) {
+      nb.disabled = true;
+      nb.textContent = tr(notice);
+    }
   }
 
   renderSaveStatus();
@@ -85,7 +91,23 @@ function changeCap(delta) {
   if (next !== state.settings.dailyCapMin) mutate((s) => { s.settings.dailyCapMin = next; });
 }
 
+/** App de Android: el botón muestra el permiso del teléfono. */
+async function renderNativeNotif(nb) {
+  const perm = await notificationPermission();
+  const notice = perm === 'granted' ? 'Notificaciones activadas'
+    : perm === 'denied' ? 'Notificaciones bloqueadas: actívalas en los ajustes del teléfono'
+      : perm === 'unavailable' ? 'Notificaciones no disponibles' : null;
+  nb.disabled = !!notice;
+  nb.textContent = tr(notice || 'Activar notificaciones');
+}
+
 async function enableNotifications() {
+  if (isNative()) {
+    const perm = await enableFromSettings();
+    toast(perm === 'granted' ? 'Listo: te avisaremos aunque la app esté en segundo plano.' : 'No se activaron las notificaciones.', perm === 'granted' ? 'good' : 'warn');
+    renderSettings();
+    return;
+  }
   try {
     const perm = await Notification.requestPermission();
     toast(perm === 'granted' ? 'Listo: te avisaremos aunque la app esté en segundo plano.' : 'No se activaron las notificaciones.', perm === 'granted' ? 'good' : 'warn');

@@ -457,4 +457,138 @@ begin
   assert not exists (select 1 from private.profiles where username = 'iris.v'), 'FALLO: quedó el perfil del ranking';
   raise notice 'OK  eliminar la cuenta en línea borra el progreso, el ranking y la cuenta';
 end $$;
+-- ===================== (v4.1) Reportar nombres del ranking =====================
+reset role;
+insert into auth.users (id, is_anonymous) values
+  ('b0000000-0000-0000-0000-000000000001', false),   -- Tomi: su nombre será reportado
+  ('b0000000-0000-0000-0000-000000000011', false),   -- quienes reportan
+  ('b0000000-0000-0000-0000-000000000012', true),
+  ('b0000000-0000-0000-0000-000000000013', false),
+  ('b0000000-0000-0000-0000-000000000014', false);
+-- 20 nombres más, para probar el tope diario
+insert into auth.users (id, is_anonymous)
+  select ('c0000000-0000-0000-0000-' || lpad(i::text, 12, '0'))::uuid, true from generate_series(1, 21) i;
+insert into private.profiles (user_id, username)
+  select ('c0000000-0000-0000-0000-' || lpad(i::text, 12, '0'))::uuid, 'relleno_' || i from generate_series(1, 21) i;
+
+set role authenticated;
+set request.jwt.claim.sub = 'b0000000-0000-0000-0000-000000000001';
+do $$ begin perform public.set_profile('tomi.reportado'); end $$;
+do $$
+begin
+  perform public.report_name('tomi.reportado', 'ofensivo');   -- reportarse a sí mismo no cuenta
+  perform public.report_name('no_existe_este_nombre', 'ofensivo');   -- no dice si existe: no falla
+  raise notice 'OK  reportarse a uno mismo o un nombre que no existe no da error ni revela nada';
+end $$;
+
+set request.jwt.claim.sub = 'b0000000-0000-0000-0000-000000000011';
+do $$
+begin
+  perform public.report_name('TOMI.reportado ', 'ofensivo');   -- sin importar mayúsculas ni espacios
+  perform public.report_name('tomi.reportado', 'otro');        -- la segunda vez no suma
+  begin
+    perform public.report_name('tomi.reportado', 'me cae mal');
+    raise exception 'FALLO: aceptó un motivo inventado';
+  exception when invalid_parameter_value then null;
+  end;
+  raise notice 'OK  reportar: un reporte por persona y nombre, y solo motivos de la lista';
+end $$;
+set request.jwt.claim.sub = 'b0000000-0000-0000-0000-000000000012';
+do $$ begin perform public.report_name('tomi.reportado', 'suplantacion'); end $$;
+reset role;
+do $$
+begin
+  assert (select count(*) from private.reports r join private.profiles p on p.user_id = r.target_id where p.username = 'tomi.reportado') = 2,
+    'FALLO: debían quedar 2 reportes (uno por persona, sin el de él mismo)';
+  assert not (select hidden from private.profiles where username = 'tomi.reportado'), 'FALLO: se ocultó con solo 2 reportes';
+  raise notice 'OK  con 2 personas el nombre sigue visible';
+end $$;
+set role authenticated;
+set request.jwt.claim.sub = 'b0000000-0000-0000-0000-000000000013';
+do $$ begin perform public.report_name('tomi.reportado', 'datos'); end $$;
+reset role;
+do $$
+declare r record;
+begin
+  assert (select hidden from private.profiles where username = 'tomi.reportado'), 'FALLO: con 3 personas el nombre debía ocultarse';
+  select * into r from private.report_summary() where username = 'tomi.reportado';
+  assert r.reports = 3 and r.hidden and r.reasons like '%datos%', 'FALLO: el resumen para el dueño no cuadra';
+  raise notice 'OK  con 3 personas distintas el nombre se oculta solo y el dueño lo ve en report_summary()';
+end $$;
+
+-- Lo que hiciste también sale en tu copia de datos
+set role authenticated;
+set request.jwt.claim.sub = 'b0000000-0000-0000-0000-000000000011';
+do $$
+declare d jsonb := public.export_my_data();
+begin
+  assert jsonb_array_length(d->'reports_made') = 1 and d->'reports_made'->0->>'username' = 'tomi.reportado', 'FALLO: la copia de datos no trae los reportes hechos';
+  raise notice 'OK  la copia de tus datos incluye los reportes que hiciste';
+end $$;
+
+-- Tope: 20 reportes al día por persona
+set request.jwt.claim.sub = 'b0000000-0000-0000-0000-000000000014';
+do $$
+declare i int;
+begin
+  for i in 1..20 loop perform public.report_name('relleno_' || i, 'otro'); end loop;
+  begin
+    perform public.report_name('relleno_21', 'otro');
+    raise exception 'FALLO: dejó reportar más de 20 veces en un día';
+  exception when program_limit_exceeded then null;
+  end;
+  raise notice 'OK  máximo 20 reportes al día por persona';
+end $$;
+
+-- Sin sesión no se puede reportar
+set role anon;
+set request.jwt.claim.sub = '';
+do $$
+begin
+  begin
+    perform public.report_name('tomi.reportado', 'ofensivo');
+    raise exception 'FALLO: un visitante sin sesión reportó';
+  exception when insufficient_privilege then null;
+  end;
+  raise notice 'OK  sin sesión no se puede reportar';
+end $$;
+
+-- Nadie lee la tabla de reportes directamente (ni con sesión)
+set role authenticated;
+set request.jwt.claim.sub = 'b0000000-0000-0000-0000-000000000011';
+do $$
+begin
+  begin
+    perform 1 from private.reports;
+    raise exception 'FALLO: alguien con sesión leyó la tabla de reportes';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    perform private.report_summary();
+    raise exception 'FALLO: alguien con sesión usó la herramienta del dueño';
+  exception when insufficient_privilege then null;
+  end;
+  raise notice 'OK  los reportes y el resumen solo los ve el dueño';
+end $$;
+
+-- El dueño revisa: si el nombre estaba bien, lo vuelve a mostrar y se borran sus reportes
+reset role;
+do $$
+begin
+  perform private.hide_name('tomi.reportado', false);
+  assert not (select hidden from private.profiles where username = 'tomi.reportado'), 'FALLO: no se volvió a mostrar';
+  assert not exists (select 1 from private.report_summary() where username = 'tomi.reportado'), 'FALLO: quedaron sus reportes (se ocultaría otra vez)';
+  raise notice 'OK  hide_name(nombre, false) lo vuelve a mostrar y limpia sus reportes';
+end $$;
+
+-- Borrar tu cuenta del ranking borra también los reportes que hiciste
+set role authenticated;
+set request.jwt.claim.sub = 'b0000000-0000-0000-0000-000000000014';
+do $$ begin perform public.delete_my_account(); end $$;
+reset role;
+do $$
+begin
+  assert not exists (select 1 from private.reports where reporter_id = 'b0000000-0000-0000-0000-000000000014'), 'FALLO: quedaron los reportes de quien borró su cuenta';
+  raise notice 'OK  al borrar tu cuenta se borran los reportes que hiciste';
+end $$;
 \echo 'Todas las pruebas del servidor pasaron.'

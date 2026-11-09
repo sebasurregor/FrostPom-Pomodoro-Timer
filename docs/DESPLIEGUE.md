@@ -1,10 +1,12 @@
-# Despliegue de FrostPom, de principio a fin (v4.0.3)
+# Despliegue de FrostPom, de principio a fin (v4.1.0)
 
 Esta guía junta **todo lo que hemos hecho** hasta la v4.0 y lo lleva a internet y a Microsoft Store. Está en orden: cada paso dice **qué hacer**, **dónde** y **cómo saber que quedó bien** (✅). Si ya hiciste un paso antes, revisa el ✅ y sigue con el siguiente.
 
 **Lo que vas a publicar:** temporizador con rangos, misiones y compañeros (el pingüino viene incluido); Progreso estilo racha; tarjetas claras con modo oscuro; español e inglés; entrada con el paisaje ártico y la fogata animada; recuperar la contraseña por correo (Supabase + Brevo); Premium en modo prueba (el cobro real se enciende después con `docs/COBRO-PREMIUM.md`); el ranking global encendido; y, desde la v4.0, **cuentas en línea** con correo y contraseña para mayores de 13 (`docs/CUENTAS-EN-LINEA.md`).
 
-> **Si vienes de la v3.9.1 (tu caso), solo te faltan 5 cosas, en este orden:**
+> **Si vienes de la v4.0.3 (tu caso):** corre el `server/supabase/schema.sql` nuevo en Supabase, copia el zip encima de tu repositorio, vuelve a poner tu site key del CAPTCHA en `js/config.js` y sube los cambios (paso 2, con el mensaje de la v4.1). Después sigue `docs/GOOGLE-PLAY.md`.
+>
+> **Si vienes de la v3.9.1, te faltan 5 cosas, en este orden:**
 > 1. Correr el `server/supabase/schema.sql` nuevo en Supabase (paso 1 de `CUENTAS-EN-LINEA.md`). **Antes** de subir el código.
 > 2. Revisar la configuración de correo de Supabase (paso 2 de `CUENTAS-EN-LINEA.md`).
 > 3. Probar en tu PC (paso 1 de esta guía y paso 3 de `CUENTAS-EN-LINEA.md`).
@@ -20,13 +22,13 @@ Esta guía junta **todo lo que hemos hecho** hasta la v4.0 y lo lleva a internet
 - [ ] **Microsoft Edge**.
 - [ ] Tu proyecto de **Supabase** (`tcxdmziakgppabwyrydd`) y tu cuenta de **Brevo** con la clave SMTP.
 - [ ] Una **cuenta Microsoft personal** (Outlook/Hotmail o una creada con tu Gmail). **No** la cuenta de trabajo `.onmicrosoft.com`.
-- [ ] El zip `frostpom-v4.0.3.zip`.
+- [ ] El zip `frostpom-v4.1.0.zip`.
 
 ---
 
 ## Paso 1. Probar la v4.0 en tu computador
 
-1. Descomprime `frostpom-v4.0.3.zip` en una carpeta nueva.
+1. Descomprime `frostpom-v4.1.0.zip` en una carpeta nueva.
 2. Abre una terminal en esa carpeta y ejecuta:
 
    ```
@@ -59,7 +61,7 @@ Esta guía junta **todo lo que hemos hecho** hasta la v4.0 y lo lleva a internet
 
    ```
    git add -A
-   git commit -m "v4.0.3: CAPTCHA listo (Turnstile), sonidos grabados (y Lluvia y pájaros), cuentas en línea, cerrar sesión sin borrar la cuenta y ajustes del ranking más simples"
+   git commit -m "v4.1: listo para Google Play (normas, reportar y ocultar en el ranking, eliminar cuenta, app de Android)"
    git push
    ```
 
@@ -185,10 +187,10 @@ En Partner Center → tu app → **Start your submission**. Los textos están en
 ## Paso 10. Cuando la app ya esté en la tienda
 
 1. Instálala desde Microsoft Store en tu PC y ábrela.
-2. Al final de **Ajustes** debe decir **versión 4.0.3**.
+2. Al final de **Ajustes** debe decir **versión 4.1.0**.
 3. Guarda la URL de la tienda: va en `js/config.js` → `premium.storeUrl` cuando enciendas el cobro.
 
-✅ **Quedó bien si** la app de la tienda abre, guarda tu progreso y muestra la versión 4.0.3.
+✅ **Quedó bien si** la app de la tienda abre, guarda tu progreso y muestra la versión 4.1.0.
 
 ---
 
@@ -221,4 +223,5 @@ En Partner Center → tu app → **Start your submission**. Los textos están en
 - [x] Ranking global encendido (`docs/RANKING-GLOBAL.md`, v3.9.1)
 - [ ] v4.0: SQL nuevo corrido en Supabase **antes** del `git push` (`docs/CUENTAS-EN-LINEA.md`)
 - [ ] v4.0.3: CAPTCHA encendido en orden (`docs/CAPTCHA.md`) y bloqueo de IP de Brevo **desactivado**
+- [ ] v4.1: `server/supabase/schema.sql` corrido en Supabase **antes** del `git push`, y la site key del CAPTCHA puesta otra vez en `js/config.js` (el zip la trae vacía). Google Play: `docs/GOOGLE-PLAY.md`
 - [ ] Después: cobro de Premium (`docs/COBRO-PREMIUM.md`)

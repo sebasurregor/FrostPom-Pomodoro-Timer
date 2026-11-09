@@ -1,4 +1,4 @@
-# FrostPom: Pomodoro Timer (v4.0.3)
+# FrostPom: Pomodoro Timer (v4.1.0)
 
 > Antes se llamaba **StudyTimer**. Publicada en **https://sebasurregor.github.io/FrostPom-Pomodoro-Timer/**
 
@@ -126,7 +126,7 @@ docs/                   Seguridad, cambios y hoja de ruta
 ## Pruebas
 
 ```
-npm test                                             # 66 pruebas de la lógica (necesita Node 18+)
+npm test                                             # 71 pruebas de la lógica (necesita Node 18+)
 python tests/e2e_smoke.py http://localhost:8000/     # recorrido en navegador (opcional, ver el archivo)
 python tests/e2e_ingles.py http://localhost:8000/    # toda la app en inglés: avisa si queda texto en español
 python tests/e2e_recuperar.py http://localhost:8000/ # recuperar contraseña por correo (simula Supabase)
@@ -135,11 +135,16 @@ python tests/e2e_ranking.py http://localhost:8000/   # ranking global con un Sup
 python tests/e2e_cuentas.py http://localhost:8000/   # cuentas en línea con un Supabase simulado
 python tests/e2e_sonidos.py http://localhost:8000/   # sonidos grabados: bucle sin corte y sin internet
 python tests/e2e_captcha.py http://localhost:8000/   # CAPTCHA con Supabase y Turnstile simulados
+python tests/e2e_android.py http://localhost:8000/   # reportar y ocultar, normas, borrar cuenta y app de Android (simulada)
 python tests/store_check.py http://localhost:8000/   # lista para Microsoft Store: manifiesto, instalable,
                                                      # sin conexión, 8 tamaños de ventana y accesibilidad (axe)
 ```
 
-Para las pruebas del servidor del ranking necesitas PostgreSQL: `server/supabase/test/run_local.sh` (27 comprobaciones).
+Para las pruebas del servidor del ranking necesitas PostgreSQL: `server/supabase/test/run_local.sh` (37 comprobaciones).
+
+## App de Android (Google Play)
+
+Con Node 22+ y Android Studio: `npm install`, `npm run android:crear` y `npm run android:abrir`. Paso a paso completo: [`docs/GOOGLE-PLAY.md`](docs/GOOGLE-PLAY.md).
 
 ## Publicar en Microsoft Store
 
@@ -150,6 +155,8 @@ Sigue `docs/MICROSOFT-STORE.md`: GitHub Pages, cuenta individual en Partner Cent
 - [`docs/PROXIMOS-PASOS.md`](docs/PROXIMOS-PASOS.md): **qué hacer ahora**, en orden, hasta tener la app en Microsoft Store.
 - [`docs/COPIA-DE-SEGURIDAD.md`](docs/COPIA-DE-SEGURIDAD.md): **copia de seguridad manual** de Supabase (plan gratis) desde Windows, y cómo restaurarla.
 - [`docs/CAPTCHA.md`](docs/CAPTCHA.md): **encender el CAPTCHA** (Cloudflare Turnstile) en orden, sin dejar a nadie por fuera.
+- [`docs/GOOGLE-PLAY.md`](docs/GOOGLE-PLAY.md): **publicar en Google Play** (v4.1): proyecto de Android, prueba en tu celular, firma, ficha (`docs/google-play/FICHA.md`), prueba cerrada y producción.
+- [`docs/PRUEBA-DE-SEGURIDAD.md`](docs/PRUEBA-DE-SEGURIDAD.md): preparar una **prueba de seguridad** externa en un proyecto aparte.
 - [`docs/TIENDAS-MOVILES.md`](docs/TIENDAS-MOVILES.md): **llevar FrostPom a Google Play y App Store** paso a paso (Capacitor, costos, prueba cerrada de 12 personas, revisión de Apple).
 - [`docs/CUENTAS-EN-LINEA.md`](docs/CUENTAS-EN-LINEA.md): **cuentas en línea (v4.0)**: qué correr en Supabase antes de publicar, cómo probarlas y cómo atender pedidos de copia o borrado de datos.
 - [`docs/RANKING-GLOBAL.md`](docs/RANKING-GLOBAL.md): **encender el ranking global** paso a paso (Supabase, SQL, moderación y limpieza).

@@ -1,6 +1,7 @@
 -- =====================================================================
 -- FrostPom: servidor del ranking global y de las cuentas en línea (Supabase / PostgreSQL 15+)
 -- v3.9: ranking global · v4.0: guardar el progreso de las cuentas con correo (sin la foto)
+-- v4.1: reportar nombres del ranking (lo piden Google Play y App Store)
 --
 -- Por qué existe: si el ranking se calculara en el teléfono, cualquiera podría
 -- editar sus minutos. Aquí el SERVIDOR mide el tiempo y decide cuánto cuenta.
@@ -24,6 +25,8 @@
 --  9. (v4.0) Las cuentas con correo guardan su progreso para entrar desde otro equipo. El
 --     servidor quita la foto y los datos de la cuenta local antes de guardarlo. Las cuentas
 --     anónimas (las del ranking) no pueden guardar progreso.
+-- 10. (v4.1) Quien tiene sesión puede reportar un nombre del ranking (una vez por nombre, máximo
+--     20 al día). Con 3 personas distintas, el nombre se oculta solo hasta que el dueño lo revise.
 --
 -- Cómo usarlo: Supabase > SQL Editor > pega este archivo > Run. Se puede volver a correr.
 -- Paso a paso completo: docs/RANKING-GLOBAL.md
@@ -182,11 +185,23 @@ create table if not exists private.saves (
   updated_at timestamptz not null default now()
 );
 
+-- (v4.1) Reportes de nombres del ranking. Una fila por persona que reporta y nombre reportado.
+create table if not exists private.reports (
+  reporter_id uuid not null references auth.users (id) on delete cascade,
+  target_id   uuid not null references private.profiles (user_id) on delete cascade on update cascade,
+  reason      text not null check (reason in ('ofensivo', 'suplantacion', 'datos', 'otro')),
+  created_at  timestamptz not null default now(),
+  primary key (reporter_id, target_id)
+);
+create index if not exists reports_target on private.reports (target_id);
+create index if not exists reports_reporter_created on private.reports (reporter_id, created_at desc);
+
 alter table private.profiles       enable row level security;
 alter table private.study_sessions enable row level security;
 alter table private.daily_totals   enable row level security;
 alter table private.transfer_codes enable row level security;
 alter table private.saves          enable row level security;
+alter table private.reports        enable row level security;
 -- Sin políticas a propósito: el acceso es SOLO a través de las funciones de abajo.
 
 revoke all on all tables in schema private from public;
@@ -483,7 +498,10 @@ begin
     'profile', (select to_jsonb(p) - 'user_id' - 'hidden' from private.profiles p where p.user_id = uid),
     'daily_totals', coalesce((select jsonb_agg(to_jsonb(dt) - 'user_id' order by dt.day) from private.daily_totals dt where dt.user_id = uid), '[]'::jsonb),
     'sessions', coalesce((select jsonb_agg(to_jsonb(s) - 'user_id' order by s.started_at) from private.study_sessions s where s.user_id = uid), '[]'::jsonb),
-    'progress', (select sv.data from private.saves sv where sv.user_id = uid)
+    'progress', (select sv.data from private.saves sv where sv.user_id = uid),
+    'reports_made', coalesce((select jsonb_agg(jsonb_build_object('username', p.username, 'reason', r.reason, 'created_at', r.created_at) order by r.created_at)
+                                from private.reports r join private.profiles p on p.user_id = r.target_id
+                               where r.reporter_id = uid), '[]'::jsonb)
   );
 end $$;
 
@@ -495,8 +513,9 @@ language plpgsql security definer set search_path = '' as $$
 declare
   uid uuid := private.require_user();
 begin
-  delete from private.profiles where user_id = uid;   -- en cascada: sesiones y totales
+  delete from private.profiles where user_id = uid;   -- en cascada: sesiones, totales y reportes recibidos
   delete from private.transfer_codes where user_id = uid;
+  delete from private.reports where reporter_id = uid;
   delete from auth.users where id = uid and coalesce(is_anonymous, false);
 end $$;
 
@@ -572,17 +591,71 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------
+-- (v4.1) Reportar un nombre del ranking. No dice si el nombre existe ni si ya se ocultó, para
+-- que nadie pueda usarlo para averiguar cosas: solo falla si el motivo no es válido o si la
+-- persona ya reportó demasiado hoy.
+-- ---------------------------------------------------------------------
+create or replace function public.report_name(p_username text, p_reason text default 'ofensivo')
+returns void
+language plpgsql security definer set search_path = '' as $$
+declare
+  uid    uuid := private.require_user();
+  target uuid;
+  today  int;
+begin
+  if p_reason is null or p_reason not in ('ofensivo', 'suplantacion', 'datos', 'otro') then
+    raise exception 'Motivo no válido' using errcode = '22023';
+  end if;
+  select count(*) into today from private.reports r
+   where r.reporter_id = uid and r.created_at > now() - interval '1 day';
+  if today >= 20 then
+    raise exception 'too_many_reports' using errcode = '54000';
+  end if;
+  select p.user_id into target from private.profiles p
+   where lower(p.username) = lower(btrim(coalesce(p_username, ''))) and p.show_on_board and not p.hidden;
+  if target is null or target = uid then
+    return;
+  end if;
+  insert into private.reports (reporter_id, target_id, reason) values (uid, target, p_reason)
+    on conflict (reporter_id, target_id) do nothing;
+  if (select count(*) from private.reports r where r.target_id = target) >= 3 then
+    update private.profiles set hidden = true where user_id = target;
+  end if;
+end $$;
+
+-- ---------------------------------------------------------------------
 -- Herramientas para el dueño de la app (SQL Editor). Nadie más puede llamarlas.
 -- ---------------------------------------------------------------------
 -- Ocultar (o volver a mostrar) un nombre inapropiado:
 --   select private.hide_name('nombre_feo');          select private.hide_name('nombre', false);
+-- Al volver a mostrarlo (false) también se borran sus reportes, para que no se oculte de nuevo.
 create or replace function private.hide_name(p_username text, p_hide boolean default true)
 returns int
-language sql security definer set search_path = '' as $$
-  with u as (
-    update private.profiles set hidden = coalesce(p_hide, true)
-     where lower(username) = lower(btrim(p_username)) returning 1
-  ) select count(*)::int from u
+language plpgsql security definer set search_path = '' as $$
+declare
+  n int;
+begin
+  update private.profiles set hidden = coalesce(p_hide, true)
+   where lower(username) = lower(btrim(p_username));
+  get diagnostics n = row_count;
+  if not coalesce(p_hide, true) then
+    delete from private.reports r
+     using private.profiles p
+     where r.target_id = p.user_id and lower(p.username) = lower(btrim(p_username));
+  end if;
+  return n;
+end $$;
+
+-- (v4.1) Ver los nombres reportados, del más reportado al menos:
+--   select * from private.report_summary();
+create or replace function private.report_summary()
+returns table (username text, reports bigint, reasons text, hidden boolean, last_report timestamptz)
+language sql stable security definer set search_path = '' as $$
+  select p.username, count(*), string_agg(distinct r.reason, ', '), p.hidden, max(r.created_at)
+    from private.reports r
+    join private.profiles p on p.user_id = r.target_id
+   group by p.user_id, p.username, p.hidden
+   order by count(*) desc, max(r.created_at) desc
 $$;
 
 -- Limpieza: borra cuentas anónimas sin actividad en p_days días (y las que nunca se unieron
@@ -605,6 +678,7 @@ begin
   get diagnostics ds = row_count;
   delete from private.daily_totals where day < (now() - interval '400 days')::date;
   delete from private.transfer_codes where expires_at < now();
+  delete from private.reports where created_at < now() - interval '400 days';
   return query select du, ds;
 end $$;
 
@@ -626,6 +700,7 @@ revoke execute on function public.delete_my_account() from public;
 revoke execute on function public.load_progress() from public;
 revoke execute on function public.save_progress(jsonb, int) from public;
 revoke execute on function public.delete_my_cloud_account() from public;
+revoke execute on function public.report_name(text, text) from public;
 
 do $$
 begin
@@ -636,5 +711,7 @@ begin
     execute 'grant execute on function public.set_profile(text, text, text, text, boolean), public.set_board_visibility(boolean), public.start_session(int), public.finish_session(uuid, int, int), public.create_transfer_code(), public.redeem_transfer_code(text), public.export_my_data(), public.delete_my_account() to authenticated';
     execute 'revoke execute on function public.load_progress(), public.save_progress(jsonb, int), public.delete_my_cloud_account() from anon';
     execute 'grant execute on function public.load_progress(), public.save_progress(jsonb, int), public.delete_my_cloud_account() to authenticated';
+    execute 'revoke execute on function public.report_name(text, text) from anon';
+    execute 'grant execute on function public.report_name(text, text) to authenticated';
   end if;
 end $$;

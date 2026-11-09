@@ -141,6 +141,10 @@ with sync_playwright() as p:
     if pg.get_attribute('#ring', 'data-status') == 'running':
         pg.click('#mainBtn')  # pausa el descanso
     pg.goto(URL + '#/ranking'); pg.clock.run_for(1500)
+    for _ in range(20):  # el ranking llega por la red: si el equipo está ocupado, puede tardar un poco más
+        if pg.evaluate("document.querySelectorAll('.podium__nick').length") >= 3:
+            break
+        pg.wait_for_timeout(100); pg.clock.run_for(200)
     pod = pg.evaluate("[...document.querySelectorAll('.podium__nick')].map(n => n.textContent.trim())")
     check(any('Zorro.lector' in x for x in pod) and len(pod) == 3, 'el podio muestra a los 3 primeros')
     you = pg.evaluate("document.querySelector('#board .row.is-you')?.textContent || ''")

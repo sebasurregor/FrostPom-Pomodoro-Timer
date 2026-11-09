@@ -273,6 +273,16 @@ export async function loginGate() {
   else forgetDevice();
 }
 
+/**
+ * (v4.1) "Al crear tu cuenta aceptas…": Google Play pide aceptar unas normas antes de que tu nombre
+ * aparezca en el ranking. Los enlaces abren en otra pestaña (en la app, en el navegador del
+ * teléfono) para no perder lo que ya escribiste.
+ */
+export function consentLine() {
+  const link = (page, label) => h('a', { class: 'link-btn', href: page, target: '_blank', rel: 'noopener', 'data-page': page }, label);
+  return h('p', { class: 'consent' }, 'Al crear tu cuenta aceptas las ', link('normas.html', 'normas de la comunidad'), ' y la ', link('privacidad.html', 'política de privacidad'), '.');
+}
+
 export async function createAccountFlow({ required = false } = {}) {
   const nick = state.profile.nick;
   const f = accountFields({ withEmail: true, withBirth: true, initialName: isValidNick(nick) && checkUsername(nick).ok ? nick : '' });
@@ -281,7 +291,7 @@ export async function createAccountFlow({ required = false } = {}) {
     className: 'dlg--onb dlg--gate',
     dismissable: !required,
     title: 'Crea tu cuenta',
-    body: [...f.nodes],
+    body: [...f.nodes, consentLine()],
     actions: [
       required ? null : { label: 'Ahora no', value: 'later' },
       { label: 'Crear cuenta', value: 'ok', variant: 'btn--gold', primary: true, validate: async () => { rec = await f.validate(); return !!rec; } },
@@ -431,6 +441,7 @@ export async function onboarding() {
       SYNC.enabled() && !migrated
         ? h('p', { class: 'signin-switch' }, h('button', { type: 'button', class: 'link-btn', id: 'toSignIn', onclick: () => dlg.close('signin') }, '¿Ya tienes cuenta? Inicia sesión'))
         : null,
+      consentLine(),
     ],
     actions: [{ label: 'Crear cuenta', value: 'ok', variant: 'btn--gold btn--xl', primary: true, validate: async () => { accRec = await acc.validate(); return !!accRec; } }],
     onOpen: acc.focus,
