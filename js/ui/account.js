@@ -63,6 +63,10 @@ async function otherAccountFlow() {
     ],
   });
   if (res !== 'wipe') return false;
+  // (v4.3) Su lugar en el ranking también se borra del servidor: si no, el nombre quedaba atrapado
+  // en una sesión que ya nadie puede usar (y esa persona no podía volver a llamarse así)
+  // (una sesión con correo no se toca: el nombre sigue siendo de esa cuenta y se recupera entrando)
+  if (BOARD.load().anon) { try { await BOARD.deleteData(); } catch { /* sin internet: lo limpia el servidor con el tiempo */ } }
   store.wipe({ final: true });
   return reloadApp();
 }

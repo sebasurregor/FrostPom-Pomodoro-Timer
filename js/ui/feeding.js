@@ -10,7 +10,9 @@ import * as P from '../pet.js';
 import * as FX from './effects.js';
 import { $, h, fmtInt } from './dom.js';
 import { toast, openDialog } from './feedback.js';
-import { say } from './companions.js';
+import { say, companion } from './companions.js';
+import * as C from '../catalog.js';
+import { closeSheet } from './sheets.js';
 import { state, mutate } from './context.js';
 import { setEating, EATING_MS, buddySays } from './focus.js';
 import { pic } from './pics.js';
@@ -20,6 +22,7 @@ const tray = () => $('#foodTray');
 export const trayOpen = () => !tray().hidden;
 
 export function openTray() {
+  closeSheet({ restore: false }); // (v4.3) en el celular, la tienda y la duración no se abren a la vez
   tray().hidden = false;
   $('#shopBtn').setAttribute('aria-expanded', 'true');
   renderTray();
@@ -66,6 +69,30 @@ export function renderShopBtn() {
   if (trayOpen()) renderTray();
 }
 
+/** (v4.3) Tus compañeros desbloqueados, para cambiar de compañero desde la tienda. */
+function renderPetPicker(current) {
+  const { achievements, gifted } = state.progress;
+  const mine = C.COMPANIONS.filter((c) => C.companionUnlocked(c.id, achievements, gifted));
+  const box = $('#trayPets');
+  box.hidden = mine.length < 2; // con un solo compañero no hay nada que elegir
+  box.replaceChildren(...mine.map((c) => {
+    const dead = P.isDead(state, c.id);
+    const name = P.petName(state, c.id);
+    const label = `${name || c.name}${dead ? ` (${tr('se murió de hambre')})` : ''}`;
+    return h('button', {
+      type: 'button', class: `tray-pet${c.id === current ? ' is-current' : ''}${dead ? ' is-dead' : ''}`, 'data-id': c.id,
+      'aria-pressed': String(c.id === current), 'aria-label': label, title: label,
+      onclick: () => {
+        if (c.id === current) return;
+        mutate((s) => E.equipCompanion(s, c.id));
+        buddySays();
+      },
+    }, dead
+      ? h('img', { src: 'assets/sprites/tumba.webp', width: '44', height: '44', alt: '', decoding: 'async' })
+      : companion(c.id, { size: 44 }));
+  }));
+}
+
 /** Cuánto le falta para morirse, en palabras ("2 días", "5 horas"). */
 function timeLeft(hours) {
   const h = Math.max(1, Math.ceil(hours));
@@ -84,6 +111,7 @@ export function renderTray() {
   const m = P.mood(full, st);
   const isFull = full >= P.FULL_AT;
   const label = petLabel(petId);
+  renderPetPicker(petId);
   $('#h-tray').textContent = st.dead ? t('Revive a {pet}', { pet: label }) : t('Dale de comer a {pet}', { pet: label });
   $('#trayNameBtn').setAttribute('aria-label', P.petName(state, petId) ? tr('Cambiar el nombre de tu compañero') : tr('Ponle nombre a tu compañero'));
   $('#trayPct').textContent = `${pct} %`;
@@ -284,6 +312,9 @@ export function bindFeeding() {
   $('#shopBtn').addEventListener('click', toggleTray);
   $('#trayClose').addEventListener('click', () => { closeTray(); $('#shopBtn').focus(); });
   $('#trayNameBtn').addEventListener('click', nameFlow);
+  document.addEventListener('frostpom:sheet-open', () => { if (trayOpen()) closeTray(); });
+  // (v4.3) Al ir a otra pantalla la tienda se cierra (si no, al volver tapaba los botones de abajo)
+  window.addEventListener('hashchange', () => { if (trayOpen()) closeTray(); });
   $('#reviveBtn').addEventListener('click', revive);
   // Tocar la tumba abre la tienda (ahí se revive); tocar al compañero lo hace hablar
   $('#buddy').addEventListener('click', () => {

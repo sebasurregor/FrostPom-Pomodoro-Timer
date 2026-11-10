@@ -152,6 +152,7 @@ with sync_playwright() as p:
     check(pg.evaluate("document.querySelector('#board').getAttribute('start')") == '4', 'la tabla sigue desde el 4.º puesto')
     check('se reinicia el' in pg.inner_text('#boardNotice') and '4 h' in pg.inner_text('#boardNotice'), 'avisa cuándo se reinicia la semana y el máximo de 4 h al día')
     check(not pg.is_visible('.soon'), 'ya no aparece "El ranking global llega pronto"')
+    check(pg.is_visible('#boardOk') and 'suman en el ranking' in pg.inner_text('#boardOk'), '(v4.3) el ranking confirma que tus pomodoros suman desde este dispositivo')
     pg.screenshot(path=OUT + '/ranking.png', full_page=True)
 
     # Cambiar el nombre: también en el ranking (y no se puede tomar uno ocupado)

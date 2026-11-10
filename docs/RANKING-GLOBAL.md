@@ -137,6 +137,51 @@ Si una palabra se repite mucho, agrégala a la lista `BLOCKED` de `js/identity.j
 
 ---
 
+## Paso 6b. Un nombre quedó atrapado en otra sesión (v4.3)
+
+**Cómo se nota:** alguien entra con su correo y el ranking dice "Todavía no estás en el ranking global"; al tocar **Unirme ahora**, la app dice que su nombre ya está en el ranking y le pide otro. Además, su propio nombre aparece en la lista con el **⋯** de "otra persona". En la consola sale `set_profile 409 (Conflict)`.
+
+**Por qué pasa:** ese nombre se guardó en el ranking con **otra sesión**. Puede ser una sesión anónima (de antes de entrar con correo, o de un equipo donde se usó FrostPom sin correo y luego se borró la cuenta del equipo), o una que la app creó sola cuando la sesión de la cuenta en línea se cerró (hasta la v4.2.1, al cerrar sesión en un equipo Supabase cerraba la sesión en **todos**). Desde la v4.3: cerrar sesión cierra solo la de ese equipo, si la sesión se cierra la app pide volver a entrar (y no inventa otra) y al borrar una cuenta del equipo también se borra su lugar en el ranking.
+
+**Cómo arreglarlo** (Supabase → **SQL Editor**):
+
+1. Mira de quién es el nombre:
+   ```sql
+   select * from private.who_has_name('el_nombre');
+   ```
+   Si `anonymous` es `true`, está en una sesión anónima. Si tiene un correo, es de otra cuenta con correo: asegúrate de que esa también es de la misma persona antes de seguir.
+2. Pásalo a la cuenta con correo (conserva los minutos de la semana y de la temporada):
+   ```sql
+   select private.move_name('el_nombre', 'correo-de-la-persona@ejemplo.com');
+   ```
+   Responde `Listo: …`. Si esa cuenta ya tenía otro nombre en el ranking, se queda con este y se suman los minutos.
+3. La persona abre FrostPom (o recarga la página) y entra al Ranking: aparece sola, con su nombre.
+
+Solo tú (el dueño, en el SQL Editor) puedes usar estas dos funciones. La app le dice a la persona que te escriba a `startupprometeus@gmail.com` si el nombre es suyo.
+
+## Paso 6c. "Estudio y no me suman los minutos" (v4.3)
+
+Primero, que la persona abra **Ranking** en su app (con la v4.3): si todo está bien dice **"✓ Tus pomodoros con internet suman en el ranking desde este dispositivo"**. Si no, la tarjeta de arriba dice por qué (por ejemplo, **"Tu sesión en línea se cerró"**, con el botón **Volver a entrar**). Además, al empezar un pomodoro que no va a contar, en **F12 → Consola** queda una línea que empieza por `[FrostPom]` con el motivo.
+
+Para ver qué pasó con sus últimos pomodoros (Supabase → **SQL Editor**):
+
+```sql
+select * from private.ranking_check('nombre_de_la_persona');
+```
+
+La primera fila dice si aparece en el ranking, si su cuenta es con correo o anónima y su zona horaria; la segunda, los minutos que le cuentan esta semana; y después sus últimos 15 pomodoros, cada uno con lo que pasó:
+
+| Dice | Qué significa |
+|---|---|
+| `Contó` | Todo bien: esos minutos están en el ranking. |
+| `Terminó, pero ese día ya llevaba el máximo (4 h)` | El tope diario: lo de más no cuenta. |
+| `En curso` | Lo está haciendo ahora. |
+| `Empezó, pero la app nunca avisó que terminó` | La app perdió la sesión o el internet al terminar (si vuelve a abrirla con internet, lo intenta otra vez). |
+| `No contó: duró menos de 1 minuto` | Muy corto. |
+| `No contó: lo saltó o reinició, …` | Lo saltó o reinició, empezó otro pomodoro antes de terminarlo (también en otro equipo: solo cuenta el último que se empezó) o lo terminó en otro equipo. |
+
+**Si no aparece ningún pomodoro reciente**, su app no le está avisando al servidor: casi siempre es que su sesión en línea se cerró (que entre a **Ajustes → Tu cuenta → Volver a entrar**, o abra la app con la v4.3, que lo pide sola), que eligió no aparecer en el ranking (Ajustes) o que empieza los pomodoros sin internet.
+
 ## Paso 7. Limpieza automática (recomendado)
 
 La política de privacidad promete que se borran las cuentas anónimas sin actividad en 90 días y las sesiones de hace más de 400 días. Para que pase solo, cada lunes:

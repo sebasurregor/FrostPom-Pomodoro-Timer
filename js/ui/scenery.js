@@ -12,6 +12,7 @@ import { svg as s } from './dom.js';
 import { walker, say } from './companions.js';
 import { localParts } from '../util.js';
 import { pickVoice } from '../voices.js';
+import { createSnow } from './snow.js';
 
 const lg = (id, stops, x2 = 0, y2 = 1) => s('linearGradient', { id, x1: 0, y1: 0, x2, y2 }, ...stops.map(([o, c, op]) => s('stop', { offset: o, 'stop-color': c, 'stop-opacity': op == null ? 1 : op })));
 
@@ -164,9 +165,8 @@ const WALKERS = [
   ['penguin', 'rtl', 58, -48],
   ['seal', 'rtl', 96, -70],
 ];
-const FLAKES = 150; // la nieve ligera usa 30, la media 80 y la fuerte todos
-
 let rootEl = null;
+let snow = null;
 export function mount(container) {
   rootEl = container;
   rootEl.replaceChildren(buildSvg());
@@ -188,25 +188,21 @@ export function mount(container) {
     w.append(hop);
     walkers.append(w);
   });
-  const flakes = document.createElement('div');
-  flakes.className = 'scenery__flakes';
-  for (let i = 0; i < FLAKES; i++) {
-    const f = document.createElement('span');
-    const layer = i % 3; // 0 = lejos (pequeños y lentos) … 2 = cerca (grandes y rápidos)
-    f.className = `flake flake--${layer}`;
-    f.style.setProperty('--x', `${(i * 37 + (i % 7) * 11) % 100}vw`);
-    f.style.setProperty('--d', `${(13 - layer * 3) + (i % 5) * 1.6}s`);
-    f.style.setProperty('--delay', `${-((i * 1.37) % 16)}s`);
-    f.style.setProperty('--s', `${2 + layer * 1.5 + (i % 2)}px`);
-    flakes.append(f);
-  }
-  rootEl.append(flakes, walkers);
+  rootEl.append(walkers);
   rootEl.dataset.weather = rootEl.dataset.weather || 'light';
+  // (v4.2.1) La nieve es un solo dibujo (snow.js); no se anima mientras la tapa la pantalla de
+  // entrada u otra ventana, ni mientras escribes en el celular (ver main.js: is-typing)
+  const html = document.documentElement;
+  snow = createSnow(rootEl, {
+    weather: rootEl.dataset.weather,
+    className: 'scenery__snow',
+    active: () => !html.classList.contains('gate-open') && !html.classList.contains('dlg-open') && !html.classList.contains('sheet-full') && !html.classList.contains('is-typing'),
+  });
 }
 
-/** Clima del paisaje: 'clear', 'light', 'medium' o 'heavy'. */
 export function setWeather(id) {
   if (rootEl) rootEl.dataset.weather = id;
+  if (snow) snow.setWeather(id);
 }
 
 // ---------- Onomatopeyas: de vez en cuando un animal dice algo ----------
@@ -248,6 +244,7 @@ export function setHealth(health, levelId) {
   const p = Math.max(0, Math.min(1, 1 - health));
   rootEl.style.setProperty('--p', p.toFixed(3));
   rootEl.dataset.level = levelId;
+  if (snow) snow.setDirty(levelId === 'contaminado' || levelId === 'critico'); // con contaminación cae ceniza
 }
 
 /** Fase del día según la hora local: amanecer, día, atardecer o noche. */

@@ -8,6 +8,7 @@
  *    cuenta) o, si es tuyo de otro equipo, se recupera con el correo.
  */
 import * as U from '../util.js';
+import { config } from '../config.js';
 import * as BOARD from '../board.js';
 import * as CLOUD from '../cloud.js';
 import * as SYNC from '../sync.js';
@@ -71,6 +72,23 @@ const profileFields = (username = state.account.username) => ({
 });
 const inBoard = () => BOARD.isJoined() && BOARD.joinedName() === (state.account && state.account.username);
 
+/**
+ * (v4.3) ¿Por qué este dispositivo NO está sumando tus pomodoros en el ranking? '' = sí suma.
+ * 'off' (sin ranking) · 'noaccount' · 'nobirth' · 'minor' · 'optout' (eligió no aparecer) ·
+ * 'nosession' (la sesión de la cuenta en línea se cerró) · 'notjoined'.
+ */
+export function boardBlocker() {
+  if (!BOARD.enabled()) return 'off';
+  const acc = state.account;
+  if (!acc) return 'noaccount';
+  if (!acc.online && !acc.birth) return 'nobirth';
+  if (!BOARD.eligible(acc)) return 'minor';
+  if (!state.settings.leaderboardOn) return 'optout';
+  if (acc.online && !BOARD.hasAccountSession()) return 'nosession';
+  if (!inBoard()) return 'notjoined';
+  return '';
+}
+
 /** Cambia el nombre de usuario en este dispositivo (cuenta, perfil y "mantener sesión"). */
 export function applyRename(username) {
   mutate((s) => { s.profile.nick = username; if (s.account) s.account.username = username; });
@@ -84,8 +102,11 @@ export function applyRename(username) {
  */
 export async function ensureJoined({ interactive = false } = {}) {
   if (!BOARD.eligible(state.account) || !state.settings.leaderboardOn) return null;
+  // (v4.3) Una cuenta en línea sin su sesión no se une con una sesión anónima nueva: antes eso
+  // hacía que el servidor dijera "ese nombre ya está ocupado" (por la misma persona)
+  if (state.account.online && !BOARD.hasAccountSession()) return { ok: false, kind: 'nosession' };
   if (inBoard()) return { ok: true };
-  const r = await BOARD.join(profileFields());
+  const r = await BOARD.join(profileFields(), { create: !state.account.online });
   if (r.ok) {
     if (!BOARD.load().noticed) {
       BOARD.markNoticed();
@@ -142,6 +163,7 @@ export async function joinDialog() {
 /** El nombre ya está en el ranking (o no está permitido): elegir otro o recuperarlo. */
 async function nameTakenFlow(kind) {
   const current = state.account.username;
+  const online = !!state.account.online; // ya entró con su correo: "recuperarlo con tu correo" no ayuda
   const name = h('input', { type: 'text', class: 'acc-input', id: 'boardName', maxlength: '20', autocomplete: 'username', autocapitalize: 'off', spellcheck: 'false', value: '' });
   const err = h('p', { class: 'form-error', role: 'alert' });
   let chosen = '';
@@ -149,13 +171,15 @@ async function nameTakenFlow(kind) {
     className: 'dlg--board',
     title: kind === 'name_taken' ? 'Ese nombre ya está en el ranking' : 'Elige otro nombre para el ranking',
     body: [
-      h('p', { class: 'dlg__text', text: kind === 'name_taken'
-        ? t('Otra persona del ranking global ya se llama {name}. Elige otro nombre de usuario: también cambiará en tu cuenta.', { name: current })
-        : t('El nombre {name} no está permitido en el ranking global. Elige otro: también cambiará en tu cuenta.', { name: current }) }),
+      h('p', { class: 'dlg__text', text: kind !== 'name_taken'
+        ? t('El nombre {name} no está permitido en el ranking global. Elige otro: también cambiará en tu cuenta.', { name: current })
+        // (v4.3) Con cuenta en línea, casi siempre es su propio nombre guardado en otra sesión
+        : online ? t('El nombre {name} está guardado en el ranking con otra sesión: por ejemplo, de un equipo donde usaste FrostPom sin entrar con tu correo. Si es tuyo, escríbenos a {mail} y lo pasamos a tu cuenta (conservas tus minutos). Mientras tanto, puedes elegir otro nombre.', { name: current, mail: config.supportEmail })
+          : t('Otra persona del ranking global ya se llama {name}. Elige otro nombre de usuario: también cambiará en tu cuenta.', { name: current }) }),
       h('label', { class: 'pin-label', for: 'boardName', text: 'Nuevo nombre de usuario' }), name,
       h('p', { class: 'acc-hint', text: '3 a 20 caracteres: letras, números, punto o guion bajo.' }),
       err,
-      kind === 'name_taken' && CLOUD.isConfigured()
+      kind === 'name_taken' && CLOUD.isConfigured() && !online
         ? h('p', { class: 'dlg__note' }, h('button', { type: 'button', class: 'link-btn', id: 'boardClaim', onclick: () => dlg.close('claim') }, '¿Es tuyo, de otro equipo? Recupéralo con tu correo'))
         : null,
     ],
@@ -271,17 +295,28 @@ export async function bootBoard() {
 // ---------------------------------------------------------------------
 // El temporizador avisa aquí
 // ---------------------------------------------------------------------
-const counting = () => BOARD.enabled() && state.account && BOARD.eligible(state.account) && state.settings.leaderboardOn && inBoard();
-let warnedOffline = '';
+let warnedDay = '';
+let warnedSession = false;
 
 /** Empezó un bloque de estudio. */
 export function onStudyStart(st) {
-  if (!counting()) return;
-  BOARD.startSession(st.sessionStartMs, st.durationSec).then((r) => {
-    if (!r.ok && r.kind === 'offline' && warnedOffline !== U.dateKey(new Date())) {
-      warnedOffline = U.dateKey(new Date());
-      toast('Sin conexión: este pomodoro no sumará en el ranking global, pero sí en tu progreso.', 'info', { ms: 6000 });
+  const why = boardBlocker();
+  if (why) {
+    // (v4.3) Queda escrito en F12 (Consola) por qué no cuenta, para poder revisarlo
+    if (!['off', 'noaccount', 'optout'].includes(why)) console.info(`[FrostPom] Este pomodoro no suma en el ranking global (${why}).`);
+    if (why === 'nosession' && !warnedSession) {
+      warnedSession = true;
+      toast('Tu sesión en línea se cerró: este pomodoro no sumará en el ranking. Vuelve a entrar en Ajustes → Tu cuenta.', 'warn', { ms: 8000 });
     }
+    return;
+  }
+  BOARD.startSession(st.sessionStartMs, st.durationSec).then((r) => {
+    if (r.ok || warnedDay === U.dateKey(new Date())) return;
+    warnedDay = U.dateKey(new Date());
+    if (r.kind === 'offline') toast('Sin conexión: este pomodoro no sumará en el ranking global, pero sí en tu progreso.', 'info', { ms: 6000 });
+    else if (r.kind === 'rate') toast('Empezaste muchos pomodoros seguidos: este no sumará en el ranking, pero sí en tu progreso.', 'info', { ms: 7000 });
+    else toast('No pudimos avisarle al ranking que empezaste: este pomodoro no sumará allí, pero sí en tu progreso.', 'info', { ms: 7000 });
+    changed();
   }).catch(() => {});
 }
 

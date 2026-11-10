@@ -45,6 +45,7 @@ from PIL import Image
 import os as _os, sys as _sys
 _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
 from _classic import classic, classic_text
+from _sheets import patch as sheets_patch  # (v4.3) en el celular, varias secciones se abren como ventana
 _img = Image.linear_gradient("L").resize((900, 600)).convert("RGB")  # con degradado: el zoom cambia la foto
 _exif = Image.Exif(); _exif[0x010F] = "TelefonoDePrueba"; _exif[0x8825] = {2: (6.0, 15.0, 0.0), 1: "N"}
 _img.save(FOTO, "JPEG", exif=_exif.tobytes())
@@ -62,7 +63,7 @@ with sync_playwright() as p:
     # color_scheme="dark": así lo ve quien tiene Windows o el teléfono en modo oscuro.
     ctx = browser.new_context(viewport={"width": 390, "height": 844}, timezone_id="America/Bogota", locale="es-CO", color_scheme="dark")
     ctx.route('**/js/config.js', classic)
-    pg = ctx.new_page()
+    pg = sheets_patch(ctx.new_page())
     errors = []
     pg.on("pageerror", lambda e: errors.append(str(e)))
     pg.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
@@ -76,8 +77,12 @@ with sync_playwright() as p:
     check(pg.evaluate("document.querySelector('#dlg .country-list').hidden"), "la lista de países empieza cerrada")
     check(pg.evaluate("!document.querySelector('#dlg button') || ![...document.querySelectorAll('#dlg button')].some(b => b.textContent.includes('Sugerir'))"), "ya no está el botón 'Sugerir uno'")
     check(pg.evaluate("!document.querySelector('#dlg .avatar-opt, #dlg .avatars')"), "el registro no tiene lista de emojis para elegir")
-    check(pg.evaluate("document.querySelectorAll('#gateScene .gate-flake').length >= 30 && getComputedStyle(document.querySelector('.gate-snow')).display !== 'none'"), "en la entrada cae una nevada suave")
+    pg.wait_for_timeout(400)
+    check(pg.evaluate("(() => { const c = document.querySelector('#gateScene canvas.gate-snow'); return !!c && Number(c.dataset.flakes) >= 30 && getComputedStyle(c).display !== 'none' && c.getContext('2d').getImageData(0, 0, c.width, c.height).data.some((v, i) => i % 4 === 3 && v > 0); })()"), "en la entrada cae una nevada suave (un solo dibujo)")
+    check(pg.evaluate("getComputedStyle(document.querySelector('.shell')).visibility === 'hidden' && getComputedStyle(document.querySelector('.scenery')).visibility === 'hidden'"), "con la entrada abierta, la app de abajo no se pinta (rendimiento)")
     check(pg.evaluate("document.querySelector('#gateScene').lastElementChild.classList.contains('gate-snow') && getComputedStyle(document.querySelector('.gate-scene__art'), '::after').content !== 'none'"), "la nieve va encima de la capa oscura de la entrada")
+    check(pg.evaluate("document.querySelector('.gate-scene__img').currentSrc.endsWith('artico-amigos-celular.webp') && getComputedStyle(document.querySelector('.campfire__tall')).display === 'block' && getComputedStyle(document.querySelector('.campfire__flame')).display === 'none'"), "celular de pie: la entrada usa el dibujo vertical, con su fogata animada")
+    check(pg.evaluate("document.querySelector('#dlg .dlg__box').getBoundingClientRect().bottom <= innerHeight * 0.5"), "celular: la ventana de entrada ocupa la mitad de arriba y deja ver el paisaje")
     pg.fill("#accUser", "putito99"); pg.fill("#accPass1", "Pingu2026"); pg.fill("#accPass2", "Pingu2026")
     pg.click("#dlg button:has-text('Crear cuenta')"); pg.wait_for_timeout(400)
     check(pg.evaluate("document.getElementById('dlg').open"), "un nombre ofensivo no se acepta")
@@ -299,6 +304,41 @@ with sync_playwright() as p:
     check(after["sessions"] == [] and after["daily"].get("2026-11-02", {}).get("studySec", 0) >= 3000, "se borra el historial detallado, pero el calendario se conserva")
     pg.click("#dlg button:has-text('Empezar la temporada')"); pg.clock.run_for(300)
 
+    # (v4.3) En el celular: menos paneles y más paisaje (las secciones se abren como ventana)
+    pg.goto(URL + "#/enfocar"); pg.clock.run_for(400)
+    check(pg.evaluate("getComputedStyle(document.getElementById('durationPanel')).display === 'none' && getComputedStyle(document.getElementById('durationChip')).display !== 'none'"), "celular: la duración es un botón pequeño, no un panel")
+    check("·" in pg.inner_text("#durationChipText"), f"el botón dice el modo y sus minutos ({pg.inner_text('#durationChipText')})")
+    if pg.get_attribute("#ring", "data-mode") != "study":
+        pg.click("#skipBtn") if pg.is_visible("#skipBtn") else None; pg.clock.run_for(300)
+    check(pg.get_attribute("#ring", "data-mode") == "study" and pg.evaluate("getComputedStyle(document.querySelector('.controls__row')).display === 'none'"), "sin un pomodoro en curso no se ven Terminar, Saltar ni Reiniciar")
+    pg.click("#durationChip"); pg.clock.run_for(300)
+    check(pg.evaluate("document.getElementById('durationPanel').classList.contains('is-open') && document.getElementById('durationChip').getAttribute('aria-expanded') === 'true'"), "al tocarlo se abre la duración abajo")
+    pg.click('#durationPanel .preset[data-preset="clasico"]'); pg.clock.run_for(300)
+    check(pg.evaluate("!document.getElementById('durationPanel').classList.contains('is-open')"), "al elegir un modo, la ventana se cierra sola")
+    pg.goto(URL + "#/perfil"); pg.clock.run_for(400)
+    tiles = pg.evaluate("[...document.querySelectorAll('#profileTiles .sheet-tile b')].map(b => b.textContent)")
+    check(tiles == ["Compañeros", "Temporadas", "Temas", "Logros"], f"Perfil: compañeros, temporadas, temas y logros son botones ({', '.join(tiles)})")
+    check(pg.evaluate("getComputedStyle(document.querySelector('[data-sheet=\"Logros\"]')).display === 'none'"), "los logros están escondidos hasta tocar su botón")
+    pg.click("#profileTiles .sheet-tile:has-text('Logros')"); pg.clock.run_for(300)
+    check(pg.evaluate("(() => { const s = document.querySelector('[data-sheet=\"Logros\"]'); const c = getComputedStyle(s); return s.classList.contains('is-open') && s.getAttribute('role') === 'dialog' && c.position === 'fixed' && parseFloat(c.top) < 20 && s.offsetHeight > 500 && document.documentElement.classList.contains('sheet-full'); })()"), "Logros se abre como ventana encima de todo")
+    pg.keyboard.press("Escape"); pg.clock.run_for(200)
+    check(pg.evaluate("!document.querySelector('[data-sheet].is-open') && document.activeElement.classList.contains('sheet-tile')"), "Escape la cierra y vuelve a su botón")
+    pg.goto(URL + "#/progreso"); pg.clock.run_for(400)
+    pg.click("#progTiles .sheet-tile:has-text('Tu estudio')"); pg.clock.run_for(400)
+    check(pg.evaluate("(() => { const s = document.querySelector('[data-sheet=\"Tu estudio\"]'); const c = getComputedStyle(s); return s.classList.contains('is-open') && c.position === 'fixed' && parseFloat(c.top) < 20 && s.offsetHeight > 600 && s.getBoundingClientRect().top < 40 && s.getBoundingClientRect().width >= innerWidth - 20; })()"), "Tu estudio se abre encima de todo (no queda atrapado en su sección)")
+    pg.click("[data-sheet='Tu estudio'] .sheet-close"); pg.clock.run_for(200)
+    check(pg.evaluate("!document.querySelector('[data-sheet].is-open') && !document.documentElement.classList.contains('sheet-open')"), "la × la cierra")
+    # (v4.3) El compañero se elige en la tienda de comida
+    pg.goto(URL + "#/enfocar"); pg.clock.run_for(400)
+    pg.click("#shopBtn"); pg.clock.run_for(300)
+    pets = pg.evaluate("[...document.querySelectorAll('#trayPets .tray-pet')].map(b => b.dataset.id)")
+    cur = state(pg)["profile"]["companion"]
+    other = next((x for x in pets if x != cur), None)
+    check(len(pets) >= 2 and cur in pets and pg.evaluate("!document.getElementById('trayPets').hidden"), f"la tienda muestra tus compañeros para elegir ({', '.join(pets)})")
+    pg.click(f'#trayPets .tray-pet[data-id="{other}"]'); pg.clock.run_for(300)
+    check(state(pg)["profile"]["companion"] == other and pg.get_attribute(f'#trayPets .tray-pet[data-id="{other}"]', "aria-pressed") == "true", "al tocar otro compañero, te acompaña ese")
+    pg.click("#trayClose"); pg.clock.run_for(200)
+
     # Sin conexión
     pg.reload(); pg.wait_for_timeout(800)
     ctx.set_offline(True)
@@ -310,6 +350,11 @@ with sync_playwright() as p:
     pg.goto(URL + "#/ajustes"); pg.clock.run_for(500)
     pg.click("#accDeleteBtn"); pg.clock.run_for(200)
     check("[object" not in pg.inner_text("#dlg"), "los diálogos no muestran texto '[object …]'")
+    # (v4.3) El ojito es nuestro (antes el de Edge desaparecía al salir del campo)
+    pg.fill("#delPass", "abc12345"); pg.click("#dlg .pass-eye"); pg.clock.run_for(100)
+    check(pg.get_attribute("#delPass", "type") == "text" and pg.get_attribute("#dlg .pass-eye", "aria-pressed") == "true", "el ojito muestra la contraseña")
+    pg.evaluate("document.activeElement.blur()"); pg.click("#dlg .pass-eye"); pg.clock.run_for(100)
+    check(pg.get_attribute("#delPass", "type") == "password" and pg.is_visible("#dlg .pass-eye"), "el ojito sigue ahí aunque el campo no tenga el foco, y la vuelve a ocultar")
     pg.fill("#delPass", "Otra2026x"); pg.click("#dlg button:has-text('Eliminar mi cuenta')"); pg.wait_for_timeout(1500)
     check(state(pg) is not None and pg.evaluate("document.getElementById('dlg').open"), "con una contraseña equivocada no se elimina nada")
     pg.fill("#delPass", "Pingu2026"); pg.click("#dlg button:has-text('Eliminar mi cuenta')"); pg.wait_for_timeout(1500); pg.clock.run_for(800)
@@ -339,7 +384,7 @@ with sync_playwright() as p:
     check(not pg4.evaluate("document.getElementById('dlg').open") and pg4.inner_text("#hudNick") == "zorrito.lector", "al volver a abrir la app no pide la contraseña")
     # v3.5: "El reloj me espera": al terminar el estudio, el descanso NO empieza solo
     pg4.goto(URL + "#/ajustes"); pg4.clock.run_for(400)
-    check(pg4.evaluate("document.getElementById('afterStudyAuto').checked"), "por defecto el descanso empieza solo")
+    check(pg4.evaluate("document.getElementById('afterStudyAuto').checked") and pg4.evaluate("!document.getElementById('setAuto')"), "por defecto lo siguiente empieza solo (y ya no está 'Volver a estudiar solo')")
     pg4.click("label:has(#afterStudyWait)"); pg4.clock.run_for(300)
     check(pg4.evaluate("JSON.parse(localStorage.getItem('st2_state')).settings.autoBreak") is False, "se puede elegir que el reloj espere")
     pg4.goto(URL + "#/enfocar"); pg4.clock.run_for(400)
@@ -366,7 +411,12 @@ with sync_playwright() as p:
     ctx2 = browser.new_context(viewport={"width": 1280, "height": 800}, reduced_motion="reduce", locale="es-CO")
     ctx2.route('**/js/config.js', classic)
     pg2 = ctx2.new_page()
-    pg2.goto(URL); pg2.wait_for_timeout(1200)
+    # (v4.2.1) con la pantalla de entrada abierta la app de abajo se queda quieta: se mira ya adentro
+    pg2.goto(URL)
+    pg2.evaluate("""() => { localStorage.setItem('st2_state', JSON.stringify({ v: 4, profile: { nick: 'pingu_prueba', avatar: '🐧', onboarded: true } }));
+      sessionStorage.setItem('st2_acc_later', '1'); localStorage.setItem('st2_motion_hint', '1');
+      localStorage.setItem('st2_board', JSON.stringify({ asked: true, noticed: true })); }""")
+    pg2.reload(); pg2.wait_for_timeout(1200)
     pos = lambda: pg2.evaluate("[...document.querySelectorAll('.walker')].map(w => Math.round(w.getBoundingClientRect().left))")
     a = pos(); pg2.wait_for_timeout(1200); b = pos()
     check(a != b, "con 'reducir movimiento' del sistema, los animales igual caminan")

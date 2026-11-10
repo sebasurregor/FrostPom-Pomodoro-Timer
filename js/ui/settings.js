@@ -78,7 +78,6 @@ function renderSaveStatus() {
 
 /** Interruptores que guardan un ajuste booleano, y qué hacer después (opcional). */
 const TOGGLES = [
-  ['#setAuto', 'autoContinue'],
   ['#setSound', 'sound', (on) => { if (on) { FX.setPrefs({ sound: true }); FX.sfx.start(); } }],
   ['#setVibrate', 'vibrate', (on) => { if (on) FX.buzz(40); }],
   ['#setAwake', 'keepAwake', (on) => wakeLock(on && session.running)],
@@ -133,8 +132,8 @@ export function bindSettings() {
   $$('input[name="afterStudy"]').forEach((r) => r.addEventListener('change', (e) => {
     if (!e.target.checked) return;
     const auto = e.target.value === 'auto';
-    mutate((s) => { s.settings.autoBreak = auto; });
-    toast(auto ? 'Al terminar de estudiar, el descanso empezará solo.' : 'Al terminar de estudiar, el reloj te esperará para empezar el descanso.', 'good');
+    mutate((s) => { s.settings.autoBreak = auto; s.settings.autoContinue = auto; }); // (v4.3) un solo ajuste para los dos
+    toast(auto ? 'Al terminar el estudio o el descanso, lo siguiente empezará solo.' : 'Al terminar el estudio o el descanso, el reloj te esperará.', 'good');
   }));
   $('#setRemember').addEventListener('change', async (e) => {
     if (e.target.checked) {

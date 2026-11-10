@@ -1,5 +1,35 @@
 # Cambios de la v2 a la v3
 
+## v4.3: más paisaje en el celular (y el ranking que no sumaba)
+
+El autor vio en su Android que casi no se veía el paisaje (muchos paneles encima) y que en la pantalla de entrar "no se veía nada". Además, un amigo estudiaba y sus minutos no llegaban al ranking.
+
+- **Celular: menos paneles, más paisaje** (`js/ui/sheets.js`). En pantallas de menos de 900 px, varias secciones se esconden y en su lugar hay un botón; al tocarlo, la sección se abre encima como una ventana, con una **×** (también se cierra con Escape, con el botón atrás de Android y al cambiar de pantalla): **Duración** (un botón pequeño junto a Silencio que dice el modo, por ejemplo "Clásico · 25 + 5", y abre los modos abajo), **Tu estudio** e **Historial** (en Progreso) y **Compañeros**, **Temporadas**, **Temas** y **Logros** (en Perfil, cada botón con su dato: "1 de 5", "0 de 18"…). Enfocar queda con el reloj, tu compañero, el botón y dos botoncitos; sin un pomodoro en curso no se ven Terminar, Saltar ni Reiniciar; la barra de arriba es más delgada. En celulares bajitos el reloj se achica un poco. En el computador todo se ve como antes.
+- **Entrar y crear cuenta en el celular:** un **dibujo vertical nuevo** del autor (la aurora, los animales y la fogata), con la fogata animada como en el computador (la llama y su centro se recortaron del dibujo: `tools/preparar_fondo_celular.py`). La ventana va arriba, es más pequeña y compacta (los dos botones lado a lado) y debajo se ven la aurora y los animales; si el formulario es largo, se desliza por dentro.
+- **El compañero se elige en la tienda de comida** (arriba de la bandeja salen tus compañeros; tócalo y te acompaña ese). También se puede desde Perfil → Compañeros.
+- **Un solo ajuste en vez de dos:** "Volver a estudiar solo" se quitó. Ahora "Al terminar el estudio o el descanso" tiene dos opciones: **Lo siguiente empieza solo** o **El reloj me espera**, para el estudio y para el descanso.
+- **El ojito de la contraseña es de la app:** el de Edge desaparecía al salir del campo y había que borrar todo para que volviera (al crear la cuenta, no se podía revisar la primera contraseña desde "Repite la contraseña"). Ahora cada campo de contraseña tiene su ojito siempre.
+- **Ranking: los minutos que no sumaban.**
+  - *Cerrar sesión cerraba la sesión en todos los equipos* (así funciona Supabase si no se le dice otra cosa). En el otro equipo la app seguía como si nada, pero ya no guardaba el progreso ni sumaba en el ranking. Ahora "Cerrar sesión" cierra solo la de ese equipo (`/logout?scope=local`).
+  - *Si la sesión de la cuenta en línea se cierra*, al abrir la app pide la contraseña ("Vuelve a entrar a tu cuenta"); antes solo lo decía Ajustes. Y ya no crea una sesión anónima para el ranking (con ella el servidor decía "ese nombre ya está ocupado", por la misma persona). Al volver a entrar, sigue en el ranking con su nombre.
+  - *Se nota si suma:* el Ranking dice "✓ Tus pomodoros con internet suman en el ranking desde este dispositivo" o, si no, por qué y cómo arreglarlo. Si el servidor no anota un pomodoro, avisa (una vez al día) y queda una línea `[FrostPom]` en F12 → Consola.
+  - Ya no aparece "El ranking global llega pronto" cuando el servidor falla: dice "No pudimos cargar…".
+  - *Para el dueño* (`schema.sql`, hay que correrlo en Supabase): `private.ranking_check('nombre')` dice qué pasó con los últimos pomodoros de alguien, en palabras simples; `private.who_has_name` y `private.move_name` pasan un nombre atrapado en otra sesión a la cuenta con correo. Paso a paso en `docs/RANKING-GLOBAL.md` (pasos 6b y 6c).
+  - "Borrar y usar otra cuenta" (cuenta solo del equipo) también borra su lugar en el ranking, para que el nombre no quede atrapado.
+- **Otros arreglos:** la tienda de comida se cierra al cambiar de pantalla (al volver tapaba los botones de abajo).
+- **Pruebas:** comprobaciones nuevas en `e2e_smoke.py` (ventanas del celular, ojito, elegir compañero en la tienda, entrada vertical), `e2e_cuentas.py` (cerrar sesión en un equipo no cierra el otro; si la sesión se cierra, pide volver a entrar sin crear una anónima) y `e2e_ranking.py`; `tests/_sheets.py` abre sola la ventana donde está lo que una prueba va a tocar. 4 pruebas nuevas del servidor (41 en total). Las capturas de Google Play se volvieron a generar.
+
+## v4.2.1: rápida en el celular
+
+El autor probó la app en su Android y se sentía lenta, sobre todo en la pantalla de entrar: hasta el teclado tardaba en poner las letras. Midiendo con el procesador 4 veces más lento (como un celular de gama media), la pantalla de entrada tenía el procesador ocupado más de la mitad del tiempo y la nevada fuerte de adentro, dos terceras partes. Las causas y lo que se hizo:
+
+- **La nieve, en un solo dibujo** (`js/ui/snow.js`, `<canvas>`): antes cada copo era un elemento con su propia animación (hasta 150 en el paisaje y 40 con dos animaciones cada uno en la entrada) y el navegador recalculaba cada uno en cada cuadro. Ahora un solo dibujo se repinta unas 30 veces por segundo, con las mismas tres profundidades, el balanceo, el viento según el clima y la ceniza gris con contaminación. Se detiene sola cuando no se ve.
+- **Con la pantalla de entrada abierta, la app de abajo no se pinta ni se anima** (antes seguía animándose aunque estuviera tapada). Lo mismo con cualquier ventana abierta: el paisaje borroso de atrás se queda quieto.
+- **La fogata de la entrada** era un dibujo del tamaño de toda la pantalla que se volvía a pintar en cada cuadro. Ahora la llama, el centro, el brillo y las chispas son capas pequeñas que se mueven sin repintar (se ve igual: posiciones en % sobre el dibujo de 1920 × 1072).
+- **Lo que no se ve no se anima:** la fogata del paisaje (con el oso y el zorro) y la luz del iglú solo de noche; el humo de la fábrica y el petróleo solo con contaminación; 2 ráfagas de viento con buen tiempo (las 5 con nevada).
+- **Mientras escribes en el celular**, el paisaje, la fogata y la nieve se quedan quietos y vuelven a moverse 2 segundos después de la última tecla (`html.is-typing`, `main.js → watchTyping`).
+- Resultado medido (procesador 4 veces más lento): pantalla de entrada de ~530 a ~180 ms de trabajo por segundo (~50 mientras escribes); nevada fuerte adentro de ~650 a ~300.
+
 ## v4.2: tu compañero siente hambre (y tiene nombre)
 
 - **Corazones en bucle al comer (arreglo):** la animación de "salto" se aplicaba al mismo dibujo del pingüino y tapaba su animación de corazones: se quedaba en el primer cuadro. Ahora el salto va en una envoltura (`.buddy__body`) y los corazones hacen el ciclo completo una y otra vez mientras come (3,6 s, dos vueltas). El zorro, la foca y el tiburón estrenan sus corazones (4 cuadros); el oso polar salta contento (todavía no tiene animación de corazones).

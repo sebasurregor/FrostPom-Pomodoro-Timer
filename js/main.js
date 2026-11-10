@@ -30,6 +30,7 @@ import { onboarding, loginGate, createAccountFlow } from './ui/account.js';
 import { t, translateDom, isEnglish } from './i18n.js';
 import { applyTheme } from './ui/theme.js';
 import { mountGateSnow } from './ui/gate-snow.js';
+import { initSheets, renderSheetTiles } from './ui/sheets.js';
 import { bootBoard } from './ui/board-ui.js';
 import { bootCloud } from './ui/cloud-ui.js';
 import { initNative, isNative } from './ui/native-ui.js';
@@ -59,6 +60,7 @@ function renderAll() {
   renderTimer();
   renderShopBtn();
   if (currentRoute) VIEWS[currentRoute]();
+  renderSheetTiles(); // (v4.3) los botones de las secciones que en el celular se abren como ventana
 }
 
 // =====================================================================
@@ -82,6 +84,7 @@ function route(fromUser) {
   }
   document.body.dataset.route = r;
   VIEWS[r]();
+  renderSheetTiles();
   if (fromUser) {
     $('#main').focus({ preventScroll: true });
     window.scrollTo({ top: 0 });
@@ -166,6 +169,27 @@ function checkNewDay() {
 }
 
 /**
+ * (v4.2.1) En el celular, mientras escribes en un campo, el paisaje, la fogata y la nieve se quedan
+ * quietos: así el teclado responde al instante (en celulares sencillos las animaciones lo frenaban).
+ * Vuelven a moverse 2 segundos después de la última tecla (o al salir del campo).
+ */
+function watchTyping() {
+  if (!window.matchMedia || !window.matchMedia('(pointer: coarse)').matches) return;
+  const html = document.documentElement;
+  let timer = 0;
+  const stop = () => { clearTimeout(timer); html.classList.remove('is-typing'); };
+  const typing = (e) => {
+    if (!e.target || !e.target.matches || !e.target.matches('input, textarea')) return;
+    html.classList.add('is-typing');
+    clearTimeout(timer);
+    timer = setTimeout(stop, 2000);
+  };
+  document.addEventListener('keydown', typing, true);
+  document.addEventListener('input', typing, true);
+  document.addEventListener('focusout', stop, true);
+}
+
+/**
  * (v4.2) Tu mascota: ordena sus registros (la que no está contigo descansa), vuelve a pintar su
  * cara (el hambre cambia con el tiempo) y, si se murió, lo avisa una sola vez.
  */
@@ -210,6 +234,8 @@ async function greet() {
 function boot() {
   translateDom(); // textos fijos del HTML en el idioma elegido (antes de pintar)
   mountGateSnow(); // nevada suave de la pantalla de entrada
+  watchTyping(); // en el celular, el paisaje se queda quieto mientras escribes
+  initSheets(); // (v4.3) en el celular, varias secciones se abren como ventana
   configure({ render: renderAll, play });
   initNative(); // solo dentro de la app de Android: botón atrás, avisos, vibración
   bindHUD();

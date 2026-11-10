@@ -1,6 +1,7 @@
 /*
  * FrostPom — avisos: toasts, notificaciones del sistema y diálogos (uno a la vez).
  */
+import { enhancePasswords } from './password.js';
 import { $, h, svg } from './dom.js';
 import { tr } from '../i18n.js';
 
@@ -57,6 +58,8 @@ export function openDialog({ title, body = [], actions = [], className = '', dis
     dlg.className = `dlg ${className}`;
     // Entrar / crear cuenta: detrás se ve el paisaje del ártico con la fogata (no la app)
     if (/\bdlg--gate\b/.test(className)) document.documentElement.classList.add('gate-open');
+    // (v4.2.1) Con una ventana abierta, el paisaje de atrás (borroso) se queda quieto: el celular descansa
+    document.documentElement.classList.add('dlg-open');
     dlg.replaceChildren(
       h('div', { class: `dlg__box${back ? ' dlg__box--back' : ''}` },
         back ? h('button', { type: 'button', class: 'dlg__back', id: 'dlgBack', 'aria-label': 'Volver', title: 'Volver', onclick: () => dlg.close(back) }, backArrow()) : null,
@@ -76,9 +79,10 @@ export function openDialog({ title, body = [], actions = [], className = '', dis
     dlg.addEventListener('close', () => {
       dlg.removeEventListener('cancel', onCancel);
       // Si enseguida se abre otro diálogo (por ejemplo, la foto después del registro), el paisaje sigue
-      setTimeout(() => { if (!dlg.open) document.documentElement.classList.remove('gate-open'); }, 150);
+      setTimeout(() => { if (!dlg.open) document.documentElement.classList.remove('gate-open', 'dlg-open'); }, 150);
       resolve(dlg.returnValue || 'cancel');
     }, { once: true });
+    enhancePasswords(dlg); // (v4.3) el ojo para ver la contraseña, en todos los campos
     dlg.returnValue = '';
     dlg.showModal();
     if (onOpen) onOpen(dlg);

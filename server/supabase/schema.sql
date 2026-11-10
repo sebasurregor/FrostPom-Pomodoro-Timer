@@ -658,6 +658,113 @@ language sql stable security definer set search_path = '' as $$
    order by count(*) desc, max(r.created_at) desc
 $$;
 
+-- (v4.3) Un nombre del ranking quedó guardado en otra sesión (por ejemplo, la cuenta anónima de un
+-- equipo donde nunca entraste con tu correo) y tu cuenta con correo ya no puede usarlo: la app dice
+-- "Ese nombre ya está en el ranking". Primero mira de quién es; si es tuyo, pásalo a tu cuenta:
+--   select * from private.who_has_name('nombre');
+--   select private.move_name('nombre', 'tu-correo@ejemplo.com');
+-- Si la cuenta de destino tenía otro nombre en el ranking, se queda con ESTE y se suman los minutos.
+-- La sesión anónima de origen se borra; una de origen con correo sigue existiendo (sin ese nombre).
+create or replace function private.who_has_name(p_username text)
+returns table (username text, email text, anonymous boolean, created_at timestamptz, last_active timestamptz)
+language sql stable security definer set search_path = '' as $$
+  select p.username, u.email::text, coalesce(u.is_anonymous, false), p.created_at, p.last_active
+    from private.profiles p
+    join auth.users u on u.id = p.user_id
+   where lower(p.username) = lower(btrim(p_username))
+$$;
+
+create or replace function private.move_name(p_username text, p_email text)
+returns text
+language plpgsql security definer set search_path = '' as $$
+declare
+  src      uuid;
+  dst      uuid;
+  v_name   text;
+  was_anon boolean;
+begin
+  select p.user_id, p.username into src, v_name
+    from private.profiles p where lower(p.username) = lower(btrim(p_username));
+  if src is null then
+    raise exception 'No hay nadie en el ranking con el nombre %', p_username;
+  end if;
+  select u.id into dst from auth.users u
+   where lower(u.email) = lower(btrim(p_email)) and not coalesce(u.is_anonymous, false);
+  if dst is null then
+    raise exception 'No hay ninguna cuenta con el correo %', p_email;
+  end if;
+  if src = dst then
+    return format('%s ya es de %s: no hubo que mover nada.', v_name, p_email);
+  end if;
+  select coalesce(u.is_anonymous, false) into was_anon from auth.users u where u.id = src;
+  update private.study_sessions set status = 'abandoned', finished_at = now()
+   where user_id in (src, dst) and status = 'active';
+  if not exists (select 1 from private.profiles where user_id = dst) then
+    -- El perfil (nombre, minutos, todo) pasa tal cual a tu cuenta
+    update private.profiles set user_id = dst where user_id = src;
+  else
+    -- Tu cuenta ya tenía otro nombre: se queda con este y se suman los minutos
+    update private.study_sessions set user_id = dst where user_id = src;
+    insert into private.daily_totals as dt (user_id, day, credited_sec, sessions)
+    select dst, d.day, d.credited_sec, d.sessions from private.daily_totals d where d.user_id = src
+    on conflict (user_id, day) do update
+      set credited_sec = least(dt.credited_sec + excluded.credited_sec, private.board_daily_cap_sec()),
+          sessions = dt.sessions + excluded.sessions;
+    delete from private.profiles where user_id = src;
+    update private.profiles set username = v_name where user_id = dst;
+  end if;
+  delete from auth.users where id = src and coalesce(is_anonymous, false);
+  return format('Listo: %s ahora es de %s%s.', v_name, p_email,
+    case when was_anon then ' (estaba en una sesión anónima, que se borró)'
+         else ' (estaba en otra cuenta con correo, que sigue existiendo sin ese nombre)' end);
+end $$;
+
+-- (v4.3) "Mis pomodoros no suman en el ranking": muestra qué pasó con los últimos pomodoros de
+-- esa persona, en palabras simples. Ejemplo (en el SQL Editor de Supabase):
+--   select * from private.ranking_check('nombre');
+-- Si no aparece NINGÚN pomodoro reciente, la app de esa persona no le está avisando al servidor
+-- (por ejemplo, su sesión en línea se cerró: debe volver a entrar en Ajustes → Tu cuenta).
+create or replace function private.ranking_check(p_username text)
+returns table (cuando timestamptz, que_paso text, minutos int)
+language plpgsql stable security definer set search_path = '' as $$
+declare
+  p    private.profiles%rowtype;
+  anon boolean;
+begin
+  select * into p from private.profiles pr where lower(pr.username) = lower(btrim(p_username));
+  if not found then
+    return query select null::timestamptz, 'No hay nadie en el ranking con ese nombre'::text, null::int;
+    return;
+  end if;
+  select coalesce(u.is_anonymous, false) into anon from auth.users u where u.id = p.user_id;
+  return query select p.last_active,
+    (case when p.hidden then 'Escondido por moderación (no aparece)'
+          when not p.show_on_board then 'Eligió no aparecer en el ranking (Ajustes)'
+          else 'Aparece en el ranking' end)
+    || ' · cuenta ' || (case when anon then 'anónima (sin correo)' else 'con correo' end)
+    || ' · zona horaria ' || p.time_zone || ' · última actividad (fecha de la izquierda)',
+    null::int;
+  return query select private.week_start(), 'Minutos que le cuentan esta semana'::text,
+    (coalesce(sum(s.credited_sec), 0) / 60)::int
+    from private.study_sessions s
+   where s.user_id = p.user_id and s.status = 'done' and s.finished_at >= private.week_start();
+  return query
+  select s.started_at,
+    case
+      when s.status = 'done' and s.credited_sec > 0 then 'Contó'
+      when s.status = 'done' then 'Terminó, pero ese día ya llevaba el máximo (4 h)'
+      when s.status = 'active' and now() < s.started_at + make_interval(secs => s.planned_sec + 600) then 'En curso'
+      when s.status = 'active' then 'Empezó, pero la app nunca avisó que terminó'
+      when s.finished_at < s.started_at + interval '65 seconds' then 'No contó: duró menos de 1 minuto'
+      else 'No contó: lo saltó o reinició, empezó otro antes de terminarlo, o lo terminó en otro equipo'
+    end,
+    s.credited_sec / 60
+    from private.study_sessions s
+   where s.user_id = p.user_id
+   order by s.started_at desc
+   limit 15;
+end $$;
+
 -- Limpieza: borra cuentas anónimas sin actividad en p_days días (y las que nunca se unieron
 -- después de 7 días), y sesiones de hace más de 400 días. Ejemplo: select * from private.cleanup(90);
 create or replace function private.cleanup(p_days int default 90)

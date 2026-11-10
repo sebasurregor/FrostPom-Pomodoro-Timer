@@ -18,7 +18,8 @@ import { seasonFor } from '../season.js';
 import { $, $$, h } from './dom.js';
 import { emblem } from './emblems.js';
 import { avatarContent, flagEl } from './widgets.js';
-import { joinDialog, ensureJoined, onBoardToggle } from './board-ui.js';
+import { joinDialog, ensureJoined, onBoardToggle, boardBlocker } from './board-ui.js';
+import { reconnectFlow } from './cloud-ui.js';
 import { openDialog, toast } from './feedback.js';
 import { state, store, mutate } from './context.js';
 import { t, tr, locale } from '../i18n.js';
@@ -194,11 +195,16 @@ function statusCard() {
     return card('No apareces en el ranking', 'Elegiste no aparecer. Tus pomodoros no se envían al servidor.',
       h('button', { type: 'button', class: 'btn btn--paper', id: 'boardBackBtn', onclick: async () => { mutate((s) => { s.settings.leaderboardOn = true; }); await onBoardToggle(true); renderRanking(); } }, 'Volver a aparecer'));
   }
+  if (boardBlocker() === 'nosession') {
+    return card('Tu sesión en línea se cerró', 'Por eso tus pomodoros no están sumando en el ranking (y tu progreso no se está guardando en tu cuenta). Vuelve a entrar con tu contraseña para arreglarlo.',
+      h('button', { type: 'button', class: 'btn btn--gold', id: 'boardReconnect', onclick: () => reconnectFlow().then(renderRanking) }, 'Volver a entrar'));
+  }
   if (!BOARD.isJoined() || BOARD.joinedName() !== acc.username) {
-    return card('Todavía no estás en el ranking global', 'Necesitas internet para unirte. Tus pomodoros empiezan a contar desde que te unas.',
+    return card('Todavía no estás en el ranking global', 'Toca «Unirme ahora» para aparecer (necesitas internet). Tus pomodoros empiezan a contar desde que te unas.',
       h('button', { type: 'button', class: 'btn btn--gold', id: 'boardRetryJoin', onclick: () => ensureJoined({ interactive: true }).then(renderRanking) }, 'Unirme ahora'));
   }
-  return null;
+  // (v4.3) Todo en orden: se dice, para que nadie se quede con la duda
+  return h('p', { class: 'board-ok', id: 'boardOk', text: tr('✓ Tus pomodoros con internet suman en el ranking desde este dispositivo.') });
 }
 
 /** Ranking global (modo "remote"). */
@@ -216,7 +222,9 @@ async function renderGlobal(mine, { you, season }) {
   } catch (e) {
     if (mine !== token) return;
     $('#board').removeAttribute('aria-busy');
-    if (e.kind === 'notready') return renderLocal({ you, season, rows: await getProvider({}).fetchBoard({ period, you }) }); // el servidor aún no está montado
+    // (v4.3) Ya no se muestra "llega pronto" aquí: el ranking ya existe; si el servidor no responde
+    // la función (por ejemplo, falta correr el SQL nuevo), se dice que no se pudo cargar.
+    if (e.kind === 'notready') console.warn('[FrostPom] El servidor no tiene la función del ranking (get_leaderboard). Revisa que corriste server/supabase/schema.sql.');
     $('#boardNotice').textContent = e.kind === 'offline'
       ? tr('No pudimos cargar el ranking global: no hay conexión. Esta es tu marca en este dispositivo.')
       : tr('No pudimos cargar el ranking global en este momento. Esta es tu marca en este dispositivo.');

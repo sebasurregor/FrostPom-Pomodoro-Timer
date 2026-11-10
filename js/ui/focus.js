@@ -11,6 +11,7 @@ import { $, $$, h } from './dom.js';
 import { toast, notify } from './feedback.js';
 import { askOnFirstSession } from './native-ui.js';
 import { petArt, headTop, say } from './companions.js';
+import { openSheet, closeSheet } from './sheets.js';
 import { pickVoice, COMPANION_KIND } from '../voices.js';
 import { currentPetId, petStatus, petName, face as petFace } from '../pet.js';
 import { presetButton, mascotPop } from './widgets.js';
@@ -115,8 +116,8 @@ function afterRecord(rec, { auto }) {
   }
   session.advance(C.nextModeAfter(rec, state.progress.cycle));
   timerChanged();
-  // Tras estudiar decide autoBreak ("el descanso empieza solo"); tras descansar, autoContinue.
-  const autoNext = rec.mode === 'study' ? state.settings.autoBreak : state.settings.autoContinue;
+  // (v4.3) Un solo ajuste: "Lo siguiente empieza solo" (autoBreak) vale para el estudio y el descanso.
+  const autoNext = state.settings.autoBreak;
   if (auto && rec.completed && autoNext && Date.now() - rec.endMs <= LATE_MS) {
     setTimeout(() => {
       if (session.state.status === 'idle') startOrToggle();
@@ -153,6 +154,7 @@ export async function wakeLock(on) {
 function choosePreset(id) {
   mutate((s) => E.choosePreset(s, id, today()));
   afterDurationChange();
+  if (id !== C.CUSTOM_PRESET) closeSheet(); // en el celular, al elegir se cierra la ventana de duración
   const btn = $(`.preset[data-preset="${id}"]`);
   if (btn) btn.focus();
 }
@@ -186,6 +188,9 @@ export function renderPresets() {
     return presetButton(p, { checked: active, onclick: () => choosePreset(p.id), extra: { tabindex: active ? '0' : '-1', dataset: { preset: p.id } } });
   }));
   const custom = s.preset === C.CUSTOM_PRESET;
+  // (v4.3) En el celular, la duración se abre desde este botón (y dice cuál tienes)
+  const cur = C.PRESETS.find((p) => p.id === s.preset);
+  $('#durationChipText').textContent = cur ? `${cur.name} · ${C.presetLabel(cur, s)}` : `${tr('Mi ritmo')} · ${C.presetLabel({ id: C.CUSTOM_PRESET }, s)}`;
   $('#customPanel').hidden = !custom;
   $('#customizeBtn').setAttribute('aria-expanded', String(custom));
   const { limits: L, premium } = prefs();
@@ -353,6 +358,7 @@ export function bindFocus() {
   $('#skipBtn').addEventListener('click', skip);
   $('#resetBtn').addEventListener('click', resetTimer);
   $('#customizeBtn').addEventListener('click', openCustomizer);
+  $('#durationChip').addEventListener('click', (e) => openSheet($('#durationPanel'), e.currentTarget));
   $('#presets').addEventListener('keydown', (e) => {
     if (!['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp'].includes(e.key)) return;
     e.preventDefault();

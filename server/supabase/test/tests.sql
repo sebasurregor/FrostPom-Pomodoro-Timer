@@ -591,4 +591,82 @@ begin
   assert not exists (select 1 from private.reports where reporter_id = 'b0000000-0000-0000-0000-000000000014'), 'FALLO: quedaron los reportes de quien borró su cuenta';
   raise notice 'OK  al borrar tu cuenta se borran los reportes que hiciste';
 end $$;
+
+-- (v4.3) El dueño pasa un nombre atrapado en una sesión anónima a la cuenta con correo
+reset role;
+do $$
+declare
+  anon_id uuid := 'd4300000-0000-0000-0000-000000000001';
+  mail_id uuid := 'd4300000-0000-0000-0000-000000000002';
+  msg text;
+begin
+  insert into auth.users (id, email, is_anonymous) values (anon_id, null, true), (mail_id, 'sebas.prueba@ejemplo.com', false);
+  insert into private.profiles (user_id, username) values (anon_id, 'sebas.atrapado');
+  insert into private.daily_totals (user_id, day, credited_sec, sessions) values (anon_id, current_date, 1800, 1);
+  assert (select anonymous from private.who_has_name('SEBAS.atrapado')), 'FALLO: who_has_name no dice que es anónima';
+  msg := private.move_name('sebas.atrapado', 'Sebas.Prueba@ejemplo.com');
+  assert (select user_id from private.profiles where username = 'sebas.atrapado') = mail_id, 'FALLO: el nombre no pasó a la cuenta con correo';
+  assert (select credited_sec from private.daily_totals where user_id = mail_id and day = current_date) = 1800, 'FALLO: se perdieron los minutos';
+  assert not exists (select 1 from auth.users where id = anon_id), 'FALLO: quedó la sesión anónima';
+  assert msg like 'Listo:%', 'FALLO: mensaje inesperado';
+  assert private.move_name('sebas.atrapado', 'sebas.prueba@ejemplo.com') like '%no hubo que mover%', 'FALLO: mover dos veces';
+  raise notice 'OK  move_name pasa un nombre de una sesión anónima a la cuenta con correo (con sus minutos)';
+end $$;
+
+-- Si la cuenta con correo ya tenía otro nombre, se queda con el que se pasa y se suman los minutos
+do $$
+declare
+  anon_id uuid := 'd4300000-0000-0000-0000-000000000003';
+  mail_id uuid := 'd4300000-0000-0000-0000-000000000004';
+begin
+  insert into auth.users (id, email, is_anonymous) values (anon_id, null, true), (mail_id, 'otra.prueba@ejemplo.com', false);
+  insert into private.profiles (user_id, username) values (anon_id, 'nombre.viejo'), (mail_id, 'nombre.nuevo');
+  insert into private.daily_totals (user_id, day, credited_sec, sessions) values (anon_id, current_date, 600, 1), (mail_id, current_date, 900, 1);
+  perform private.move_name('nombre.viejo', 'otra.prueba@ejemplo.com');
+  assert (select username from private.profiles where user_id = mail_id) = 'nombre.viejo', 'FALLO: no quedó el nombre pedido';
+  assert not exists (select 1 from private.profiles where username = 'nombre.nuevo'), 'FALLO: quedó el otro nombre';
+  assert (select credited_sec from private.daily_totals where user_id = mail_id and day = current_date) = 1500, 'FALLO: no se sumaron los minutos';
+  raise notice 'OK  move_name con dos perfiles: se queda el nombre pedido y se suman los minutos';
+end $$;
+
+-- (v4.3) ranking_check: qué pasó con los pomodoros de alguien, en palabras simples
+do $$
+declare
+  uid uuid := 'd4300000-0000-0000-0000-000000000005';
+  r   record;
+begin
+  insert into auth.users (id, email, is_anonymous) values (uid, 'revisar.prueba@ejemplo.com', false);
+  insert into private.profiles (user_id, username) values (uid, 'amigo.revisar');
+  insert into private.study_sessions (user_id, planned_sec, started_at, finished_at, credited_sec, status) values
+    (uid, 1500, now() - interval '3 hours', now() - interval '150 minutes', 1500, 'done'),
+    (uid, 1500, now() - interval '2 hours', now() - interval '119 minutes', 0, 'abandoned'),
+    (uid, 1500, now() - interval '90 minutes', null, 0, 'active');
+  assert (select count(*) from private.ranking_check('AMIGO.revisar')) = 5, 'FALLO: ranking_check no muestra perfil, semana y 3 pomodoros';
+  select * into r from private.ranking_check('amigo.revisar') limit 1;
+  assert r.que_paso like 'Aparece en el ranking · cuenta con correo%', 'FALLO: ranking_check no describe el perfil: ' || r.que_paso;
+  assert exists (select 1 from private.ranking_check('amigo.revisar') where que_paso = 'Contó' and minutos = 25), 'FALLO: no muestra el pomodoro que contó';
+  assert exists (select 1 from private.ranking_check('amigo.revisar') where que_paso like 'No contó: duró menos%'), 'FALLO: no explica el pomodoro corto';
+  assert exists (select 1 from private.ranking_check('amigo.revisar') where que_paso like 'Empezó, pero la app nunca%'), 'FALLO: no explica el que nunca terminó';
+  assert (select que_paso from private.ranking_check('nadie.asi') limit 1) like 'No hay nadie%', 'FALLO: nombre que no existe';
+  raise notice 'OK  ranking_check explica qué pasó con los pomodoros de alguien';
+end $$;
+
+-- Nadie con sesión puede usar estas herramientas
+set role authenticated;
+set request.jwt.claim.sub = 'b0000000-0000-0000-0000-000000000011';
+do $$
+begin
+  begin
+    perform private.move_name('nombre.viejo', 'x@ejemplo.com');
+    raise exception 'FALLO: alguien con sesión movió un nombre';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    perform * from private.ranking_check('amigo.revisar');
+    raise exception 'FALLO: alguien con sesión revisó los pomodoros de otro';
+  exception when insufficient_privilege then null;
+  end;
+  raise notice 'OK  move_name, who_has_name y ranking_check solo los usa el dueño';
+end $$;
+reset role;
 \echo 'Todas las pruebas del servidor pasaron.'

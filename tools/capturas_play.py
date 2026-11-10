@@ -52,7 +52,7 @@ SHOTS = [
     # (archivo, ruta, hora, tema, acción)
     ('01-enfocar', '#/enfocar', 10, 'light', None),
     ('02-tienda', '#/enfocar', 10, 'light', 'tray'),
-    ('03-progreso', '#/progreso', 10, 'light', None),
+    ('03-progreso', '#/progreso', 10, 'light', 'estudio'),  # (v4.3) el calendario se abre como ventana
     ('04-ranking', '#/ranking', 10, 'light', None),
     ('05-perfil', '#/perfil', 10, 'light', None),
     ('06-noche', '#/enfocar', 20, 'dark', None),
@@ -125,6 +125,8 @@ def main():
                     pg.click('#dlg .dlg__actions button:last-child'); pg.wait_for_timeout(300); pg.clock.run_for(800)
                 if action == 'tray':
                     pg.click('#shopBtn'); pg.wait_for_timeout(300); pg.clock.run_for(600)
+                if action == 'estudio':
+                    pg.click('#progTiles .sheet-tile >> nth=0'); pg.wait_for_timeout(300); pg.clock.run_for(600)
                 pg.evaluate("document.querySelectorAll('#toasts .toast').forEach(t => t.remove())")
                 pg.evaluate("window.scrollTo(0, 0)"); pg.clock.run_for(400)
                 pg.screenshot(path=os.path.join(folder, f'{name}.png'))

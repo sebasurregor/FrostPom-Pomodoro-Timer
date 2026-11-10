@@ -159,13 +159,16 @@ const timeZone = () => {
  * Devuelve { ok: true } o { ok: false, kind } con kind = 'name_taken' | 'name_invalid' |
  * 'name_blocked' | 'offline' | 'notready' | 'server'…
  */
-export async function join({ username, country = '', avatar = '', show = true }) {
+export async function join({ username, country = '', avatar = '', show = true }, { create = true } = {}) {
   if (!enabled()) return { ok: false, kind: 'off' };
   try {
+    // create = false (cuenta en línea): nunca se inventa una sesión anónima; si la sesión de la
+    // cuenta se cerró, hay que volver a entrar (si no, el nombre quedaba "ocupado" por la otra)
+    if (!create && !load().refresh) return { ok: false, kind: 'nosession' };
     await call('set_profile', {
       p_username: username, p_country: country || null, p_avatar: avatar || null,
       p_time_zone: timeZone(), p_show: show !== false,
-    }, { create: true });
+    }, { create });
     save({ joined: true, name: username });
     return { ok: true };
   } catch (e) {
@@ -214,6 +217,7 @@ export async function startSession(startMs, plannedSec) {
     return { ok: true };
   } catch (e) {
     save({ active: null });
+    console.warn(`[FrostPom] El ranking no pudo anotar el inicio de este pomodoro (${e.kind || 'server'}).`);
     return { ok: false, kind: e.kind || 'server' };
   }
 }
@@ -249,7 +253,8 @@ export function flush() {
         credited += (r && r.credited_sec) || 0;
       } catch (e) {
         if (e.kind === 'offline' || e.kind === 'rate' || e.kind === 'auth') return { ok: false, kind: e.kind, credited };
-        // 'Sesión no encontrada o ya terminada' u otro error definitivo: se descarta
+        // 'Sesión no encontrada o ya terminada' u otro error definitivo: se descarta (y queda en F12)
+        console.warn(`[FrostPom] El ranking no aceptó el final de un pomodoro (${e.kind || 'server'}).`);
       }
       st = save({ pending: load().pending.filter((x) => x.id !== p.id) });
     }

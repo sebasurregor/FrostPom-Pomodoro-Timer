@@ -232,25 +232,8 @@ b, strong { font-weight: 800; }
 .scenery[data-level="critico"] .walker:nth-child(n + 2) { display: none; }
 .scenery[data-level="critico"] .walker { animation-duration: calc(var(--dur) * 1.6); }
 
-/* Nieve (y ceniza cuando el polo está contaminado) */
-.flake {
-  position: absolute;
-  top: -12px;
-  left: var(--x);
-  width: var(--s);
-  height: var(--s);
-  border-radius: 50%;
-  background: #ffffff;
-  opacity: 0.85;
-  animation: snowfall var(--d) linear infinite;
-  animation-delay: var(--delay);
-}
-.scenery[data-level="contaminado"] .flake,
-.scenery[data-level="critico"] .flake { background: #7D7666; }
-@keyframes snowfall {
-  from { transform: translate(0, 0); }
-  to { transform: translate(30px, 105vh); }
-}
+/* Nieve (y ceniza cuando el polo está contaminado): un solo <canvas>, ver js/ui/snow.js (v4.2.1) */
+.scenery__snow { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 
 /* =====================================================================
    Pingüino animado (sprite sheets del autor en assets/sprites)
@@ -1450,7 +1433,7 @@ select:disabled { opacity: 0.6; }
 .reduce-motion .psprite.is-triste { background-position-x: 0%; }
 .reduce-motion .psprite:is(.is-lloroso, .is-llorando, .is-debil) { background-position-x: 25%; }
 .reduce-motion .walker__body { animation: none !important; }
-.reduce-motion .scenery__flakes { display: none; }
+.reduce-motion .scenery__snow { display: none; }
 .reduce-motion *, .reduce-motion *::before, .reduce-motion *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
 .reduce-motion .ring__breath .b-out { display: none; }
 
@@ -1690,19 +1673,7 @@ select:disabled { opacity: 0.6; }
 @keyframes say-out { to { opacity: 0; transform: translateX(-50%) translateY(-8px); } }
 .buddy .say { bottom: calc(100% - 4px); font-size: 1.05rem; }
 
-/* Clima: cuántos copos se ven y con cuánto viento caen */
-.flake { --drift: 30px; }
-.flake--0 { opacity: 0.6; }
-.flake--2 { opacity: 0.95; }
-@keyframes snowfall {
-  from { transform: translate(0, 0); }
-  to { transform: translate(var(--drift), 105vh); }
-}
-.scenery[data-weather="clear"] .flake { display: none; }
-.scenery[data-weather="light"] .flake:nth-child(n + 31) { display: none; }
-.scenery[data-weather="medium"] .flake:nth-child(n + 81) { display: none; }
-.scenery[data-weather="medium"] .flake { --drift: 60px; width: calc(var(--s) * 1.3); height: calc(var(--s) * 1.3); }
-.scenery[data-weather="heavy"] .flake { --drift: 180px; width: calc(var(--s) * 1.8); height: calc(var(--s) * 1.8); animation-duration: calc(var(--d) * 0.6); }
+/* Clima: cuántos copos y cuánto viento lo decide js/ui/snow.js (WEATHER); aquí, la ventisca */
 .sc-blizzard { opacity: 0; }
 .scenery[data-weather="medium"] .sc-blizzard { opacity: 0.25; }
 .scenery[data-weather="heavy"] .sc-blizzard { opacity: 0.6; }
@@ -1958,7 +1929,9 @@ html.is-feeding, html.is-feeding * { cursor: grabbing !important; }
    primero y tarjetas claras. (En la v3.7 el fondo blanco se quitó: se ve el paisaje.)
    ===================================================================== */
 .view--paper { --pp-line: #E3E9F2; --pp-muted: #5E6E86; --pp-orange: #FF9600; --pp-orange-soft: #FFE2BD; color: var(--text); }
-.view--paper:not([hidden]) { animation: paper-in .28s ease-out both; }
+/* (v4.3) backwards y no both: al terminar no se queda con un transform (si no, las ventanas del celular
+   quedaban atrapadas dentro de la sección en vez de cubrir la pantalla) */
+.view--paper:not([hidden]) { animation: paper-in .28s ease-out backwards; }
 @keyframes paper-in { from { opacity: 0; transform: translateY(6px); } }
 
 .prog { display: grid; gap: 22px; width: min(100%, 640px); margin: 0 auto; padding-bottom: 24px; }
@@ -2125,8 +2098,9 @@ html.is-feeding, html.is-feeding * { cursor: grabbing !important; }
 .gate-open .gate-scene { display: block; }
 /* Igual que background-size: cover, pero con medidas reales para que la llama quede encima de los troncos */
 .gate-scene__art {
-  --w: max(100vw, calc(100vh * 1920 / 1072));
-  --h: max(100vh, calc(100vw * 1072 / 1920));
+  --aw: 1920; --ah: 1072; /* tamaño del dibujo (en el celular de pie es otro: ver v4.3) */
+  --w: max(100vw, calc(100vh * var(--aw) / var(--ah)));
+  --h: max(100vh, calc(100vw * var(--ah) / var(--aw)));
   position: absolute; width: var(--w); height: var(--h);
   left: calc((100vw - var(--w)) * 0.72); top: calc((100vh - var(--h)) * 0.5);
 }
@@ -2144,19 +2118,38 @@ html.is-feeding, html.is-feeding * { cursor: grabbing !important; }
   .dlg--gate { margin: auto auto 16px; }
 }
 
-/* La fogata: llama (cuerpo naranja + centro amarillo), brillo en la nieve y gotitas de fuego que suben */
-.campfire__body { fill: #F88F2E; stroke: #E46C1E; stroke-width: 4; stroke-linejoin: round; }
-.campfire__core { fill: #FBCC56; }
-.campfire__spark { fill: #F88F2E; stroke: #E46C1E; stroke-width: 2; }
-.campfire__flame, .campfire__core { transform-box: fill-box; transform-origin: 50% 100%; }
-.campfire__flame { animation: fire-flicker 1.7s ease-in-out infinite; }
-.campfire__core { animation: fire-core 0.85s ease-in-out infinite alternate; }
-.campfire__glow { transform-box: fill-box; transform-origin: center; mix-blend-mode: screen; animation: fire-glow 2.3s ease-in-out infinite; }
-.campfire__spark { opacity: 0; animation: fire-spark 2.6s ease-out infinite; }
-.campfire__sparks g:nth-child(1) .campfire__spark { --dx: -14px; animation-delay: 0s; }
-.campfire__sparks g:nth-child(2) .campfire__spark { --dx: 6px; animation-delay: 0.7s; }
-.campfire__sparks g:nth-child(3) .campfire__spark { --dx: 16px; animation-delay: 1.4s; }
-.campfire__sparks g:nth-child(4) .campfire__spark { --dx: -6px; animation-delay: 2s; }
+/* La fogata: llama (cuerpo naranja + centro amarillo), brillo en la nieve y gotitas de fuego que suben.
+   (v4.2.1) Cada parte es su propia capa, ubicada en % sobre el dibujo de 1920 × 1072: así se anima
+   con transform/opacity sin volver a pintar nada (antes era un SVG del tamaño de toda la pantalla). */
+.campfire { pointer-events: none; }
+.campfire > *, .campfire__body, .campfire__core { position: absolute; display: block; overflow: visible; }
+.campfire__body { inset: 0; width: 100%; height: 100%; }
+.campfire__body path { fill: #F88F2E; stroke: #E46C1E; stroke-width: 4; stroke-linejoin: round; }
+.campfire__core path { fill: #FBCC56; }
+.campfire__spark path { fill: #F88F2E; stroke: #E46C1E; stroke-width: 2; }
+.campfire__glow {
+  left: 63.4375%; top: 67.3507%; width: 19.7917%; height: 14.5522%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(255, 179, 71, 0.75), rgba(255, 154, 60, 0.25) 55%, rgba(255, 154, 60, 0));
+  mix-blend-mode: screen;
+  will-change: transform, opacity;
+  animation: fire-glow 2.3s ease-in-out infinite;
+}
+.campfire__flame {
+  left: 70.5208%; top: 63.9925%; width: 5.625%; height: 12.6866%;
+  transform-origin: 50% 97.4%; will-change: transform;
+  animation: fire-flicker 1.7s ease-in-out infinite;
+}
+.campfire__core {
+  left: 24.074%; top: 36.765%; width: 51.852%; height: 55.147%;
+  transform-origin: 50% 97.3%; will-change: transform;
+  animation: fire-core 0.85s ease-in-out infinite alternate;
+}
+.campfire__spark { width: 0.7292%; height: 1.8657%; opacity: 0; will-change: transform, opacity; animation: 2.6s ease-out infinite; }
+.campfire__spark--1 { left: 71.8229%; top: 63.153%; animation-name: fire-spark-1; animation-delay: 0s; }
+.campfire__spark--2 { left: 73.125%; top: 61.567%; animation-name: fire-spark-2; animation-delay: 0.7s; }
+.campfire__spark--3 { left: 74.1146%; top: 63.3396%; animation-name: fire-spark-3; animation-delay: 1.4s; }
+.campfire__spark--4 { left: 72.4479%; top: 64.3657%; animation-name: fire-spark-4; animation-delay: 2s; }
 /* La llama nunca se hace más pequeña que la del dibujo: solo crece, se estira y se mece */
 @keyframes fire-flicker {
   0%, 100% { transform: scale(1, 1) skewX(0deg); }
@@ -2172,43 +2165,17 @@ html.is-feeding, html.is-feeding * { cursor: grabbing !important; }
   0%, 100% { opacity: 0.55; transform: scale(1); }
   50% { opacity: 0.85; transform: scale(1.08); }
 }
-@keyframes fire-spark {
-  0% { opacity: 0; transform: translate(0, 34px) scale(0.5); }
-  15% { opacity: 1; }
-  100% { opacity: 0; transform: translate(var(--dx, 0px), -46px) scale(1.05); }
-}
+/* Las chispas suben y se desvían un poco a un lado (en % de su propio tamaño: escalan con el dibujo) */
+@keyframes fire-spark-1 { 0% { opacity: 0; transform: translate(0, 170%) scale(0.5); } 15% { opacity: 1; } 100% { opacity: 0; transform: translate(-100%, -230%) scale(1.05); } }
+@keyframes fire-spark-2 { 0% { opacity: 0; transform: translate(0, 170%) scale(0.5); } 15% { opacity: 1; } 100% { opacity: 0; transform: translate(42.86%, -230%) scale(1.05); } }
+@keyframes fire-spark-3 { 0% { opacity: 0; transform: translate(0, 170%) scale(0.5); } 15% { opacity: 1; } 100% { opacity: 0; transform: translate(114.3%, -230%) scale(1.05); } }
+@keyframes fire-spark-4 { 0% { opacity: 0; transform: translate(0, 170%) scale(0.5); } 15% { opacity: 1; } 100% { opacity: 0; transform: translate(-42.86%, -230%) scale(1.05); } }
 /* "Menos animaciones": la fogata queda quieta, como en el dibujo original */
 .reduce-motion .campfire__flame, .reduce-motion .campfire__core, .reduce-motion .campfire__glow { animation: none; }
 .reduce-motion .campfire__spark { animation: none; opacity: 1; }
 
-/* v3.8.3 — Nevada suave en la pantalla de entrada (js/ui/gate-snow.js).
-   Pocos copos con borde difuminado, en tres profundidades; caen despacio, se balancean
-   y aparecen/desaparecen poco a poco. Solo transform y opacity. */
-.gate-snow { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
-.gate-flake {
-  position: absolute; top: 0; left: var(--x);
-  width: var(--s); height: var(--s);
-  opacity: 0; will-change: transform, opacity;
-  animation: gate-fall var(--fall) linear var(--delay) infinite;
-}
-.gate-flake__dot {
-  display: block; width: 100%; height: 100%; border-radius: 50%;
-  background: radial-gradient(circle, #fff 0 42%, rgba(255, 255, 255, 0.75) 58%, rgba(255, 255, 255, 0) 74%);
-  filter: drop-shadow(0 0 2px rgba(220, 240, 255, 0.55));
-  animation: gate-sway var(--sway-t) ease-in-out var(--sway-delay) infinite alternate;
-}
-/* los de adelante, más grandes y desenfocados (como fuera de foco en una foto) */
-.gate-flake--2 .gate-flake__dot { background: radial-gradient(circle, rgba(255, 255, 255, 0.9) 0 22%, rgba(255, 255, 255, 0.45) 48%, rgba(255, 255, 255, 0) 72%); filter: none; }
-@keyframes gate-fall {
-  0% { transform: translate3d(0, -4vh, 0); opacity: 0; }
-  12% { opacity: var(--o); }
-  78% { opacity: var(--o); }
-  100% { transform: translate3d(var(--drift), 102vh, 0); opacity: 0; }
-}
-@keyframes gate-sway {
-  from { transform: translateX(calc(var(--sway) * -1)); }
-  to { transform: translateX(var(--sway)); }
-}
+/* v3.8.3 — Nevada suave en la pantalla de entrada (js/ui/gate-snow.js; un solo <canvas> desde la v4.2.1) */
+.gate-snow { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .reduce-motion .gate-snow { display: none; }
 
 /* =====================================================================
@@ -2636,3 +2603,190 @@ html[data-theme="dark"] .report-reason { border-color: var(--card-line, #3B5175)
 .nametag--card { position: static; display: inline-block; transform: none; font-size: 0.85rem; }
 .companion-card.is-dead .companion-card__how { color: #B3203F; font-weight: 800; }
 html[data-theme="dark"] .companion-card.is-dead .companion-card__how { color: #FF8BA2; }
+
+/* =====================================================================
+   (v4.2.1) Rendimiento: en el celular, lo que no se ve no se anima
+   ===================================================================== */
+/* Con la pantalla de entrada abierta, la app de abajo queda tapada: no se pinta ni se anima */
+.gate-open .scenery, .gate-open .shell { visibility: hidden; }
+.gate-open .scenery *, .gate-open .shell * { animation-play-state: paused !important; }
+/* La fogata (con el oso y el zorro) y la luz del iglú solo se animan de noche, que es cuando se ven */
+.scenery:not([data-phase="night"]) .sc-camp *,
+.scenery:not([data-phase="night"]) .sc-igloo-glow { animation: none !important; }
+/* El humo de la fábrica y el petróleo solo se animan cuando hay contaminación */
+.scenery[data-level="limpio"] .sc-puff { animation: none; }
+.scenery:is([data-level="limpio"], [data-level="neblina"]) .sc-oil * { animation: none; }
+/* Ráfagas de viento: 2 con buen tiempo y las 5 cuando nieva fuerte */
+.scenery:not([data-weather="medium"]):not([data-weather="heavy"]) :is(.sc-gust--2, .sc-gust--3, .sc-gust--4) { display: none; }
+/* Mientras escribes en el celular (html.is-typing, ver main.js), el paisaje y la fogata se quedan quietos */
+.is-typing .scenery *, .is-typing .gate-scene * { animation-play-state: paused !important; }
+/* Con una ventana abierta (fondo oscuro y borroso), la app de atrás se queda quieta */
+.dlg-open .scenery *, .dlg-open .shell * { animation-play-state: paused !important; }
+
+/* (v4.3) Ojo para ver la contraseña (js/ui/password.js); el de Edge se esconde */
+input::-ms-reveal, input::-ms-clear { display: none; }
+.pass-wrap { position: relative; display: block; }
+.pass-wrap > input { width: 100%; padding-right: 50px; }
+.pass-eye {
+  position: absolute; top: 50%; right: 6px; transform: translateY(-50%);
+  display: grid; place-items: center; width: 40px; height: 40px; padding: 0;
+  border: 0; border-radius: 10px; background: transparent; color: var(--card-muted, #6B7A90); cursor: pointer;
+}
+.pass-eye:hover { color: var(--text, #13294B); background: rgba(127, 150, 190, 0.14); }
+.pass-eye:focus-visible { outline: 3px solid var(--focus, #2D68BC); outline-offset: 1px; }
+.pass-eye svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.pass-eye[aria-pressed="true"] { color: var(--text, #13294B); }
+/* (v4.3) Elegir compañero desde la tienda */
+.tray-pets { display: flex; flex-wrap: wrap; gap: 8px; margin: 2px 0 10px; }
+.tray-pets[hidden] { display: none; }
+.tray-pet {
+  display: grid; place-items: center; width: 54px; height: 54px; padding: 3px;
+  border-radius: 14px; border: 2px solid var(--card-line, #D9E2EF); background: var(--card-soft, #F3F6FB); cursor: pointer;
+}
+.tray-pet img, .tray-pet .companion { width: 44px; height: 44px; object-fit: contain; }
+.tray-pet.is-current { border-color: #F5C451; background: #FFF6DA; box-shadow: 0 0 0 2px rgba(245, 196, 81, 0.35); }
+.tray-pet:hover { border-color: #F5C451; }
+.tray-pet:focus-visible { outline: 3px solid var(--focus, #2D68BC); outline-offset: 2px; }
+html[data-theme="dark"] .tray-pet.is-current { background: rgba(245, 196, 81, 0.16); }
+
+/* =====================================================================
+   (v4.3) Celular: menos paneles y más paisaje (js/ui/sheets.js)
+   En pantallas grandes no cambia nada: los botones nuevos no se ven y las secciones siguen igual.
+   ===================================================================== */
+.duration-chip, .sheet-tiles, .sheet-close { display: none; }
+@keyframes sheet-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+
+@media (max-width: 899px) {
+  /* Barra de arriba más delgada: el rango y la barra de XP sin el texto "X XP para subir" */
+  .hud__xptext { display: none; }
+  .hud { padding-top: calc(6px + var(--safe-t)); padding-bottom: 8px; row-gap: 4px; }
+
+  /* Secciones que se abren como ventana: escondidas hasta que tocas su botón */
+  [data-sheet]:not(.is-open) { display: none !important; }
+  [data-sheet].is-open {
+    position: fixed; z-index: 45;
+    left: 8px; right: 8px;
+    top: calc(8px + var(--safe-t));
+    bottom: calc(var(--tabbar-h) + var(--safe-b) + 10px);
+    margin: 0 !important;
+    padding: 14px;
+    overflow: auto; overscroll-behavior: contain;
+    border-radius: var(--r-card, 22px);
+    background: var(--card);
+    border: 2px solid var(--card-line);
+    box-shadow: 0 18px 50px rgba(5, 14, 32, 0.45);
+    color: var(--text);
+    animation: sheet-in 0.22s ease-out both;
+  }
+  [data-sheet][data-sheet-style="bottom"].is-open { top: auto; max-height: 64vh; }
+  [data-sheet].is-open { align-content: start; } /* (las secciones en grid no se estiran a lo alto) */
+  [data-sheet].is-open .prog__title { color: var(--text); text-shadow: none; }
+  [data-sheet].is-open .prog__head { flex-wrap: nowrap; }
+  [data-sheet].is-open .prog__head .sheet-close { margin-left: 0; flex: none; }
+  [data-sheet].is-open .panel__head, [data-sheet].is-open .prog__head { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; }
+  [data-sheet].is-open :is(.panel__head, .prog__head) > :first-child { min-width: 0; }
+  .sheet-close { display: grid; place-items: center; margin-left: auto; width: 40px; height: 40px; font-size: 1.5rem; line-height: 1; }
+  /* lo de atrás se oscurece un poco, como en las otras ventanas */
+  .sheet-full [data-sheet].is-open { box-shadow: 0 18px 50px rgba(5, 14, 32, 0.45), 0 0 0 100vmax rgba(6, 14, 34, 0.55); }
+  .sheet-open.sheet-full .tabs { visibility: hidden; }
+  .sheet-full [data-sheet].is-open { bottom: calc(10px + var(--safe-b)); }
+
+  /* Botones de las secciones escondidas */
+  .sheet-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .sheet-tile {
+    display: flex; align-items: center; gap: 10px; min-height: 64px; padding: 10px 12px; text-align: left;
+    border-radius: 18px; border: 2px solid var(--card-line); background: var(--card); box-shadow: var(--card-shadow);
+    color: var(--text); font: inherit; cursor: pointer;
+  }
+  .sheet-tile:active { transform: translateY(1px); }
+  .sheet-tile:focus-visible { outline: 3px solid var(--focus, #2D68BC); outline-offset: 2px; }
+  .sheet-tile__icon { font-size: 1.6rem; line-height: 1; }
+  .sheet-tile__text { display: grid; min-width: 0; }
+  .sheet-tile__text b { font-family: var(--font-display); font-size: 1.05rem; line-height: 1.1; }
+  .sheet-tile__text small { color: var(--card-muted); font-weight: 700; font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Enfocar: el reloj, tu compañero y el botón; la duración y el sonido, en dos botones pequeños.
+     Debajo se ve el paisaje (el iglú, los animales y la fogata). */
+  .duration-chip { display: inline-flex; align-items: center; gap: 6px; }
+  /* En celulares bajitos el reloj se achica un poco, para que la duración y el sonido no queden
+     escondidos detrás de la barra de abajo */
+  .ring { --size: max(210px, min(80vw, 340px, calc(100dvh - 400px))); }
+  [data-sheet].is-open .prog__title { white-space: nowrap; font-size: 1.25rem; }
+  [data-sheet].is-open .mini-seg__btn { white-space: nowrap; }
+  .focus-status { padding: 0; gap: 8px; background: none !important; border: 0 !important; box-shadow: none !important; }
+  .focus-status__row { justify-content: center; }
+  .focus-status .today-line, .focus-status__pole { display: none; }
+  .focus-status .ambient-btn { min-height: 40px; padding: 6px 14px; background: var(--card); border: 2px solid var(--card-line); box-shadow: var(--card-shadow); }
+  .focus-status .xp-hint { justify-self: center; padding: 4px 12px; border-radius: 999px; background: var(--card); border: 2px solid var(--card-line); font-size: 0.85rem; text-align: center; }
+  /* Sin un pomodoro en curso, "Terminar", "Saltar" y "Reiniciar" no hacen falta */
+  .ring[data-status="idle"][data-mode="study"] ~ .controls .controls__row { display: none; }
+
+  /* Entrar y crear cuenta: la ventana arriba, más pequeña y compacta, para que debajo se vea el
+     paisaje (la aurora, los animales y la fogata). Si el formulario es largo, se desliza por dentro. */
+  .dlg--gate { margin: calc(10px + var(--safe-t)) auto auto; width: min(94vw, 420px); }
+  .dlg--gate .dlg__box { max-height: max(300px, calc(46dvh - var(--safe-t))); padding: 14px 14px 12px; border-radius: 20px; }
+  .dlg--gate .onb__mascot { display: none; }
+  .dlg--gate .dlg__title { font-size: 1.2rem; margin-bottom: 4px; }
+  .dlg--gate .dlg__text { font-size: 0.88rem; margin-bottom: 6px; }
+  .dlg--gate .dlg__note { margin-top: 6px; font-size: 0.8rem; }
+  .dlg--gate .pin-form { gap: 3px; }
+  .dlg--gate .pin-label { font-size: 0.82rem; }
+  .dlg--gate .acc-input { min-height: 40px; padding: 7px 11px; font-size: 0.95rem; }
+  .dlg--gate .acc-hint { font-size: 0.74rem; margin: 2px 0 4px; }
+  .dlg--gate .form-error:empty { display: none; }
+  .dlg--gate .switch--compact { padding: 6px 0 0; }
+  /* Los dos botones lado a lado (en vez de uno encima del otro) */
+  .dlg--gate .dlg__actions { flex-wrap: nowrap; gap: 8px; margin-top: 10px; }
+  .dlg--gate .dlg__actions .btn { width: auto; flex: 1 1 0; min-width: 0; min-height: 44px; padding: 8px 10px; font-size: 0.95rem; }
+}
+
+/* (v4.3) El paisaje de entrar en el celular (de pie): un dibujo vertical, hecho para la pantalla
+   del teléfono, con la misma fogata animada. Se baja un poco: arriba queda cielo liso detrás de la
+   ventana, y debajo se ven la aurora y los animales (el hielo vacío de abajo se recorta). */
+.campfire__tall, .campfire__tall-core { display: none; }
+@media (max-width: 899px) and (orientation: portrait) {
+  .gate-scene { background: rgb(18, 23, 66); } /* el color del cielo de arriba, con la capa oscura */
+  .gate-scene__art {
+    --aw: 1206; --ah: 2160;
+    background: #181D54;
+    left: calc((100vw - var(--w)) * 0.97);
+    top: calc((100vh - var(--h)) * 0.5);
+  }
+  .gate-scene__art::after { background: rgba(4, 10, 24, 0.3); }
+  .campfire__flame { display: none; }
+  .campfire__tall {
+    display: block; left: 71.0709%; top: 59.472%; width: 5.2156%; height: 4.0373%;
+    background: url("../assets/scenes/fogata-llama.webp") center / 100% 100% no-repeat;
+    transform-origin: 50% 97%; will-change: transform;
+    animation: fire-flicker 1.7s ease-in-out infinite;
+  }
+  .campfire__tall-core {
+    display: block; position: absolute; left: 20%; top: 37.5%; width: 60%; height: 56.73%;
+    background: url("../assets/scenes/fogata-centro.webp") center / 100% 100% no-repeat;
+    transform-origin: 50% 97%; will-change: transform;
+    animation: fire-core 0.85s ease-in-out infinite alternate;
+  }
+  .campfire__glow { left: 64.5%; top: 60.37%; width: 18.36%; height: 4.66%; }
+  .campfire__spark { width: 0.676%; height: 0.539%; }
+  .campfire__spark--1 { left: 72.27%; top: 59.2%; }
+  .campfire__spark--2 { left: 73.48%; top: 58.7%; }
+  .campfire__spark--3 { left: 74.4%; top: 59.27%; }
+  .campfire__spark--4 { left: 72.86%; top: 59.59%; }
+  .reduce-motion .campfire__tall, .reduce-motion .campfire__tall-core { animation: none; }
+}
+@media (max-width: 560px) and (orientation: portrait) {
+  .gate-scene__art { top: 24vh; }
+  .gate-scene__img { -webkit-mask-image: linear-gradient(transparent, #000 9%); mask-image: linear-gradient(transparent, #000 9%); }
+}
+/* Con una sección abierta como ventana, lo de atrás se queda quieto */
+.sheet-full .scenery *, .sheet-full .gate-scene * { animation-play-state: paused !important; }
+
+/* (v4.3) Ranking: "todo en orden, tus pomodoros suman desde aquí" */
+.board-ok { margin: 0 0 12px; padding: 8px 14px; border-radius: 14px; font-weight: 800; font-size: 0.88rem; background: #EFFFF8; border: 2px solid #A6EBD3; color: #0B6B4D; }
+html[data-theme="dark"] .board-ok { background: #12352C; border-color: #2B7A63; color: #BFF5E2; }
+
+/* (v4.3) Celular bajito: con el reloj más pequeño, el compañero se corre un poco hacia afuera para
+   que su nombre no tape los números */
+@media (max-width: 899px) and (max-height: 739px) {
+  .buddy { right: -13%; bottom: -5%; }
+}

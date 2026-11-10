@@ -8,6 +8,7 @@
  *  - Los recordatorios (Premium) los programa el teléfono, así llegan con la app cerrada.
  *  - La vibración usa el motor del teléfono.
  */
+import { sheetOpen, closeSheet } from './sheets.js';
 import * as N from '../native.js';
 import { $ } from './dom.js';
 import { dlg } from './feedback.js';
@@ -37,8 +38,9 @@ export function handleBack() {
     dlg.close('cancel');
     return true;
   }
-  // 3. La tienda de comida
+  // 3. La tienda de comida, o una sección abierta como ventana (v4.3)
   if (trayOpen()) { closeTray(); return true; }
+  if (sheetOpen()) { closeSheet(); return true; }
   // 4. Otra pantalla: Ajustes vuelve a Perfil; las demás, a Enfocar
   const route = document.body.dataset.route;
   if (route && route !== 'enfocar') {

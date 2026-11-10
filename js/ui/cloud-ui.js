@@ -381,8 +381,10 @@ export async function reconnectFlow() {
   }
   await BOARD.adoptSession(session);
   await startOrResume();
+  await ensureJoined().catch(() => null); // (v4.3) y tus pomodoros vuelven a sumar en el ranking
   toast('Listo: tu progreso se vuelve a guardar en tu cuenta.', 'good');
   document.dispatchEvent(new CustomEvent('frostpom:cloud'));
+  document.dispatchEvent(new CustomEvent('frostpom:board'));
 }
 
 // ---------------------------------------------------------------------
@@ -516,7 +518,14 @@ export async function bootCloud() {
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && isOnline() && SYNC.load().dirty) flush(); });
   }
   if (isOnline()) {
-    if (BOARD.hasAccountSession()) await startOrResume();
+    if (BOARD.hasAccountSession()) await startOrResume(); // (si la sesión ya no sirve, aquí se nota)
+    // (v4.3) Si la sesión se cerró (por ejemplo, cerraste sesión en otro equipo con una versión
+    // anterior), se pide la contraseña una vez al abrir: antes solo se veía en Ajustes y, mientras
+    // tanto, no se guardaba el progreso ni sumaban los pomodoros en el ranking.
+    if (!BOARD.hasAccountSession() && navigator.onLine !== false && !store.tab.get('reconnect_asked')) {
+      store.tab.set('reconnect_asked', '1');
+      await reconnectFlow();
+    }
     return;
   }
   if (state.account.cloudPending && navigator.onLine && !triedNow) await connectFlow({ pending: true });

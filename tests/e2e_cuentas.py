@@ -179,6 +179,10 @@ with sync_playwright() as p:
     check(title(pg1) == 'Inicia sesión' and pg1.input_value('#signMail') == 'pingu@example.com' and 'Cerraste sesión' in pg1.inner_text('#dlg'),
           'después de cerrar sesión aparece "Inicia sesión" con el correo ya escrito')
     check(uid in fake.users and fake.saves[uid]['data']['progress']['xp'] == xp2, 'cerrar sesión no borra la cuenta ni su progreso')
+    # (v4.3) Cerrar sesión en un equipo NO cierra la de los otros (antes Supabase las cerraba todas
+    # y en el otro equipo la app dejaba de guardar y de sumar en el ranking sin decir nada)
+    check(('logout', {'scope': 'local'}, uid) in [(c[0], c[1], c[2]) for c in fake.fn_calls('logout')], 'cerrar sesión pide cerrar solo la de este equipo (scope=local)')
+    check(board(pg2)['refresh'] in fake.refresh, 'el equipo 2 sigue con su sesión después de que el equipo 1 cerró la suya')
     check(pg1.evaluate("!JSON.parse(localStorage.getItem('st2_state') || '{}').account") and pg1.evaluate("!!localStorage.getItem('st2_photos')"),
           'en el equipo solo queda la foto guardada aparte (nunca se sube)')
     pg1.fill('#signPass', 'Pingu2026'); pg1.click("#dlg button:has-text('Entrar')"); pg1.wait_for_timeout(1500); tick(pg1, 1500)
@@ -194,6 +198,23 @@ with sync_playwright() as p:
     inputs[0].fill('Pingu2026'); inputs[1].fill('NuevaClave77'); inputs[2].fill('NuevaClave77')
     pg2.click("#dlg button:has-text('Guardar')"); pg2.wait_for_timeout(1500); tick(pg2)
     check(fake.users[uid]['password'] == 'NuevaClave77', 'cambiar la contraseña también la cambia en la cuenta en línea')
+
+    # (v4.3) La sesión del equipo 2 se cerró en el servidor: al abrir pide la contraseña (antes solo
+    # lo decía Ajustes) y NO inventa una sesión anónima (con ella el ranking decía "nombre ocupado")
+    anon_before = len(fake.fn_calls('anon_signup'))
+    for t in [t for t, u in fake.refresh.items() if u == uid]:
+        fake.refresh.pop(t)
+    for t in [t for t, u in fake.tokens.items() if u == uid]:
+        fake.tokens.pop(t)
+    pg2.reload(); pg2.wait_for_timeout(1500); tick(pg2, 1500)
+    if title(pg2) == '¡Hola de nuevo!':
+        pg2.fill('#loginPass', 'NuevaClave77'); pg2.click("#dlg button:has-text('Entrar')"); pg2.wait_for_timeout(1500); tick(pg2, 1500)
+    check(title(pg2) == 'Vuelve a entrar a tu cuenta', 'si la sesión en línea se cerró, al abrir pide volver a entrar')
+    check(len(fake.fn_calls('anon_signup')) == anon_before, 'sin sesión no se crea una cuenta anónima para el ranking')
+    pg2.fill('#recPass', 'NuevaClave77'); pg2.click("#dlg button:has-text('Entrar')"); pg2.wait_for_timeout(1500); tick(pg2, 1500)
+    check('se vuelve a guardar' in toasts(pg2) and board(pg2)['refresh'] in fake.refresh, 'con la contraseña, la sesión vuelve y el progreso se guarda otra vez')
+    check(board(pg2)['joined'] and fake.profiles.get(uid, {}).get('username') == 'pingu_nube', 'y sigue en el ranking con su nombre (sin "nombre ocupado")')
+    pg2.goto(URL + '#/ajustes'); tick(pg2, 600)
 
     # Cerrar sesión en el equipo 2 y, con la flecha, ir a crear otra cuenta
     pg2.click('#accLogoutBtn'); pg2.wait_for_timeout(300); tick(pg2)

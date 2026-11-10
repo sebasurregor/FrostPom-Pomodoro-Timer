@@ -29,6 +29,7 @@ import sys
 from playwright.sync_api import sync_playwright
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _fake_supabase import FakeSupabase
+from _sheets import patch as sheets_patch  # (v4.3) en el celular, varias secciones se abren como ventana
 
 URL = sys.argv[1] if len(sys.argv) > 1 else 'http://localhost:8000/'
 SUPA = 'https://tcxdmziakgppabwyrydd.supabase.co'
@@ -66,7 +67,7 @@ SEED = """(s) => {
 def open_app(browser, st, locale='es-CO', route='#/enfocar', width=412):
     ctx = browser.new_context(viewport={'width': width, 'height': 900}, locale=locale, service_workers='block')
     ctx.route(f'{SUPA}/**', FakeSupabase().handle)
-    pg = ctx.new_page()
+    pg = sheets_patch(ctx.new_page())
     errs, missing = [], []
     pg.on('pageerror', lambda e: errs.append(str(e)))
     pg.on('console', lambda m: errs.append(m.text) if m.type == 'error' else None)

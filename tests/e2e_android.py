@@ -23,6 +23,7 @@ import time
 from playwright.sync_api import sync_playwright
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _fake_supabase import FakeSupabase
+from _sheets import patch as sheets_patch  # (v4.3) en el celular, varias secciones se abren como ventana
 
 URL = sys.argv[1] if len(sys.argv) > 1 else 'http://localhost:8000/'
 SUPA = 'https://tcxdmziakgppabwyrydd.supabase.co'
@@ -73,7 +74,7 @@ def device(browser, fake, locale='es-CO', native=False):
     ctx.route(f'{SUPA}/**', fake.handle)
     if native:
         ctx.add_init_script(FAKE_CAP)
-    pg = ctx.new_page()
+    pg = sheets_patch(ctx.new_page())
     errs = []
     pg.on('pageerror', lambda e: errs.append(str(e)))
     pg.on('console', lambda m: errs.append(m.text) if m.type == 'error' else None)

@@ -181,7 +181,9 @@ export async function updatePassword(token, password) {
 
 /** Cierra la sesión en Supabase (si falla, no importa: en el equipo ya se borró). */
 export async function signOut(token) {
-  if (token) await call('/logout', { token }).catch(() => {});
+  // (v4.3) scope=local: solo este equipo. Sin eso Supabase cerraba la sesión en TODOS los equipos
+  // y en los otros la app dejaba de guardar el progreso y de sumar en el ranking sin decir nada.
+  if (token) await call('/logout?scope=local', { token }).catch(() => {});
 }
 
 // ---------------------------------------------------------------------

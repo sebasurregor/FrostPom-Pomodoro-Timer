@@ -5,7 +5,7 @@ Supabase SIMULADO para las pruebas en navegador (e2e_ranking.py y e2e_cuentas.py
 PostgreSQL: server/supabase/test/run_local.sh
 """
 import json
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs
 
 
 class FakeSupabase:
@@ -129,6 +129,15 @@ class FakeSupabase:
                 u = self.new_uid(); self.users[u] = {'anon': False, 'email': body.get('email')}
             return ok(self.session(u))
         if path == '/auth/v1/logout':
+            # Como Supabase: sin ?scope=local cierra la sesión en TODOS los equipos de esa cuenta
+            scope = parse_qs(urlparse(req.url).query).get('scope', ['global'])[0]
+            self.calls.append(('logout', {'scope': scope}, uid))
+            if uid:
+                n = bearer.rsplit('-', 1)[-1]
+                for t in [t for t, u in self.refresh.items() if u == uid and (scope == 'global' or t.rsplit('-', 1)[-1] == n)]:
+                    self.refresh.pop(t, None)
+                for t in [t for t, u in self.tokens.items() if u == uid and (scope == 'global' or t == bearer)]:
+                    self.tokens.pop(t, None)
             return route.fulfill(status=204, body='')
         if not path.startswith('/rest/v1/rpc/'):
             return ok({'msg': 'not found'}, 404)
