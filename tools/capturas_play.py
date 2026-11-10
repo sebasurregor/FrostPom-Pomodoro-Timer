@@ -1,5 +1,5 @@
 """
-FrostPom — imágenes para la ficha de Google Play (v4.1).
+FrostPom — imágenes para la ficha de Google Play (v4.1; la mascota con nombre desde la v4.2).
 
 Genera en docs/google-play/:
   - icono-512.png                       (512 × 512, el ícono cuadrado; Google le pone la forma)
@@ -34,8 +34,9 @@ SEED = """async ({ theme }) => {
   const mins = [75, 50, 100, 25, 125, 75, 0, 50, 100, 75, 150, 25, 50, 0, 100, 75, 125, 50, 75, 100, 25];
   mins.forEach((m, i) => { if (m) daily[day(i + 1)] = { studySec: m * 60, creditedSec: m * 60, sessions: Math.round(m / 25), partials: 0, breaks: Math.round(m / 25), xp: m, noPauseSessions: Math.round(m / 25) }; });
   daily[day(0)] = { studySec: 50 * 60, creditedSec: 50 * 60, sessions: 2, partials: 0, breaks: 1, xp: 50, noPauseSessions: 2 };
-  const s = { v: 3, createdAt: new Date(Date.now() - 864e5 * 40).toISOString(),
+  const s = { v: 4, createdAt: new Date(Date.now() - 864e5 * 40).toISOString(),
     profile: { nick: 'pingu_estudia', avatar: '🐧', companion: null, country: 'CO', onboarded: true },
+    pets: { pinguino: { fullness: 85, at: new Date(Date.now() - 36e5).toISOString(), name: 'Copito' } }, // v4.2: con nombre
     premium: { active: true }, progress: { xp: 1450, gems: 140 }, daily,
     settings: { theme } };
   const sec = await import('./js/security.js');

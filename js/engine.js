@@ -243,9 +243,11 @@ export function chooseSkin(state, skinId, todayKey) {
   }
 }
 
-export function equipCompanion(state, id) {
+export function equipCompanion(state, id, now = new Date()) {
   if (id !== null && !C.companionUnlocked(id, state.progress.achievements, state.progress.gifted)) return refused();
+  P.settle(state, now); // la que se va descansa con la barriguita que tenía
   state.profile.companion = id;
+  P.settle(state, now); // la que llega empieza a tener hambre desde ahora
   return done();
 }
 
@@ -315,7 +317,7 @@ export function giftCompanion(state, id) {
 }
 
 // =========================================================
-// Tienda: darle de comer a tu mascota
+// Tienda: darle de comer a tu mascota (y revivirla, y su nombre)
 // =========================================================
 /**
  * Gasta gemas en una comida para la mascota de ahora. No se puede si no alcanzan las gemas
@@ -324,16 +326,52 @@ export function giftCompanion(state, id) {
 export function feedPet(state, foodId, now = new Date()) {
   const food = P.FOOD_BY_ID[foodId];
   if (!food) return refused({ reason: 'unknown' });
+  P.settle(state, now);
   const petId = P.currentPetId(state);
-  const before = P.fullness(state, petId, now);
+  const st = P.petStatus(state, petId, now);
+  if (st.dead) return refused({ reason: 'dead' });
+  const before = st.fullness;
   if (before >= P.FULL_AT) return refused({ reason: 'full' });
   if (state.progress.gems < food.cost) return refused({ reason: 'gems' });
   const gained = P.fillFor(petId, foodId);
   const after = Math.min(100, before + gained);
   state.progress.gems -= food.cost;
   state.progress.totals.fed += 1;
-  state.pets[petId] = { fullness: after, at: now.toISOString() };
-  return done([{ type: 'fed', petId, food, favorite: P.isFavorite(petId, foodId), gained: Math.round(after - before), fullness: after }]);
+  state.pets[petId] = { ...state.pets[petId], fullness: after, at: now.toISOString() };
+  return done([{ type: 'fed', petId, food, favorite: P.isFavorite(petId, foodId), gained: Math.round(after - before), fullness: after, before }]);
+}
+
+/** (v4.2) Revive a la mascota de ahora si se murió de hambre. Cuesta P.REVIVE_COST gemas. */
+export function revivePet(state, now = new Date()) {
+  P.settle(state, now);
+  const petId = P.currentPetId(state);
+  if (!P.petStatus(state, petId, now).dead) return refused({ reason: 'alive' });
+  if (state.progress.gems < P.REVIVE_COST) return refused({ reason: 'gems' });
+  state.progress.gems -= P.REVIVE_COST;
+  state.progress.totals.revived += 1;
+  const rec = { ...state.pets[petId], fullness: P.REVIVE_FULLNESS, at: now.toISOString() };
+  delete rec.dead;
+  delete rec.rest;
+  state.pets[petId] = rec;
+  return done([{ type: 'revived', petId, gems: P.REVIVE_COST }]);
+}
+
+/** (v4.2) Ponle nombre a la mascota de ahora ('' lo quita). */
+export function namePet(state, name, now = new Date()) {
+  const check = P.checkPetName(name);
+  if (!check.ok) return refused({ reason: check.reason });
+  P.settle(state, now);
+  const petId = P.currentPetId(state);
+  const rec = { ...state.pets[petId] };
+  if (check.value) rec.name = check.value;
+  else delete rec.name;
+  state.pets[petId] = rec;
+  return done([], { name: check.value });
+}
+
+/** (v4.2) Ordena los registros de las mascotas (ver pet.js: settle). */
+export function settlePets(state, now = new Date()) {
+  return P.settle(state, now) ? done() : refused();
 }
 
 // =========================================================

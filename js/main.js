@@ -18,12 +18,13 @@ import { startChatter } from './ui/scenery.js';
 import { renderPremium, maybePaywall, bindPremium, syncStorePremium } from './ui/premium.js';
 import { bindSound } from './ui/sound.js';
 import { checkReminder, bindReminders } from './ui/reminders.js';
-import { renderTimer, renderPresets, renderToday, startOrToggle, tick, onDue, wakeLock, bindFocus } from './ui/focus.js';
+import { renderTimer, renderPresets, renderToday, startOrToggle, tick, onDue, wakeLock, bindFocus, renderBuddy } from './ui/focus.js';
 import { renderProgress, bindProgress } from './ui/progress.js';
 import { bindActivity } from './ui/activity.js';
 import { renderProfile, bindProfile } from './ui/profile.js';
 import { renderRanking, bindRanking } from './ui/ranking.js';
-import { bindFeeding, renderShopBtn, openTray } from './ui/feeding.js';
+import { bindFeeding, renderShopBtn, openTray, petLabel } from './ui/feeding.js';
+import { needsSettle, currentPetId, petStatus } from './pet.js';
 import { renderSettings, bindSettings } from './ui/settings.js';
 import { onboarding, loginGate, createAccountFlow } from './ui/account.js';
 import { t, translateDom, isEnglish } from './i18n.js';
@@ -118,6 +119,7 @@ function bindGlobal() {
     renderHUD();
     renderPole();
     renderToday();
+    checkPet();
   });
   // Otra pestaña cambió los datos: nos sincronizamos.
   window.addEventListener('storage', (e) => {
@@ -164,6 +166,27 @@ function checkNewDay() {
 }
 
 /**
+ * (v4.2) Tu mascota: ordena sus registros (la que no está contigo descansa), vuelve a pintar su
+ * cara (el hambre cambia con el tiempo) y, si se murió, lo avisa una sola vez.
+ */
+function checkPet() {
+  if (!state.profile.onboarded) return;
+  if (needsSettle(state)) mutate((s) => E.settlePets(s));
+  else {
+    renderBuddy();
+    renderShopBtn();
+  }
+  const petId = currentPetId(state);
+  const st = petStatus(state, petId);
+  if (!st.dead) return;
+  const mark = `${petId}@${st.diedAt}`;
+  if (store.pref.get('pet_rip') === mark) return;
+  store.pref.set('pet_rip', mark);
+  const who = petLabel(petId);
+  toast(t('{pet} se murió de hambre. Tócalo para revivirlo con gemas.', { pet: who[0].toLocaleUpperCase() + who.slice(1) }), 'warn', { icon: '🪦', ms: 8000 });
+}
+
+/**
  * Windows, macOS, Android e iOS tienen un ajuste para "reducir movimiento". Antes la app lo
  * obedecía en silencio y el paisaje se quedaba quieto. Ahora el control es "Menos animaciones"
  * en Ajustes (cumple WCAG 2.2.2: hay una forma de detener el movimiento), y si el sistema lo
@@ -191,7 +214,7 @@ function boot() {
   initNative(); // solo dentro de la app de Android: botón atrás, avisos, vibración
   bindHUD();
   updatePhase();
-  setInterval(() => { updatePhase(); checkNewDay(); checkSeason(); }, 60 * 1000);
+  setInterval(() => { updatePhase(); checkNewDay(); checkSeason(); checkPet(); }, 60 * 1000);
   startChatter(() => session.running && session.state.mode === 'study');
   for (const bind of [bindPremium, bindSound, bindReminders, bindFocus, bindProgress, bindActivity, bindProfile, bindRanking, bindSettings, bindFeeding, bindGlobal]) bind();
   renderAll();
@@ -201,7 +224,7 @@ function boot() {
   if (session.isDue()) onDue();
   checkNewDay();
   // Cuentas en línea (v4.0) primero: si hay progreso más nuevo en la nube, se trae antes del ranking
-  Promise.resolve(greet()).then(bootCloud).then(bootBoard).catch(() => {}).finally(checkSeason);
+  Promise.resolve(greet()).then(bootCloud).then(bootBoard).catch(() => {}).finally(() => { checkSeason(); checkPet(); });
   syncStorePremium(); // con cobro real: Premium sigue a la suscripción de Microsoft Store
   hintReducedMotion();
   registerServiceWorker();

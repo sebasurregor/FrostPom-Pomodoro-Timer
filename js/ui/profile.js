@@ -10,6 +10,7 @@ import { $, h, fmtInt } from './dom.js';
 import { openDialog, confirmDialog } from './feedback.js';
 import { emblem } from './emblems.js';
 import { companion } from './companions.js';
+import * as P from '../pet.js';
 import { avatarContent, countryPicker, flagEl } from './widgets.js';
 import { pickProfilePhoto } from './photo.js';
 import { premiumDialog, giftCompanionDialog } from './premium.js';
@@ -105,11 +106,18 @@ function renderCompanions() {
     if (using) action = h('span', { class: 'skin__using', text: 'Contigo' });
     else if (unlocked) action = h('button', { type: 'button', class: 'btn btn--gold btn--sm', onclick: () => mutate((s) => E.equipCompanion(s, c.id)) }, 'Elegir');
     else action = h('span', { class: 'companion-card__lock' }, pic('candado', 18), t('Logro: {name}', { name: ach.name }));
-    return h('li', { class: `companion-card companion-card--${rarity}${unlocked ? ' is-unlocked' : ''}${using ? ' is-using' : ''}` },
+    // (v4.2) Su nombre (si se lo pusiste) y, si se murió de hambre, la tumba
+    const name = unlocked ? P.petName(state, c.id) : '';
+    const dead = unlocked && P.isDead(state, c.id);
+    const art = dead
+      ? h('img', { class: 'companion companion--img companion--tomb', src: 'assets/sprites/tumba.webp', width: '88', height: '88', alt: t('{name}: se murió de hambre', { name: name || c.name }), decoding: 'async' })
+      : companion(c.id, { size: 88, locked: !unlocked, title: unlocked ? c.name : `${c.name}, bloqueado` });
+    return h('li', { class: `companion-card companion-card--${rarity}${unlocked ? ' is-unlocked' : ''}${using ? ' is-using' : ''}${dead ? ' is-dead' : ''}` },
       h('span', { class: 'companion-card__tag', text: c.starter ? 'Incluido' : isGift ? 'Regalo Premium' : unlocked ? G.RARITY[rarity].label : 'Limitado' }),
-      h('span', { class: 'companion-card__art' }, companion(c.id, { size: 88, locked: !unlocked, title: unlocked ? c.name : `${c.name}, bloqueado` })),
+      h('span', { class: 'companion-card__art' }, art),
       h('span', { class: 'companion-card__name', text: unlocked ? c.name : '???' }),
-      h('span', { class: 'companion-card__how', text: unlocked || !ach ? c.tagline : ach.desc }),
+      name ? h('span', { class: 'companion-card__pet' }, h('span', { class: 'nametag nametag--card' }, name)) : null,
+      h('span', { class: 'companion-card__how', text: dead ? 'Se murió de hambre. Elígelo y revívelo con gemas en la tienda.' : unlocked || !ach ? c.tagline : ach.desc }),
       action);
   }));
 }

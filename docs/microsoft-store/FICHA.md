@@ -18,7 +18,7 @@ Elige cuánto quieres estudiar (25 + 5, 50 + 10 o tu propio ritmo) y concéntrat
 • Entra desde cualquier equipo con tu correo y tu contraseña: tu progreso viaja contigo.
 • Ranking global: compite con estudiantes de todo el mundo por los minutos de estudio de la semana (puedes salir cuando quieras).
 • Pon tu foto de perfil (opcional, se queda solo en tu dispositivo).
-• Dale de comer a tu compañero: arrastra la comida con el mouse o con el dedo.
+• Dale de comer a tu compañero: arrastra la comida con el mouse o con el dedo. Ponle nombre y aparece en una etiqueta sobre su cabeza. Si pasa hambre se pone triste y llora… y si lo olvidas 3 días, tendrás que revivirlo con gemas.
 • Mira tu progreso en un calendario y en la gráfica de los últimos 7 días.
 • Un paisaje polar vivo, que sigue la hora de tu país: nieva, cambia el clima y de noche el oso asa malvaviscos junto a la fogata.
 • Sonidos para concentrarte (lluvia, lluvia con pájaros, olas, fogata, ruido blanco y más) y descansos guiados.
@@ -133,7 +133,7 @@ Pick how long you want to study (25 + 5, 50 + 10 or your own pace) and focus whi
 • Sign in from any device with your email and password: your progress travels with you.
 • Global leaderboard: compete with students around the world for this week's study minutes (you can leave anytime).
 • Add a profile photo (optional, it stays only on your device).
-• Feed your buddy: drag food with your mouse or finger.
+• Feed your buddy: drag food with your mouse or finger. Give it a name that floats on a tag above its head. When it’s hungry it gets sad and cries… and if you forget it for 3 days, you’ll have to revive it with gems.
 • See your progress in a calendar and a 7-day chart.
 • A living polar landscape that follows your local time: it snows, the weather changes and at night the bear roasts marshmallows by the campfire.
 • Focus sounds (rain, rain and birds, ocean waves, campfire, white noise and more) and guided breaks.
@@ -148,7 +148,7 @@ Privacy first: we don't ask for your real name and your photo never leaves your 
 - Pomodoro with ready-made or custom lengths
 - Ranks, seasons, daily missions and achievements
 - Limited-edition buddies you earn by studying
-- Shop to feed your buddy by dragging food
+- Shop to feed your buddy by dragging food, and a name tag for it
 - Online account: your progress on any device
 - Weekly and seasonal global leaderboard
 - Monthly calendar and weekly chart

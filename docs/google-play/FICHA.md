@@ -39,7 +39,7 @@ Elige cuánto quieres estudiar (25 + 5, 50 + 10 o tu propio ritmo) y concéntrat
 • Te avisa cuando termina cada bloque, aunque salgas de la app.
 • Entra desde cualquier equipo con tu correo y tu contraseña: tu progreso viaja contigo (también en la web y en Windows).
 • Ranking global: compite con estudiantes de todo el mundo por los minutos de estudio de la semana. Puedes salir cuando quieras, reportar nombres y ocultar a quien no quieras ver.
-• Dale de comer a tu compañero arrastrando la comida con el dedo.
+• Dale de comer a tu compañero arrastrando la comida con el dedo y ponle nombre: aparece en una etiqueta sobre su cabeza. Si pasa hambre se pone triste y llora… y si lo olvidas 3 días, tendrás que revivirlo con gemas.
 • Mira tu progreso en un calendario y en la gráfica de los últimos 7 días.
 • Un paisaje polar vivo, que sigue la hora de tu país: nieva, cambia el clima y de noche el oso asa malvaviscos junto a la fogata.
 • Sonidos para concentrarte (lluvia, lluvia con pájaros, olas, fogata, ruido blanco y más) y descansos guiados.
@@ -79,7 +79,7 @@ Pick how long you want to study (25 + 5, 50 + 10 or your own pace) and focus whi
 • Get notified when each block ends, even if you leave the app.
 • Sign in from any device with your email and password: your progress travels with you (also on the web and on Windows).
 • Global leaderboard: compete with students around the world for this week's study minutes. You can leave anytime, report names and hide anyone you don't want to see.
-• Feed your buddy by dragging food with your finger.
+• Feed your buddy by dragging food with your finger and give it a name that floats on a tag above its head. When it’s hungry it gets sad and cries… and if you forget it for 3 days, you’ll have to revive it with gems.
 • See your progress in a calendar and a 7-day chart.
 • A living polar landscape that follows your local time: it snows, the weather changes and at night the bear roasts marshmallows by the campfire.
 • Focus sounds (rain, rain and birds, ocean waves, campfire, white noise and more) and guided breaks.
@@ -160,6 +160,7 @@ En cualquier caso responde **"No"** a "¿Podría atraer de forma no intencional 
 | Información personal → **Otra información** (el país, si lo eliges) | Sí | Funcionalidad de la app (ranking) | Sí |
 | Actividad en la app → **Interacciones con la app** (pomodoros, minutos, progreso) | Sí | Funcionalidad de la app | No |
 | Actividad en la app → **Otras acciones** (los nombres que reportas) | Sí | Seguridad, prevención de fraude y cumplimiento | Sí |
+| Actividad en la app → **Otro contenido generado por el usuario** (v4.2: el nombre que le pones a tu mascota; viaja con tu progreso y no lo ve nadie más) | Sí | Funcionalidad de la app | Sí |
 | Ubicación, fotos, contactos, salud, finanzas, ID de publicidad | **No** | | |
 
 Notas:

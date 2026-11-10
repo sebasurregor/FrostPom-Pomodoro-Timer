@@ -10,9 +10,9 @@ import * as FX from './effects.js';
 import { $, $$, h } from './dom.js';
 import { toast, notify } from './feedback.js';
 import { askOnFirstSession } from './native-ui.js';
-import { penguin, companion, say } from './companions.js';
+import { petArt, headTop, say } from './companions.js';
 import { pickVoice, COMPANION_KIND } from '../voices.js';
-import { currentPetId, fullness } from '../pet.js';
+import { currentPetId, petStatus, petName, face as petFace } from '../pet.js';
 import { presetButton, mascotPop } from './widgets.js';
 import { premiumDialog } from './premium.js';
 import { syncAmbient } from './sound.js';
@@ -35,11 +35,13 @@ function timerChanged() {
   renderTimer();
 }
 
-/** Tu compañero de Enfocar dice algo (onomatopeya de su especie). */
+/** Tu compañero de Enfocar dice algo (onomatopeya de su especie). Si murió, no dice nada. */
 export function buddySays(ctx = {}) {
   const kind = COMPANION_KIND[state.profile.companion] || 'penguin';
-  const hungry = fullness(state, currentPetId(state)) < 25; // con mucha hambre, te lo recuerda
-  say($('#buddy'), pickVoice(kind, { hungry, ...ctx }), { ms: 2400 });
+  const st = petStatus(state, currentPetId(state));
+  if (st.dead) return;
+  const hungry = st.fullness < 25; // con mucha hambre, te lo recuerda
+  say($('#buddy'), pickVoice(kind, { hungry, starving: st.fullness <= 0, ...ctx }), { ms: 2400 });
 }
 
 export function startOrToggle() {
@@ -235,25 +237,51 @@ function updateClock() {
 }
 
 let eatingUntil = 0;
-/** Mientras come (ms), el pingüino pone ojos de corazón y los demás compañeros saltan. */
+/** Mientras come (ms), el compañero pone ojos de corazón (en bucle) o salta si no tiene esa animación. */
+export const EATING_MS = 3600; // dos vueltas completas de la animación de corazones
 export function setEating(ms) {
   eatingUntil = ms ? Date.now() + ms : 0;
   renderBuddy();
   if (ms) setTimeout(renderBuddy, ms + 50);
 }
 
-/** Sin compañero (o con el Pingüino), el acompañante es el pingüino animado: quieto mientras estudias y saludando en los descansos. */
-function renderBuddy() {
+/**
+ * (v4.2) El compañero de Enfocar según cómo está su barriguita: contento, triste, llorando,
+ * débil o la tumba. Arriba lleva su nombre (si se lo pusiste), como una etiqueta de nombre.
+ * El pingüino contento está quieto mientras estudias y saluda en los descansos.
+ */
+export function renderBuddy() {
   const b = $('#buddy');
-  const c = state.profile.companion;
-  const st = session.state;
-  const eating = Date.now() < eatingUntil;
+  const petId = currentPetId(state);
+  const st = petStatus(state, petId);
+  const face = petFace(st);
+  const eating = Date.now() < eatingUntil && !st.dead;
+  const run = session.state;
+  const pose = run.status === 'running' && run.mode !== 'study' ? 'saludo' : 'quieto';
+  const key = `${petId}:${eating ? 'amor' : face}:${pose}`;
   b.classList.toggle('is-eating', eating);
-  const key = c && c !== 'pinguino' ? c : eating ? 'sprite:amor' : st.status === 'running' && st.mode !== 'study' ? 'sprite:saludo' : 'sprite:quieto';
+  b.dataset.face = eating ? 'amor' : face;
   if (b.dataset.id !== key) {
-    b.replaceChildren(key.startsWith('sprite:') ? penguin(key.slice(7), { size: 96 }) : companion(c, { size: 96 }));
+    const body = h('span', { class: 'buddy__body' }, petArt(petId, face, { eating, pose }));
+    const old = $('.buddy__body', b);
+    if (old) old.replaceWith(body);
+    else b.append(body);
     b.dataset.id = key;
   }
+  // Etiqueta con el nombre, apoyada sobre la cabeza (como en los juegos de bloques)
+  const name = petName(state, petId);
+  let tag = $('.nametag', b);
+  if (name) {
+    if (!tag) {
+      tag = h('span', { class: 'nametag', 'aria-hidden': 'true' });
+      b.prepend(tag);
+    }
+    tag.textContent = name;
+    b.style.setProperty('--head', String(headTop(petId, eating ? 'feliz' : face)));
+  } else if (tag) {
+    tag.remove();
+  }
+  b.classList.toggle('has-tag', !!name);
   b.hidden = false;
 }
 

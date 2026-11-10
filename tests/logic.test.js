@@ -675,14 +675,16 @@ test('util: localParts da el día y la hora de otra zona horaria', () => {
 
 test('tienda: la barriguita baja con el tiempo y cada animal tiene sus favoritas', () => {
   const st = S.defaultState();
-  st.createdAt = '2026-11-03T12:00:00.000Z';
   const t0 = new Date('2026-11-03T12:00:00.000Z');
   assert.equal(PET.currentPetId(st), 'pinguino'); // sin compañero, el pingüino
-  assert.equal(PET.fullness(st, 'pinguino', t0), PET.START_FULLNESS);
+  assert.equal(PET.fullness(st, 'pinguino', t0), PET.START_FULLNESS); // recién llegado
+  PET.settle(st, t0); // al abrir la app, su barriguita empieza a correr
+  assert.deepEqual(st.pets.pinguino, { fullness: PET.START_FULLNESS, at: t0.toISOString() });
   assert.equal(PET.fullness(st, 'pinguino', new Date('2026-11-03T22:00:00.000Z')), 30); // 10 h × 3
   assert.equal(PET.fullness(st, 'pinguino', new Date('2026-11-05T12:00:00.000Z')), 0); // nunca baja de 0
   assert.equal(PET.mood(90).id, 'lleno');
   assert.equal(PET.mood(10).id, 'mucha-hambre');
+  assert.equal(PET.mood(0).id, 'muriendo');
   assert.equal(PET.fillFor('pinguino', 'pescado'), 18); // favorito: 12 × 1,5
   assert.equal(PET.fillFor('oso-polar', 'pescado'), 12);
   assert.equal(PET.FOODS.length, 12);
@@ -695,7 +697,7 @@ test('tienda: la barriguita baja con el tiempo y cada animal tiene sus favoritas
 
 test('tienda: darle de comer cobra gemas, llena la barriguita y respeta los límites', () => {
   const st = S.defaultState();
-  st.createdAt = '2026-11-03T12:00:00.000Z';
+  st.pets.pinguino = { fullness: 60, at: '2026-11-03T12:00:00.000Z' };
   const now = new Date('2026-11-03T22:00:00.000Z'); // barriguita en 30
   st.progress.gems = 3;
   let r = E.feedPet(st, 'pescado', now);
@@ -714,22 +716,128 @@ test('tienda: darle de comer cobra gemas, llena la barriguita y respeta los lím
   r = E.feedPet(st, 'pescado', now);
   assert.deepEqual([r.ok, r.reason], [false, 'full']);
   assert.equal(E.feedPet(st, 'piedra', now).reason, 'unknown');
-  // Con otro compañero equipado, come él (cada mascota tiene su propia barriguita).
-  st.profile.companion = 'oso-polar';
+  // Con otro compañero, come él (cada mascota tiene su propia barriguita) y el pingüino descansa.
+  st.progress.gifted.push('oso-polar');
+  assert.equal(E.equipCompanion(st, 'oso-polar', now).ok, true);
+  assert.equal(st.pets['oso-polar'].fullness, PET.START_FULLNESS); // llega con 60
   E.feedPet(st, 'jamon', now);
-  assert.ok(st.pets['oso-polar'].fullness > 30 && st.pets.pinguino.fullness === 100);
+  assert.ok(st.pets['oso-polar'].fullness > 60);
+  assert.deepEqual(st.pets.pinguino, { fullness: 100, at: now.toISOString(), rest: true });
 });
 
 test('tienda: los datos de las mascotas se validan al cargar', () => {
   const st = S.validateState({
-    pets: { pinguino: { fullness: 250, at: '2026-11-03T12:00:00.000Z' }, dragon: { fullness: 50, at: '2026-11-03T12:00:00.000Z' }, __proto__: { fullness: 1 }, 'oso-polar': { fullness: 40, at: 'ayer' } },
-    progress: { totals: { fed: 7 } },
+    v: 4,
+    pets: {
+      pinguino: { fullness: 250, at: '2026-11-03T12:00:00.000Z', name: '  Copito   Nieve ' },
+      dragon: { fullness: 50, at: '2026-11-03T12:00:00.000Z' },
+      __proto__: { fullness: 1 },
+      'oso-polar': { fullness: 40, at: 'ayer' },
+      'zorro-artico': { fullness: 30, at: '2026-11-03T12:00:00.000Z', rest: true, name: '<script>' },
+      'oso-marino': { fullness: 70, at: '2026-11-03T12:00:00.000Z', dead: '2026-11-06T12:00:00.000Z', rest: true },
+    },
+    progress: { totals: { fed: 7, revived: 2 } },
   });
-  assert.deepEqual(Object.keys(st.pets), ['pinguino']);
+  assert.deepEqual(Object.keys(st.pets).sort(), ['oso-marino', 'pinguino', 'zorro-artico']);
   assert.equal(st.pets.pinguino.fullness, 100);
+  assert.equal(st.pets.pinguino.name, 'Copito Nieve');
+  assert.deepEqual(st.pets['zorro-artico'], { fullness: 30, at: '2026-11-03T12:00:00.000Z', rest: true }); // el nombre raro se descarta
+  assert.deepEqual(st.pets['oso-marino'], { fullness: 0, at: '2026-11-03T12:00:00.000Z', dead: '2026-11-06T12:00:00.000Z' });
   assert.equal(st.progress.totals.fed, 7);
+  assert.equal(st.progress.totals.revived, 2);
   assert.equal(V.pickVoice('bear', { ate: 'favorite' }), '¡Mi favorito! ¡Groar!');
   assert.equal(V.pickVoice('penguin', { hungry: true }, () => 0.1), '¡Pi-pi… tengo hambre!');
+  assert.equal(V.pickVoice('fox', { starving: true, hungry: true }, () => 0.1), '¡Buaaa! ¡Yip… hambre!');
+  assert.equal(V.pickVoice('seal', { revived: true }), '¡Volví! ¡Arf arf!');
+});
+
+test('v4.2: con hambre se pone triste, llora y a los 3 días en 0 se muere', () => {
+  const st = S.defaultState();
+  const t0 = new Date('2026-11-01T00:00:00.000Z');
+  st.pets.pinguino = { fullness: 90, at: t0.toISOString() };
+  const at = (h) => new Date(t0.getTime() + h * 3600000);
+  assert.equal(PET.face(PET.petStatus(st, 'pinguino', at(0))), 'feliz');
+  assert.equal(PET.face(PET.petStatus(st, 'pinguino', at(15))), 'triste'); // 45
+  assert.equal(PET.face(PET.petStatus(st, 'pinguino', at(25))), 'lloroso'); // 15
+  const zero = PET.petStatus(st, 'pinguino', at(31)); // llegó a 0 a las 30 h
+  assert.equal(PET.face(zero), 'llorando');
+  assert.equal(Math.round(zero.hoursLeft), 71);
+  assert.equal(PET.face(PET.petStatus(st, 'pinguino', at(30 + 60))), 'debil'); // le quedan 12 h
+  const dead = PET.petStatus(st, 'pinguino', at(30 + 72));
+  assert.equal(dead.dead, true);
+  assert.equal(dead.diedAt, at(102).toISOString());
+  assert.equal(PET.face(dead), 'muerto');
+  assert.equal(PET.mood(0, dead).id, 'muerto');
+  // Muerta no come
+  st.progress.gems = 100;
+  assert.deepEqual([E.feedPet(st, 'pescado', at(110)).reason], ['dead']);
+  assert.equal(st.progress.gems, 100);
+});
+
+test('v4.2: revivir cuesta gemas y vuelve con la barriguita a la mitad (con su nombre)', () => {
+  const st = S.defaultState();
+  st.pets.pinguino = { fullness: 0, at: '2026-11-01T00:00:00.000Z', name: 'Copito' };
+  const now = new Date('2026-11-05T00:00:00.000Z'); // 96 h en 0: muerto
+  st.progress.gems = PET.REVIVE_COST - 1;
+  assert.equal(E.revivePet(st, now).reason, 'gems');
+  st.progress.gems = PET.REVIVE_COST + 5;
+  const r = E.revivePet(st, now);
+  assert.equal(r.ok, true);
+  assert.equal(r.events[0].type, 'revived');
+  assert.equal(st.progress.gems, 5);
+  assert.deepEqual(st.pets.pinguino, { fullness: PET.REVIVE_FULLNESS, at: now.toISOString(), name: 'Copito' });
+  assert.equal(st.progress.totals.revived, 1);
+  assert.equal(E.revivePet(st, now).reason, 'alive'); // vivo no se revive
+});
+
+test('v4.2: solo le da hambre a la mascota que está contigo; las demás descansan', () => {
+  const st = S.defaultState();
+  st.progress.gifted.push('zorro-artico');
+  const t0 = new Date('2026-11-01T00:00:00.000Z');
+  st.pets.pinguino = { fullness: 80, at: t0.toISOString(), name: 'Pingu' };
+  E.equipCompanion(st, 'zorro-artico', new Date('2026-11-01T10:00:00.000Z')); // pingüino en 50
+  assert.deepEqual(st.pets.pinguino, { fullness: 50, at: '2026-11-01T10:00:00.000Z', name: 'Pingu', rest: true });
+  // Un mes después el pingüino sigue igual (descansando) y no se murió
+  const later = new Date('2026-12-01T10:00:00.000Z');
+  assert.deepEqual([PET.fullness(st, 'pinguino', later), PET.isDead(st, 'pinguino', later)], [50, false]);
+  assert.equal(PET.isDead(st, 'zorro-artico', later), true); // el zorro sí estaba contigo
+  // Al volver, su barriguita corre desde ese momento
+  E.equipCompanion(st, null, later);
+  assert.deepEqual(st.pets.pinguino, { fullness: 50, at: later.toISOString(), name: 'Pingu' });
+  assert.equal(st.pets['zorro-artico'].dead, '2026-11-05T06:00:00.000Z'); // llegó a las 10:00 con 60: 20 h hasta 0 + 72 h
+  assert.equal(PET.needsSettle(st), false);
+  st.profile.companion = 'zorro-artico'; // cambió en otro equipo (sin equipCompanion)
+  assert.equal(PET.needsSettle(st), true);
+});
+
+test('v4.2: los datos de la v4.1 no encuentran a la mascota muerta al actualizar', () => {
+  const st = S.validateState({ v: 3, createdAt: '2026-01-01T00:00:00.000Z', pets: { 'oso-polar': { fullness: 90, at: '2026-01-02T00:00:00.000Z' } } });
+  assert.equal(st.v, 4);
+  // El pingüino (de ahora) estaba en 0 hace meses: ahora tiene sus 3 días de gracia
+  const p = PET.petStatus(st, 'pinguino');
+  assert.equal(p.dead, false);
+  assert.ok(p.hoursLeft > 71);
+  assert.equal(st.pets['oso-polar'].rest, true); // el oso descansa
+  assert.equal(st.pets['oso-polar'].fullness, 0);
+});
+
+test('v4.2: el nombre de la mascota se revisa (largo, letras y respeto)', () => {
+  assert.deepEqual(PET.checkPetName('  Señor   Copito '), { ok: true, value: 'Señor Copito' });
+  assert.deepEqual(PET.checkPetName(''), { ok: true, value: '' }); // vacío = quitar el nombre
+  assert.equal(PET.checkPetName('Pingüinito del Polo Sur').ok, false); // más de 16
+  assert.equal(PET.checkPetName('<b>hola</b>').ok, false);
+  assert.equal(PET.checkPetName('🐧🐧').ok, false);
+  assert.equal(PET.checkPetName('...').ok, false);
+  assert.equal(PET.checkPetName('puta').ok, false);
+  assert.equal(PET.checkPetName("¡Kiki-2!").ok, true);
+  assert.equal(PET.checkPetName(42).ok, false);
+  const st = S.defaultState();
+  assert.equal(E.namePet(st, 'Copito').ok, true);
+  assert.equal(PET.petName(st, 'pinguino'), 'Copito');
+  assert.equal(E.namePet(st, 'puta').ok, false);
+  assert.equal(PET.petName(st, 'pinguino'), 'Copito');
+  E.namePet(st, '');
+  assert.equal(PET.petName(st, 'pinguino'), '');
 });
 
 test('foto de perfil: solo imágenes WebP, JPEG o PNG en base64 y de tamaño razonable', () => {

@@ -127,11 +127,14 @@ function igloo() {
     block('M446 788 Q480 780 514 788'));
 }
 
-// Escena nocturna: el oso polar asa malvaviscos junto a la fogata (arte del autor).
+// Escena nocturna: el oso polar y (v4.2) el zorro ártico asan malvaviscos junto a la fogata (arte del autor).
 // El oso tiene 5 cuadros (mira el malvavisco, sonríe, se le antoja, se asusta y lo sopla).
 // La fogata es la del mismo dibujo, separada en llama (titila) y leños (quietos), con
 // resplandor, chispas y humo animados encima.
 const ROAST = { x: 750, y: 658.5, w: 182.5, h: 150, frames: 5 }; // ventana de un cuadro, en unidades del paisaje
+// (v4.2) El zorro, al otro lado de la fogata: su malvavisco queda junto al del oso, en la punta
+// de la llama. Hoja de 5 cuadros de 400 × 320 (tools/preparar_sprites.py).
+const ROAST2 = { x: 889, y: 670, w: 174.8, h: 139.8, frames: 5 };
 const FIRE = { x: 905, y: 806 }; // centro de la base de los leños
 function camp() {
   return s('g', { class: 'sc-camp' },
@@ -140,6 +143,9 @@ function camp() {
     // oso con malvavisco: una tira de 5 cuadros que se recorre dentro de una ventana
     s('svg', { class: 'sc-roast', x: ROAST.x, y: ROAST.y, width: ROAST.w, height: ROAST.h, viewBox: `0 0 ${ROAST.w} ${ROAST.h}`, overflow: 'hidden' },
       s('image', { class: 'sc-roast__strip', href: 'assets/sprites/oso-malvavisco.webp', x: 0, y: 0, width: ROAST.w * ROAST.frames, height: ROAST.h, preserveAspectRatio: 'none' })),
+    // zorro con malvavisco (mira el malvavisco, se asoma, se le hace agua la boca, ¡se quema!, se lo come)
+    s('svg', { class: 'sc-roast2', x: ROAST2.x, y: ROAST2.y, width: ROAST2.w, height: ROAST2.h, viewBox: `0 0 ${ROAST2.w} ${ROAST2.h}`, overflow: 'hidden' },
+      s('image', { class: 'sc-roast2__strip', href: 'assets/sprites/zorro-malvavisco.webp', x: 0, y: 0, width: ROAST2.w * ROAST2.frames, height: ROAST2.h, preserveAspectRatio: 'none' })),
     // fogata del dibujo: leños quietos y llama que titila
     s('image', { class: 'sc-fire-logs', href: 'assets/sprites/fogata-lenos.webp', x: FIRE.x - 24.75, y: FIRE.y - 17.75, width: 49.5, height: 18, preserveAspectRatio: 'none' }),
     s('image', { class: 'sc-flame sc-fire-art', href: 'assets/sprites/fogata-llama.webp', x: FIRE.x - 21.75, y: FIRE.y - 58.25, width: 43.25, height: 40.5, preserveAspectRatio: 'none' }),

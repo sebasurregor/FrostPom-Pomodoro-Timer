@@ -9,10 +9,10 @@ import * as E from '../engine.js';
 import * as P from '../pet.js';
 import * as FX from './effects.js';
 import { $, h, fmtInt } from './dom.js';
-import { toast } from './feedback.js';
+import { toast, openDialog } from './feedback.js';
 import { say } from './companions.js';
 import { state, mutate } from './context.js';
-import { setEating } from './focus.js';
+import { setEating, EATING_MS, buddySays } from './focus.js';
 import { pic } from './pics.js';
 import { t, tr } from '../i18n.js';
 
@@ -49,31 +49,68 @@ export function closeTray() {
 }
 const toggleTray = () => (trayOpen() ? closeTray() : openTray());
 
-/** Ícono de la tienda: avisa con un "!" cuando la mascota tiene mucha hambre. */
+/** Cómo se llama la mascota en los textos: su nombre, o "tu pingüino", "tu oso polar"… */
+export function petLabel(petId = P.currentPetId(state)) {
+  return P.petName(state, petId) || (petId === 'pinguino' ? tr('tu pingüino') : t('tu {pet}', { pet: P.PETS[petId].name.toLowerCase() }));
+}
+
+/** Ícono de la tienda: avisa con un "!" cuando la mascota tiene mucha hambre (o se murió). */
 export function renderShopBtn() {
-  const hungry = P.fullness(state, P.currentPetId(state)) < 25;
+  const st = P.petStatus(state, P.currentPetId(state));
+  const hungry = st.dead || st.fullness < 25;
   $('#shopHungry').hidden = !hungry;
   $('#shopBtn').classList.toggle('is-hungry', hungry);
+  const label = st.dead ? t('Tienda: {pet} se murió de hambre. Revívelo con gemas', { pet: petLabel() }) : tr('Tienda: dale de comer a tu compañero');
+  $('#shopBtn').setAttribute('aria-label', label);
+  $('#shopBtn').title = label;
   if (trayOpen()) renderTray();
+}
+
+/** Cuánto le falta para morirse, en palabras ("2 días", "5 horas"). */
+function timeLeft(hours) {
+  const h = Math.max(1, Math.ceil(hours));
+  const hrs = (n) => (n === 1 ? tr('1 hora') : t('{n} horas', { n }));
+  if (h < 24) return hrs(h);
+  const d = Math.floor(h / 24);
+  const days = d === 1 ? tr('1 día') : t('{n} días', { n: d });
+  return h % 24 ? t('{days} y {hours}', { days, hours: hrs(h % 24) }) : days;
 }
 
 export function renderTray() {
   const petId = P.currentPetId(state);
-  const pet = P.PETS[petId];
-  const full = P.fullness(state, petId);
+  const st = P.petStatus(state, petId);
+  const full = st.fullness;
   const pct = Math.round(full);
-  const m = P.mood(full);
+  const m = P.mood(full, st);
   const isFull = full >= P.FULL_AT;
-  $('#trayPetName').textContent = state.profile.companion ? t('tu {pet}', { pet: pet.name.toLowerCase() }) : tr('tu pingüino');
+  const label = petLabel(petId);
+  $('#h-tray').textContent = st.dead ? t('Revive a {pet}', { pet: label }) : t('Dale de comer a {pet}', { pet: label });
+  $('#trayNameBtn').setAttribute('aria-label', P.petName(state, petId) ? tr('Cambiar el nombre de tu compañero') : tr('Ponle nombre a tu compañero'));
   $('#trayPct').textContent = `${pct} %`;
   $('#trayFill').style.setProperty('--p', `${pct}%`);
   $('#trayMeter').setAttribute('aria-valuenow', String(pct));
   $('#trayMeter').setAttribute('aria-valuetext', `${pct} %: ${m.label}`);
   $('#trayMeter').dataset.mood = m.id;
   $('#trayGems').textContent = fmtInt(state.progress.gems);
+  // Se murió: la tumba y el botón para revivirlo (la comida no se muestra)
+  $('#trayRevive').hidden = !st.dead;
+  $('#trayFoods').hidden = st.dead;
+  if (st.dead) {
+    const missing = P.REVIVE_COST - state.progress.gems;
+    $('#trayHint').textContent = `${m.emoji} ${t('{pet} se murió porque pasó 3 días sin comer.', { pet: capital(label) })}`;
+    $('#reviveCost').textContent = String(P.REVIVE_COST);
+    $('#reviveBtn').disabled = missing > 0;
+    $('#reviveNote').textContent = missing > 0
+      ? t('Te faltan {n} gemas. Las ganas estudiando y con las misiones.', { n: missing })
+      : t('Vuelve con la barriguita a la mitad ({n} %).', { n: P.REVIVE_FULLNESS });
+    $('#trayFoods').replaceChildren();
+    return;
+  }
   $('#trayHint').textContent = isFull
     ? `${m.emoji} ${tr('¡Está lleno!')}`
-    : tr('Arrástrala hasta tu compañero. ★ = favorita.');
+    : st.hoursLeft !== undefined
+      ? `${m.emoji} ${t('¡Su barriguita está vacía! Si no come en {time}, se muere.', { time: timeLeft(st.hoursLeft) })}`
+      : tr('Arrástrala hasta tu compañero. ★ = favorita.');
   $('#trayFoods').replaceChildren(...P.FOODS.map((f) => {
     const fav = P.isFavorite(petId, f.id);
     const missing = f.cost - state.progress.gems;
@@ -176,18 +213,83 @@ function onClick(e) {
   $('#buddy').classList.add('is-hint');
 }
 
+const capital = (txt) => (txt ? txt[0].toLocaleUpperCase() + txt.slice(1) : txt);
+
 function feed(foodId) {
-  setEating(2200);
   const res = mutate((s) => E.feedPet(s, foodId));
+  if (res.ok) setEating(EATING_MS); // corazones en bucle (dos vueltas completas)
+  else {
+    const why = { full: 'Tu compañero ya está lleno. Vuelve más tarde.', dead: 'Tu compañero se murió de hambre. Primero revívelo.' };
+    toast(why[res.reason] || 'No te alcanzan las gemas. Las ganas estudiando y con las misiones.', 'warn');
+  }
+}
+
+/** (v4.2) Revivir a la mascota con gemas. */
+function revive() {
+  const res = mutate((s) => E.revivePet(s));
   if (!res.ok) {
-    setEating(0);
-    toast(res.reason === 'full' ? 'Tu compañero ya está lleno. Vuelve más tarde.' : 'No te alcanzan las gemas. Las ganas estudiando y con las misiones.', 'warn');
+    if (res.reason === 'gems') toast('No te alcanzan las gemas. Las ganas estudiando y con las misiones.', 'warn');
+    return;
+  }
+  setEating(EATING_MS); // vuelve feliz, con corazones
+  const first = $('#trayFoods .tray-food:not([disabled])');
+  if (first) first.focus({ preventScroll: true });
+}
+
+/** (v4.2) Ponerle nombre a la mascota: aparece en una etiqueta encima de su cabeza. */
+export async function nameFlow() {
+  const petId = P.currentPetId(state);
+  const id = 'petNameInput';
+  const input = h('input', {
+    type: 'text', id, name: 'petName', class: 'acc-input acc-input--pet', maxlength: String(P.NAME_MAX + 4),
+    autocomplete: 'off', spellcheck: 'false', value: P.petName(state, petId), placeholder: tr('Por ejemplo: Copito'),
+  });
+  const err = h('p', { class: 'form-error', role: 'alert' });
+  const preview = h('span', { class: 'nametag nametag--preview', 'aria-hidden': 'true' });
+  const showPreview = () => {
+    const c = P.checkPetName(input.value);
+    preview.textContent = c.ok && c.value ? c.value : input.value.trim() || '…';
+  };
+  input.addEventListener('input', () => { err.textContent = ''; showPreview(); });
+  showPreview();
+  let value = '';
+  const res = await openDialog({
+    title: 'Ponle nombre a tu compañero',
+    body: [
+      h('p', { class: 'dlg__text', text: t('Aparece en una etiqueta encima de {pet}. Solo lo ves tú.', { pet: petLabel(petId) }) }),
+      h('div', { class: 'name-preview' }, preview),
+      h('div', { class: 'field' }, h('label', { for: id, text: 'Nombre (máximo 16 caracteres)' }), input, err),
+    ],
+    actions: [
+      { label: 'Cancelar', value: 'cancel' },
+      ...(P.petName(state, petId) ? [{ label: 'Quitar nombre', value: 'clear' }] : []),
+      { label: 'Guardar', value: 'ok', variant: 'btn--gold', primary: true, validate: () => {
+        const c = P.checkPetName(input.value);
+        if (!c.ok) { err.textContent = c.reason; input.focus(); return false; }
+        value = c.value;
+        return true;
+      } },
+    ],
+    onOpen: () => { input.focus(); input.select(); },
+  });
+  if (res !== 'ok' && res !== 'clear') return;
+  const r = mutate((s) => E.namePet(s, res === 'clear' ? '' : value));
+  if (r.ok && r.name) {
+    toast(t('¡Ahora se llama {name}!', { name: r.name }), 'good', { icon: '🏷️' });
+    buddySays();
   }
 }
 
 export function bindFeeding() {
   $('#shopBtn').addEventListener('click', toggleTray);
   $('#trayClose').addEventListener('click', () => { closeTray(); $('#shopBtn').focus(); });
+  $('#trayNameBtn').addEventListener('click', nameFlow);
+  $('#reviveBtn').addEventListener('click', revive);
+  // Tocar la tumba abre la tienda (ahí se revive); tocar al compañero lo hace hablar
+  $('#buddy').addEventListener('click', () => {
+    if (P.isDead(state, P.currentPetId(state))) openTray();
+    else buddySays();
+  });
   const list = $('#trayFoods');
   list.addEventListener('pointerdown', onDown);
   list.addEventListener('pointermove', onMove);

@@ -170,7 +170,10 @@
         <div class="focus-side">
           <section class="panel food-tray" id="foodTray" aria-labelledby="h-tray" hidden>
             <div class="food-tray__head">
-              <h2 class="panel__title" id="h-tray">Dale de comer a <span id="trayPetName">tu pingüino</span></h2>
+              <h2 class="panel__title" id="h-tray">Dale de comer a tu pingüino</h2>
+              <button type="button" class="icon-btn icon-btn--name" id="trayNameBtn" aria-label="Ponle nombre a tu compañero" title="Ponle nombre a tu compañero">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l1.2-4.6L15.6 5a2 2 0 0 1 2.8 0l.6.6a2 2 0 0 1 0 2.8L8.6 18.8z"/><path d="M13.8 6.8l3.4 3.4"/></svg>
+              </button>
               <button type="button" class="icon-btn" id="trayClose" aria-label="Cerrar la tienda">×</button>
             </div>
             <div class="food-tray__status">
@@ -180,6 +183,13 @@
               <span class="tray-gems" title="Tus gemas"><img class="pic pic--gema" src="assets/icons/gema.png" width="18" height="18" alt="" aria-hidden="true"> <b id="trayGems">0</b><span class="sr-only"> gemas</span></span>
             </div>
             <p class="food-tray__hint" id="trayHint"></p>
+            <div class="tray-revive" id="trayRevive" hidden>
+              <img class="tray-revive__art" src="assets/sprites/tumba.webp" width="88" height="88" alt="" aria-hidden="true" decoding="async">
+              <div class="tray-revive__body">
+                <button type="button" class="btn btn--gold" id="reviveBtn">Revivir por <b id="reviveCost">30</b> <img class="pic pic--gema" src="assets/icons/gema.png" width="18" height="18" alt="gemas"></button>
+                <p class="tray-revive__note" id="reviveNote"></p>
+              </div>
+            </div>
             <ul class="tray-foods" id="trayFoods" aria-label="Comida"></ul>
           </section>
 

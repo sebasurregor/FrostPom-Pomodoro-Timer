@@ -79,6 +79,18 @@ const SHOW = {
     }
     return wait(150);
   },
+  revived(e) {
+    const stage = $('#buddy');
+    FX.sfx.achievement();
+    FX.buzz([30, 40, 60]);
+    if (stage) {
+      say(stage, pickVoice(PETS[e.petId].kind, { revived: true }), { ms: 2600 });
+      const r = stage.getBoundingClientRect();
+      FX.confetti({ x: r.left + r.width / 2, y: r.top + r.height / 3, count: 50, spread: 0.5, colors: ['#FF5E7E', '#FFC531', '#ffffff', '#45C6EE'] });
+    }
+    toast(t('¡Volvió! Gastaste {n} gemas. Dale de comer seguido para que no vuelva a pasar.', { n: e.gems }), 'good', { icon: '💖', ms: 5000 });
+    return wait(200);
+  },
   skin(e) {
     toast(t('Nuevo estilo para tu anillo: {name}.', { name: e.skin.name }), 'good');
     return wait(100);

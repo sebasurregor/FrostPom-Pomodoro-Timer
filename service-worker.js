@@ -7,7 +7,7 @@
  *  - Solo se guarda en caché lo de este mismo sitio y respuestas correctas. Nunca respuestas de APIs
  *    ni de otros dominios (podrían contener datos personales).
  */
-const VERSION = '4.1.0';
+const VERSION = '4.2.0';
 const CACHE = `frostpom-${VERSION}`;
 const PRECACHE = [
   './',
@@ -91,6 +91,8 @@ const PRECACHE = [
   './assets/fonts/lilita-one-latin.woff2',
   './assets/fonts/nunito-latin-wght.woff2',
   './assets/fonts/twemoji-country-flags.woff2',
+  './assets/fonts/pixelify-sans-latin.woff2',
+  './assets/fonts/pixelify-sans-latin-ext.woff2',
   './assets/icons/icon.svg',
   './assets/icons/icon-192.png',
   './assets/icons/icon-512.png',
@@ -108,6 +110,18 @@ const PRECACHE = [
   './assets/sprites/oso-malvavisco.webp',
   './assets/sprites/fogata-llama.webp',
   './assets/sprites/fogata-lenos.webp',
+  // v4.2: corazones, llanto, tumba y el zorro (camina y asa malvaviscos)
+  './assets/sprites/pinguino-llora.webp',
+  './assets/sprites/oso-llora.webp',
+  './assets/sprites/oso-marino-llora.webp',
+  './assets/sprites/oso-marino-amor.webp',
+  './assets/sprites/tiburon-llora.webp',
+  './assets/sprites/tiburon-amor.webp',
+  './assets/sprites/zorro-llora.webp',
+  './assets/sprites/zorro-amor.webp',
+  './assets/sprites/zorro-camina.webp',
+  './assets/sprites/zorro-malvavisco.webp',
+  './assets/sprites/tumba.webp',
   './assets/food/pescado.webp',
   './assets/food/camaron.webp',
   './assets/food/arandanos.webp',

@@ -1,4 +1,4 @@
-# FrostPom: Pomodoro Timer (v4.1.0)
+# FrostPom: Pomodoro Timer (v4.2.0)
 
 > Antes se llamaba **StudyTimer**. Publicada en **https://sebasurregor.github.io/FrostPom-Pomodoro-Timer/**
 
@@ -30,11 +30,11 @@ Si ya usabas la v2, la v3 **abre tus datos tal cual** (mismo almacenamiento). Si
 
 **Registro en dos pasos:** primero el nombre de usuario, la contraseña y la nacionalidad (opcional); después, una vista aparte para subir la foto de perfil (opcional, con recorte y zoom). Si no sube foto, la app le asigna un animal al azar; no hay lista de emojis para elegir ni botón de "Sugerir" nombre.
 
-Diseño: paisaje polar simple (montañas en #2d68bc, #749eda y #93c0ed) con pingüinos, un oso polar, un zorro ártico y una foca que caminan, dan salticos y de vez en cuando dicen algo ("¡Cuac!", "¡Grrr!", "¡Yip yip!"). El cielo sigue la hora real (amanecer, día, atardecer y noche) y de noche el oso polar asa malvaviscos junto a la fogata y a su iglú. El clima cambia cada 3 horas: despejado, nieve ligera, nevando o nevada fuerte. Encima van paneles claros tipo pegatina y botones de videojuego.
+Diseño: paisaje polar simple (montañas en #2d68bc, #749eda y #93c0ed) con pingüinos, un oso polar, un zorro ártico y una foca que caminan, dan salticos y de vez en cuando dicen algo ("¡Cuac!", "¡Grrr!", "¡Yip yip!"). El cielo sigue la hora real (amanecer, día, atardecer y noche) y de noche el oso polar y el zorro ártico asan malvaviscos junto a la fogata y al iglú. El clima cambia cada 3 horas: despejado, nieve ligera, nevando o nevada fuerte. Encima van paneles claros tipo pegatina y botones de videojuego.
 
 | Vista | Para qué sirve |
 |---|---|
-| **Enfocar** | Temporizador con modos (Mini 15+5, Clásico 25+5, Enfoque 45+10, Profundo 50+10, Largo 60+15) y **Mi ritmo**, donde eliges tus minutos de estudio y descanso. El descanso largo llega solo cada 4 pomodoros. Solo registra *cuánto* estudiaste, no *qué*. |
+| **Enfocar** | Temporizador con modos (Mini 15+5, Clásico 25+5, Enfoque 45+10, Profundo 50+10, Largo 60+15) y **Mi ritmo**, donde eliges tus minutos de estudio y descanso. El descanso largo llega solo cada 4 pomodoros. Solo registra *cuánto* estudiaste, no *qué*. Junto al reloj está tu compañero (v4.2): con la tienda le das de comer (corazones al comer), le pones **nombre** (etiqueta sobre su cabeza) y se le nota el hambre (triste, llora); si pasa 3 días en 0 queda una tumba y se revive con 30 gemas. |
 | **Premium 👑** | Corona en la barra superior. Modo prueba sin cobro: duración libre, todos los temas, sonidos y tonos, y recordatorios de enfoque. **Regalo de bienvenida (una sola vez):** 1000 gemas para alimentar a la mascota y una mascota de edición limitada que el usuario elige. |
 | **Progreso** | Salud de tu polo, rango (Bronce → Leyenda), racha, misiones diarias, **Tu estudio** (pestañas: gráfica de los últimos 7 días o calendario del mes con los minutos de cada día) e historial (las 5 últimas sesiones, con "Ver más"). |
 | **Ranking** | **Ranking global** (`docs/RANKING-GLOBAL.md`): podio y tabla de la semana y la temporada, el servidor mide el tiempo, máximo 4 h al día, aparecen los de 13+ con su nombre de usuario y se puede salir (y borrar los minutos). Con `mode: 'local'`: tu marca y el aviso "llega pronto". |
@@ -136,6 +136,7 @@ python tests/e2e_cuentas.py http://localhost:8000/   # cuentas en línea con un 
 python tests/e2e_sonidos.py http://localhost:8000/   # sonidos grabados: bucle sin corte y sin internet
 python tests/e2e_captcha.py http://localhost:8000/   # CAPTCHA con Supabase y Turnstile simulados
 python tests/e2e_android.py http://localhost:8000/   # reportar y ocultar, normas, borrar cuenta y app de Android (simulada)
+python tests/e2e_mascota.py http://localhost:8000/   # v4.2: corazones, hambre, tumba, revivir y nombre de tu compañero
 python tests/store_check.py http://localhost:8000/   # lista para Microsoft Store: manifiesto, instalable,
                                                      # sin conexión, 8 tamaños de ventana y accesibilidad (axe)
 ```

@@ -12,7 +12,7 @@ import * as C from './catalog.js';
 import { isValidNick, checkUsername, isCountry, AVATARS } from './identity.js';
 import { MAX_SESSIONS, applyRecord } from './engine.js';
 import { isSeasonId, MAX_ARCHIVE } from './season.js';
-import { isPetId } from './pet.js';
+import { isPetId, checkPetName, migrateFromV3 } from './pet.js';
 
 export const KEY = 'st2_state';
 export const TIMER_KEY = 'st2_timer';
@@ -48,7 +48,7 @@ function usable(kind) {
 // ---------- Estado por defecto ----------
 export function defaultState() {
   return {
-    v: 3,
+    v: 4, // 4 = v4.2 (mascotas que descansan, mueren y tienen nombre; ver pet.js)
     createdAt: new Date().toISOString(),
     profile: { nick: '', avatar: '🐧', photo: '', companion: null, country: '', onboarded: false }, // photo: data URL, solo en este dispositivo
     settings: {
@@ -68,11 +68,11 @@ export function defaultState() {
     progress: {
       xp: 0, gems: 0, achievements: U.dict(), claimed: U.dict(), owned: ['clasico'], gifted: [],
       bestStreak: 0, combo: 0, bestCombo: 0, longestSessionSec: 0, cycle: 0, breakEarned: false, customized: false,
-      totals: { studySec: 0, creditedSec: 0, sessions: 0, partials: 0, breaks: 0, missionsClaimed: 0, fed: 0 },
+      totals: { studySec: 0, creditedSec: 0, sessions: 0, partials: 0, breaks: 0, missionsClaimed: 0, fed: 0, revived: 0 },
       season: '', // temporada a la que pertenecen xp y rango ("2026-10"); ver season.js
     },
     seasons: [], // resumen de las temporadas terminadas (la más reciente primero)
-    pets: U.dict(), // barriguita de cada mascota: { pinguino: { fullness, at } } (ver pet.js)
+    pets: U.dict(), // cada mascota: { pinguino: { fullness, at, name?, rest?, dead? } } (ver pet.js)
     daily: U.dict(),
     sessions: [],
   };
@@ -225,7 +225,17 @@ export function validateState(raw) {
   out.seasons = arr(raw.seasons).map(sanitizeSeason).filter(Boolean).slice(0, MAX_ARCHIVE);
   for (const [id, rec] of Object.entries(obj(raw.pets))) {
     const r = obj(rec);
-    if (isPetId(id) && isISO(r.at)) out.pets[id] = { fullness: int(r.fullness, 0, 100, 60), at: r.at };
+    if (!isPetId(id) || !isISO(r.at)) continue;
+    const pet = { fullness: int(r.fullness, 0, 100, 60), at: r.at };
+    const name = checkPetName(r.name);
+    if (typeof r.name === 'string' && name.ok && name.value) pet.name = name.value;
+    if (isISO(r.dead)) {
+      pet.dead = r.dead;
+      pet.fullness = 0;
+    } else if (r.rest === true) {
+      pet.rest = true;
+    }
+    out.pets[id] = pet;
   }
 
   // El tema elegido solo se conserva si es tuyo o si Premium lo incluye.
@@ -233,6 +243,8 @@ export function validateState(raw) {
   // El compañero solo vale si su logro está desbloqueado.
   dp.gifted = [...new Set(arr(pr.gifted).filter((x) => typeof x === 'string' && C.COMPANION_BY_ID[x]))];
   out.profile.companion = typeof p.companion === 'string' && C.companionUnlocked(p.companion, dp.achievements, dp.gifted) ? p.companion : null;
+  // Datos de antes de la v4.2: el reloj del hambre de la mascota empieza de nuevo (ver pet.js)
+  if (!(Number(raw.v) >= 4)) migrateFromV3(out);
 
   const dayKeys = Object.keys(obj(raw.daily)).filter(U.isDateKey).sort().slice(-LIMITS.dailyDays);
   for (const k of dayKeys) out.daily[k] = sanitizeDay(raw.daily[k]);
