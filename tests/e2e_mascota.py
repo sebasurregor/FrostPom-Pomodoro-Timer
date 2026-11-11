@@ -17,7 +17,12 @@ Comprueba que:
   F. Datos de la v4.1: al actualizar nadie encuentra a su mascota muerta (3 días de gracia).
   G. Paisaje: el zorro camina con su sprite de 4 cuadros y de noche asa malvaviscos junto al oso.
   H. Con "Menos animaciones" el llanto y los corazones quedan quietos en un cuadro.
-  I. Sin errores en la consola ni archivos que falten.
+  J. (v4.3.1) Sin nombre, tocar al compañero abre "Ponle nombre"; con nombre, habla. Y sin nombre,
+     de vez en cuando pide uno (más o menos 1 de cada 4 frases, nunca dos seguidas; también en inglés).
+  K. (v4.3.1) En el celular (360 × 640, 384 × 832 y 412 × 915), con la bandeja de comida abierta el
+     compañero y su nombre quedan enteros por encima de ella, el reloj se lee y se le puede arrastrar
+     la comida.
+  L. Sin errores en la consola ni archivos que falten.
 
 Uso (con la app servida: python -m http.server 8000):
     python tests/e2e_mascota.py http://localhost:8000/
@@ -64,8 +69,8 @@ SEED = """(s) => {
 }"""
 
 
-def open_app(browser, st, locale='es-CO', route='#/enfocar', width=412):
-    ctx = browser.new_context(viewport={'width': width, 'height': 900}, locale=locale, service_workers='block')
+def open_app(browser, st, locale='es-CO', route='#/enfocar', width=412, height=900):
+    ctx = browser.new_context(viewport={'width': width, 'height': height}, locale=locale, service_workers='block')
     ctx.route(f'{SUPA}/**', FakeSupabase().handle)
     pg = sheets_patch(ctx.new_page())
     errs, missing = [], []
@@ -306,7 +311,7 @@ def main():
         check(pg.evaluate("document.querySelector('.walker--fox .sprite--zorro-camina') !== null"), 'el zorro camina con su sprite de 4 cuadros')
         check(pg.evaluate("document.querySelector('.sc-roast2 image').getAttribute('href')") == 'assets/sprites/zorro-malvavisco.webp', 'de noche el zorro asa malvaviscos junto a la fogata')
         pg.evaluate("document.querySelector('.scenery').dataset.phase = 'night'")
-        pg.wait_for_timeout(300)
+        pg.wait_for_timeout(2800)  # el paisaje cambia de fase con una transición de 2,5 s
         check(pg.evaluate("getComputedStyle(document.querySelector('.sc-camp')).opacity") == '1', 'la fogata se ve de noche')
         xs = set()
         for _ in range(26):
@@ -322,9 +327,80 @@ def main():
         check(seen == {'25%'}, f'el llanto queda quieto en un cuadro ({seen})')
         done(ctx, errs, missing)
 
+        # ------------------------------------------------------------------ J
+        print('J. Tocar al compañero le pone nombre')
+        ctx, pg, errs, missing = open_app(browser, state(None, {'pinguino': {'fullness': 80, 'at': ago(0.1)}}))
+        pg.click('#buddy')
+        pg.wait_for_timeout(400)
+        check(pg.evaluate("document.getElementById('dlg').open && !!document.querySelector('#dlg #petNameInput')"), 'sin nombre: tocarlo abre "Ponle nombre a tu compañero"')
+        pg.fill('#petNameInput', 'Copito')
+        pg.click('#dlg [data-primary]')
+        pg.wait_for_timeout(300)
+        check(pg.text_content('#buddy .nametag') == 'Copito', 'y el nombre queda puesto')
+        pg.wait_for_timeout(2800)  # termina de hablar
+        pg.click('#buddy')
+        pg.wait_for_timeout(300)
+        check(not pg.evaluate("document.getElementById('dlg').open") and pg.evaluate("!!document.querySelector('#buddy .say')"), 'con nombre: tocarlo no abre el diálogo, habla')
+        done(ctx, errs, missing)
+
+        # El recordatorio: con el azar fijo en 0 pide nombre; en 0.9 no. Nunca dos veces seguidas.
+        SAYS = "async (r) => { Math.random = () => r; const m = await import('./js/ui/focus.js'); m.buddySays(); const s = document.querySelector('#buddy .say'); return s ? s.textContent : ''; }"
+        ctx, pg, errs, missing = open_app(browser, state(None, {'pinguino': {'fullness': 80, 'at': ago(0.1)}}))
+        a, b, c = pg.evaluate(SAYS, 0), pg.evaluate(SAYS, 0), pg.evaluate(SAYS, 0)
+        check('nombre' in a and 'Tócame' in a, f'sin nombre, a veces pide uno ({a})')
+        check('nombre' not in b, f'pero nunca dos veces seguidas ({b})')
+        check('nombre' in c, f'y después lo vuelve a pedir ({c})')
+        d, e = pg.evaluate(SAYS, 0.9), pg.evaluate(SAYS, 0.9)
+        check('nombre' not in d and 'nombre' not in e, f'las demás veces dice su onomatopeya ({d} / {e})')
+        done(ctx, errs, missing)
+        ctx, pg, errs, missing = open_app(browser, state(None, {'pinguino': {'fullness': 80, 'at': ago(0.1), 'name': 'Copito'}}))
+        a, b = pg.evaluate(SAYS, 0), pg.evaluate(SAYS, 0)
+        check('nombre' not in a and 'nombre' not in b, f'con nombre nunca lo pide ({a} / {b})')
+        done(ctx, errs, missing)
+        ctx, pg, errs, missing = open_app(browser, state(None, {'pinguino': {'fullness': 0, 'at': ago(100)}}))
+        check(pg.evaluate(SAYS, 0) == '', 'muerto no dice nada')
+        done(ctx, errs, missing)
+        ctx, pg, errs, missing = open_app(browser, state(None, {'pinguino': {'fullness': 80, 'at': ago(0.1)}}), locale='en-US')
+        a = pg.evaluate(SAYS, 0)
+        check('name' in a and 'Tap me' in a, f'en inglés, el recordatorio está traducido ({a})')
+        done(ctx, errs, missing)
+
+        # ------------------------------------------------------------------ K
+        print('K. En el celular, la bandeja no tapa al compañero')
+        GEOM = """(() => {
+          const R = (s) => document.querySelector(s).getBoundingClientRect();
+          const b = R('#buddy'), t = R('#foodTray'), n = R('#buddy .nametag');
+          return { open: document.documentElement.classList.contains('tray-open'), buddyBottom: b.bottom, trayTop: t.top,
+                   tagTop: n.top, tagBottom: n.bottom, clock: parseFloat(getComputedStyle(document.querySelector('#clock')).fontSize) };
+        })()"""
+        for w, hgt in [(360, 640), (384, 832), (412, 915)]:
+            ctx, pg, errs, missing = open_app(browser, state(None, {'pinguino': {'fullness': 30, 'at': ago(0.1), 'name': 'Copito'}}), width=w, height=hgt)
+            pg.click('#shopBtn')
+            pg.wait_for_timeout(500)
+            g = pg.evaluate(GEOM)
+            check(g['open'] and g['buddyBottom'] <= g['trayTop'], f'{w}×{hgt}: el compañero queda entero encima de la bandeja (abajo {g["buddyBottom"]:.0f} ≤ bandeja {g["trayTop"]:.0f})')
+            check(g['tagTop'] >= 0 and g['tagBottom'] <= g['trayTop'], f'{w}×{hgt}: su nombre se ve ({g["tagTop"]:.0f}–{g["tagBottom"]:.0f})')
+            check(g['clock'] >= 32, f'{w}×{hgt}: el reloj sigue legible ({g["clock"]:.0f} px)')
+            gems0 = saved(pg)['progress']['gems']
+            a = pg.locator('#trayFoods .tray-food[data-food="pescado"]').bounding_box()
+            b = pg.locator('#buddy').bounding_box()
+            x0, y0 = a['x'] + a['width'] / 2, a['y'] + a['height'] / 2
+            x1, y1 = b['x'] + b['width'] / 2, b['y'] + b['height'] / 2
+            pg.mouse.move(x0, y0)
+            pg.mouse.down()
+            for k in range(1, 11):
+                pg.mouse.move(x0 + (x1 - x0) * k / 10, y0 + (y1 - y0) * k / 10)
+            pg.mouse.up()
+            pg.wait_for_timeout(300)
+            check(saved(pg)['progress']['gems'] == gems0 - 2, f'{w}×{hgt}: arrastrar el pescado hasta él se lo da')
+            pg.click('#trayClose')
+            pg.wait_for_timeout(200)
+            check(not pg.evaluate("document.documentElement.classList.contains('tray-open')"), f'{w}×{hgt}: al cerrar la bandeja, el reloj vuelve a su tamaño')
+            done(ctx, errs, missing)
+
         browser.close()
 
-    print('I. Consola y archivos')
+    print('L. Consola y archivos')
     errs = [e for e in all_errs if 'supabase' not in e.lower() and 'Failed to load resource' not in e]
     check(not errs, f'sin errores en la consola {errs[:3]}')
     check(not all_missing, f'no falta ningún archivo {sorted(set(all_missing))[:5]}')

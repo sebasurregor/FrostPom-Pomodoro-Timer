@@ -14,7 +14,26 @@ import { localParts } from '../util.js';
 import { pickVoice } from '../voices.js';
 import { createSnow } from './snow.js';
 
-const lg = (id, stops, x2 = 0, y2 = 1) => s('linearGradient', { id, x1: 0, y1: 0, x2, y2 }, ...stops.map(([o, c, op]) => s('stop', { offset: o, 'stop-color': c, 'stop-opacity': op == null ? 1 : op })));
+const lg = (id, stops, x2 = 0, y2 = 1, attrs = {}) => s('linearGradient', { id, x1: 0, y1: 0, x2, y2, ...attrs }, ...stops.map(([o, c, op]) => s('stop', { offset: o, 'stop-color': c, 'stop-opacity': op == null ? 1 : op })));
+
+// El dibujo mide 1440 × 900. (v4.3.1) En el celular de pie se ve más lejos: solo cabían ~400 unidades
+// de ancho (el iglú enorme, todo amontonado); ahora se ven 900, y por arriba sigue el cielo.
+const SCENE_W = 1440;
+const SCENE_H = 900;
+const PHONE_SHOW_W = 900;
+const SKY_UP = 3000; // cuánto cielo hay dibujado por encima del borde de arriba (para el celular)
+// Degradados del cielo (y de la ventisca y el esmog) en unidades del dibujo: van de y1 a 900.
+// fitViewBox sube y1 hasta el borde de arriba de lo que se ve, así el degradado llena todo el cielo.
+const vertical = (id, stops) => lg(id, stops, 0, SCENE_H, { gradientUnits: 'userSpaceOnUse', 'data-sky': '' });
+const tallRect = (cls, fill) => s('rect', { class: cls, y: -SKY_UP, width: SCENE_W, height: SCENE_H + SKY_UP, fill });
+
+/** Qué parte del dibujo se ve: en el celular de pie, 900 de ancho (y el cielo que haga falta). */
+function fitViewBox(el) {
+  const phone = innerWidth < 900 && innerHeight > innerWidth;
+  const h = phone ? Math.min(SCENE_H + SKY_UP, Math.ceil(PHONE_SHOW_W * innerHeight / innerWidth)) : SCENE_H;
+  el.setAttribute('viewBox', `0 ${SCENE_H - h} ${SCENE_W} ${h}`);
+  for (const g of el.querySelectorAll('[data-sky]')) g.setAttribute('y1', String(SCENE_H - h));
+}
 
 // Picos: [x, y] de cada cima; los casquetes de nieve se dibujan en las más altas.
 function ridge(points, baseY) {
@@ -42,24 +61,24 @@ function buildSvg() {
   const near = [[140, 690], [300, 716], [470, 680], [640, 712], [800, 684], [960, 716], [1130, 686], [1290, 712]];
   const smoke = [0, 1, 2, 3].map((i) => s('circle', { class: `sc-puff sc-puff--${i}`, cx: 820 + (i % 2) * 42, cy: 566, r: 14 + i * 3, fill: '#6F6B62' }));
 
-  return s('svg', { class: 'scenery__svg', viewBox: '0 0 1440 900', preserveAspectRatio: 'xMidYMax slice', 'aria-hidden': 'true', focusable: 'false' },
+  return s('svg', { class: 'scenery__svg', viewBox: `0 0 ${SCENE_W} ${SCENE_H}`, preserveAspectRatio: 'xMidYMax slice', 'aria-hidden': 'true', focusable: 'false' },
     s('defs', {},
-      lg('scSkyDay', [[0, '#3F86D6'], [0.5, '#7DB3EA'], [0.75, '#B9D8F6'], [1, '#E3F0FC']]),
-      lg('scSkyDawn', [[0, '#2B5DA8'], [0.45, '#8DA6DA'], [0.68, '#F4B7C3'], [1, '#FFD9A8']]),
-      lg('scSkyDusk', [[0, '#23468A'], [0.45, '#7C6FB4'], [0.66, '#E9909E'], [1, '#FFB27A']]),
-      lg('scSkyNight', [[0, '#061430'], [0.5, '#0F2A5C'], [0.8, '#1F4782'], [1, '#2d5a9a']]),
+      vertical('scSkyDay', [[0, '#3F86D6'], [0.5, '#7DB3EA'], [0.75, '#B9D8F6'], [1, '#E3F0FC']]),
+      vertical('scSkyDawn', [[0, '#2B5DA8'], [0.45, '#8DA6DA'], [0.68, '#F4B7C3'], [1, '#FFD9A8']]),
+      vertical('scSkyDusk', [[0, '#23468A'], [0.45, '#7C6FB4'], [0.66, '#E9909E'], [1, '#FFB27A']]),
+      vertical('scSkyNight', [[0, '#061430'], [0.5, '#0F2A5C'], [0.8, '#1F4782'], [1, '#2d5a9a']]),
       s('radialGradient', { id: 'scFire', cx: '0.5', cy: '0.5', r: '0.5' },
         s('stop', { offset: 0, 'stop-color': '#FFB86B', 'stop-opacity': 0.55 }),
         s('stop', { offset: 1, 'stop-color': '#FFB86B', 'stop-opacity': 0 })),
       lg('scSnow', [[0, '#F2F8FF'], [1, '#CFE3F8']]),
-      lg('scSmog', [[0, '#3E3C38', 0.65], [0.55, '#7D7666', 0.85], [1, '#9A9281', 0.75]]),
+      vertical('scSmog', [[0, '#3E3C38', 0.65], [0.55, '#7D7666', 0.85], [1, '#9A9281', 0.75]]),
       lg('scAurora', [[0, '#5EF2C8', 0], [0.3, '#5EF2C8', 0.55], [0.6, '#7FB6FF', 0.45], [1, '#B98CFF', 0]], 1, 0),
       lg('scOil', [[0, '#14131A'], [0.5, '#2A2433'], [1, '#14131A']], 1, 0),
-      lg('scBlizzard', [[0, '#FFFFFF', 0.05], [0.55, '#EAF3FF', 0.45], [1, '#FFFFFF', 0.6]])),
-    s('rect', { class: 'sc-sky sc-sky--day', width: 1440, height: 900, fill: 'url(#scSkyDay)' }),
-    s('rect', { class: 'sc-sky sc-sky--dawn', width: 1440, height: 900, fill: 'url(#scSkyDawn)' }),
-    s('rect', { class: 'sc-sky sc-sky--dusk', width: 1440, height: 900, fill: 'url(#scSkyDusk)' }),
-    s('rect', { class: 'sc-sky sc-sky--night', width: 1440, height: 900, fill: 'url(#scSkyNight)' }),
+      vertical('scBlizzard', [[0, '#FFFFFF', 0.05], [0.55, '#EAF3FF', 0.45], [1, '#FFFFFF', 0.6]])),
+    tallRect('sc-sky sc-sky--day', 'url(#scSkyDay)'),
+    tallRect('sc-sky sc-sky--dawn', 'url(#scSkyDawn)'),
+    tallRect('sc-sky sc-sky--dusk', 'url(#scSkyDusk)'),
+    tallRect('sc-sky sc-sky--night', 'url(#scSkyNight)'),
     s('g', { class: 'sc-stars' }, ...[[120, 80], [260, 150], [420, 60], [610, 120], [780, 40], [930, 140], [1110, 70], [1280, 130], [1380, 50], [520, 200], [1010, 210], [200, 240]].map(([x, y], i) =>
       s('circle', { cx: x, cy: y, r: i % 3 === 0 ? 2.2 : 1.4, fill: '#ffffff', opacity: '0.85' }))),
     s('g', { class: 'sc-aurora' },
@@ -106,8 +125,8 @@ function buildSvg() {
     camp(),
     s('g', { class: 'sc-wind' }, ...[[120, 610], [420, 690], [760, 560], [1040, 660], [300, 520]].map(([x, y], i) =>
       s('path', { class: `sc-gust sc-gust--${i}`, d: `M${x} ${y} q40 -10 80 0 t80 0`, fill: 'none', stroke: '#ffffff', 'stroke-width': 3, 'stroke-linecap': 'round' }))),
-    s('rect', { class: 'sc-blizzard', width: 1440, height: 900, fill: 'url(#scBlizzard)' }),
-    s('rect', { class: 'sc-smog', width: 1440, height: 900, fill: 'url(#scSmog)' }));
+    tallRect('sc-blizzard', 'url(#scBlizzard)'),
+    tallRect('sc-smog', 'url(#scSmog)'));
 }
 
 // Iglú (siempre visible; de noche su entrada brilla)
@@ -169,7 +188,10 @@ let rootEl = null;
 let snow = null;
 export function mount(container) {
   rootEl = container;
-  rootEl.replaceChildren(buildSvg());
+  const art = buildSvg();
+  rootEl.replaceChildren(art);
+  fitViewBox(art);
+  window.addEventListener('resize', () => fitViewBox(art));
   const walkers = document.createElement('div');
   walkers.className = 'scenery__walkers';
   WALKERS.forEach(([kind, dir, dur, delay], i) => {

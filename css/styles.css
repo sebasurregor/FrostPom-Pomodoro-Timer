@@ -1837,17 +1837,30 @@ html.is-feeding, html.is-feeding * { cursor: grabbing !important; }
     left: 8px; right: 8px;
     bottom: calc(var(--tabbar-h) + var(--safe-b) + 8px);
     z-index: 30;
-    max-height: 46vh;
+    max-height: 38vh;
     overflow: auto;
-    padding: 12px;
+    padding: 8px 12px 6px;
     animation: tray-up 0.25s ease both;
   }
-  .tray-foods { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 5px; }
-  .tray-food { padding: 5px 1px 3px; border-width: 2px; border-radius: 10px; }
-  .tray-food__img { width: 38px; height: 38px; }
+  /* (v4.3.1) La comida va en una sola fila que se desliza de lado (pan-x): el dedo hacia arriba
+     arrastra la comida hasta la mascota; de lado, recorre las demás. Así la bandeja es baja. */
+  .tray-foods { display: flex; gap: 5px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; padding: 2px; margin: -2px; }
+  .tray-foods::-webkit-scrollbar { display: none; }
+  .tray-food { flex: 0 0 52px; padding: 5px 1px 3px; border-width: 2px; border-radius: 10px; touch-action: pan-x; }
+  .tray-food__img { width: 36px; height: 36px; }
   .tray-food__price { font-size: 0.75rem; }
-  .food-tray__hint { font-size: 0.8rem; margin: 6px 0; }
+  .food-tray__hint { font-size: 0.8rem; margin: 3px 0; }
+  .food-tray__head { margin-bottom: 4px; }
   .food-tray__head .panel__title { font-size: 1.05rem; }
+  .tray-pets { gap: 6px; margin: 0 0 6px; }
+  .tray-pet { width: 42px; height: 42px; border-radius: 12px; }
+  .tray-pet img, .tray-pet .companion { width: 34px; height: 34px; }
+  /* Con la bandeja abierta (html.tray-open, js/ui/feeding.js) el reloj se achica lo justo para que
+     el compañero y su nombre queden enteros por encima de ella y se le pueda dar de comer:
+     el borde de arriba de la bandeja está, como mínimo, a 62dvh - 84px - safe-b del borde de arriba
+     de la pantalla (su alto máximo es 38vh); el reloj empieza a unos 134 px (más el borde de arriba
+     del celular), y el compañero asoma hasta un 5 % por debajo del reloj. */
+  .tray-open .ring { --size: max(170px, min(var(--fit), calc((62dvh - 84px - var(--safe-b) - 134px - var(--safe-t) - 8px) / 1.05))); }
 }
 @keyframes tray-up { from { transform: translateY(30px); opacity: 0; } }
 
@@ -2710,7 +2723,7 @@ html[data-theme="dark"] .tray-pet.is-current { background: rgba(245, 196, 81, 0.
   .duration-chip { display: inline-flex; align-items: center; gap: 6px; }
   /* En celulares bajitos el reloj se achica un poco, para que la duración y el sonido no queden
      escondidos detrás de la barra de abajo */
-  .ring { --size: max(210px, min(80vw, 340px, calc(100dvh - 400px))); }
+  .ring { --fit: min(80vw, 340px, calc(100dvh - 400px)); --size: max(210px, var(--fit)); }
   [data-sheet].is-open .prog__title { white-space: nowrap; font-size: 1.25rem; }
   [data-sheet].is-open .mini-seg__btn { white-space: nowrap; }
   .focus-status { padding: 0; gap: 8px; background: none !important; border: 0 !important; box-shadow: none !important; }
@@ -2724,6 +2737,7 @@ html[data-theme="dark"] .tray-pet.is-current { background: rgba(245, 196, 81, 0.
   /* Entrar y crear cuenta: la ventana arriba, más pequeña y compacta, para que debajo se vea el
      paisaje (la aurora, los animales y la fogata). Si el formulario es largo, se desliza por dentro. */
   .dlg--gate { margin: calc(10px + var(--safe-t)) auto auto; width: min(94vw, 420px); }
+  /* (apaisado; de pie la altura la decide la cabeza del oso: ver v4.3.1 más abajo) */
   .dlg--gate .dlg__box { max-height: max(300px, calc(46dvh - var(--safe-t))); padding: 14px 14px 12px; border-radius: 20px; }
   .dlg--gate .onb__mascot { display: none; }
   .dlg--gate .dlg__title { font-size: 1.2rem; margin-bottom: 4px; }
@@ -2745,12 +2759,16 @@ html[data-theme="dark"] .tray-pet.is-current { background: rgba(245, 196, 81, 0.
    ventana, y debajo se ven la aurora y los animales (el hielo vacío de abajo se recorta). */
 .campfire__tall, .campfire__tall-core { display: none; }
 @media (max-width: 899px) and (orientation: portrait) {
+  /* Alto y posición del dibujo, en un solo lugar: los usan el dibujo y la ventana de entrar (v4.3.1) */
+  html { --gate-art-h: max(100vh, calc(100vw * 2160 / 1206)); --gate-art-top: calc((100vh - var(--gate-art-h)) * 0.5); }
+  html { --gate-bear-top: calc(var(--gate-art-top) + var(--gate-art-h) * 0.495); } /* donde empieza la cabeza del oso */
   .gate-scene { background: rgb(18, 23, 66); } /* el color del cielo de arriba, con la capa oscura */
   .gate-scene__art {
     --aw: 1206; --ah: 2160;
     background: #181D54;
     left: calc((100vw - var(--w)) * 0.97);
-    top: calc((100vh - var(--h)) * 0.5);
+    --h: var(--gate-art-h);
+    top: var(--gate-art-top);
   }
   .gate-scene__art::after { background: rgba(4, 10, 24, 0.3); }
   .campfire__flame { display: none; }
@@ -2773,9 +2791,14 @@ html[data-theme="dark"] .tray-pet.is-current { background: rgba(245, 196, 81, 0.
   .campfire__spark--3 { left: 74.4%; top: 59.27%; }
   .campfire__spark--4 { left: 72.86%; top: 59.59%; }
   .reduce-motion .campfire__tall, .reduce-motion .campfire__tall-core { animation: none; }
+  /* (v4.3.1) La ventana de entrar se apoya 16 px por encima de la cabeza del oso (al 49,5 % del alto
+     del dibujo), así que los animales y la fogata se ven completos y arriba queda el cielo. Crece hacia
+     arriba hasta ~65 % de la pantalla o hasta el margen de arriba (10 px), lo que llegue primero. */
+  .dlg--gate { margin-top: auto; margin-bottom: calc(100vh - var(--gate-bear-top) + 16px); }
+  .dlg--gate .dlg__box { max-height: max(300px, min(calc(65dvh - var(--safe-t)), calc(var(--gate-bear-top) - 16px - 10px - var(--safe-t)))); }
 }
 @media (max-width: 560px) and (orientation: portrait) {
-  .gate-scene__art { top: 24vh; }
+  html { --gate-art-top: 24vh; }
   .gate-scene__img { -webkit-mask-image: linear-gradient(transparent, #000 9%); mask-image: linear-gradient(transparent, #000 9%); }
 }
 /* Con una sección abierta como ventana, lo de atrás se queda quieto */

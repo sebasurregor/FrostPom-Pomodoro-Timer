@@ -404,7 +404,7 @@ export async function signOutOnline({ title = '¿Cerrar sesión?', confirmLabel 
     confirmLabel, 'btn--gold'); // no se borra nada: no es un botón rojo
   if (!ok) return false;
   clearTimeout(timer);
-  const r = await SYNC.push(state);
+  const r = await SYNC.push(state, { force: true }); // al cerrar sesión no se espera el freno
   if (!r.ok && SYNC.load().dirty) {
     const anyway = await confirmDialog('No pudimos guardar tus últimos cambios',
       'Puede que no haya internet. Si cierras sesión ahora, se pierde lo que hiciste desde el último guardado. Mejor conéctate y vuelve a intentarlo.',
@@ -487,6 +487,7 @@ async function flush() {
   clearTimeout(timer);
   if (!isOnline()) return;
   const r = await SYNC.push(state);
+  if (r.kind === 'wait') { timer = setTimeout(flush, 5000); return; } // (v4.3) muy seguido: se guarda en un momento
   if (r.adopt) {
     adoptState(r.adopt);
     toast('Trajimos tu progreso más reciente de tu cuenta.', 'info');

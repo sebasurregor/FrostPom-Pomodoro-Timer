@@ -1,5 +1,14 @@
 # Cambios de la v2 a la v3
 
+## v4.3.1: tres arreglos del celular
+
+- **Entrar y crear cuenta:** la ventana quedaba muy bajita (46 % de la pantalla). Ahora se apoya 16 px por encima de la cabeza del oso (arriba queda el cielo) y crece hacia arriba hasta el 65 % de la pantalla, así que los animales y la fogata se ven enteros y el formulario muestra más campos sin deslizarse (en un celular de 360 × 640 llega hasta "Correo"; "Inicia sesión" cabe completo).
+- **Ponerle nombre al compañero es más fácil:** si no tiene nombre, al tocarlo se abre "Ponle nombre a tu compañero" (antes solo desde el lápiz de la tienda). Con nombre, tocarlo lo hace hablar, y la tumba sigue abriendo la tienda para revivirlo. Además, sin nombre, de vez en cuando (más o menos 1 de cada 4 frases, nunca dos seguidas) dice "¡Todavía no tengo nombre! Tócame para ponerme uno." (tres frases, en español e inglés).
+- **La tienda ya no tapa al compañero:** en el celular la bandeja es más baja (hasta 38 % de la pantalla: la comida va en una sola fila que se desliza de lado, y con el dedo hacia arriba se arrastra hasta la mascota; los compañeros, más pequeños). Mientras está abierta (`html.tray-open`), el reloj se achica lo justo para que el compañero y su nombre queden enteros encima de ella (en 360 × 640 el reloj queda de 170 px y la hora se lee bien; en 412 × 915 no cambia). En el computador nada cambia.
+- **El paisaje del celular, más lejos:** el dibujo del fondo (1440 × 900) se recortaba a lo alto de la pantalla, así que en un celular de pie solo se veía un pedacito del ancho (unas 400 unidades en 412 × 915: el iglú enorme y todo amontonado). Ahora en el celular de pie se ven 900 unidades de ancho (el 62 %) y el degradado del cielo se estira hasta arriba; se ajusta solo al girar el teléfono. En el computador no cambia.
+- **Freno al guardar en la cuenta (de la v4.3.0, se había perdido):** la app nunca intenta guardar más de una vez cada 5 s y, si el choque de versiones no se resuelve 3 veces seguidas, deja de intentar hasta que se vuelva a abrir (`js/sync.js`).
+- **Pruebas:** `e2e_mascota.py` comprueba que tocar al compañero sin nombre abre el diálogo (y con nombre, no), el recordatorio del nombre (1 de 4, nunca dos seguidas, también en inglés) y, en 360 × 640, 384 × 832 y 412 × 915, que con la bandeja abierta el compañero y su nombre se ven y se le puede arrastrar la comida.
+
 ## v4.3: más paisaje en el celular (y el ranking que no sumaba)
 
 El autor vio en su Android que casi no se veía el paisaje (muchos paneles encima) y que en la pantalla de entrar "no se veía nada". Además, un amigo estudiaba y sus minutos no llegaban al ranking.

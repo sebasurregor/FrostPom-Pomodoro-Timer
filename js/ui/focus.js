@@ -36,13 +36,26 @@ function timerChanged() {
   renderTimer();
 }
 
+// (v4.3.1) Sin nombre, de vez en cuando te recuerda que se lo pongas (tocándolo; ver feeding.js)
+const NAME_HINTS = [
+  tr('¡Todavía no tengo nombre! Tócame para ponerme uno.'),
+  tr('¿Cómo me vas a llamar? Tócame y elige mi nombre.'),
+  tr('Psst… tócame: quiero un nombre.'),
+];
+const NAME_HINT_ODDS = 0.25; // más o menos 1 de cada 4 frases, y nunca dos seguidas
+let hintedLast = false;
+
 /** Tu compañero de Enfocar dice algo (onomatopeya de su especie). Si murió, no dice nada. */
 export function buddySays(ctx = {}) {
-  const kind = COMPANION_KIND[state.profile.companion] || 'penguin';
-  const st = petStatus(state, currentPetId(state));
+  const petId = currentPetId(state);
+  const st = petStatus(state, petId);
   if (st.dead) return;
+  const hint = !petName(state, petId) && !hintedLast && Math.random() < NAME_HINT_ODDS;
+  hintedLast = hint;
+  const kind = COMPANION_KIND[state.profile.companion] || 'penguin';
   const hungry = st.fullness < 25; // con mucha hambre, te lo recuerda
-  say($('#buddy'), pickVoice(kind, { hungry, starving: st.fullness <= 0, ...ctx }), { ms: 2400 });
+  const text = hint ? NAME_HINTS[Math.floor(Math.random() * NAME_HINTS.length)] : pickVoice(kind, { hungry, starving: st.fullness <= 0, ...ctx });
+  say($('#buddy'), text, { ms: hint ? 3200 : 2400 });
 }
 
 export function startOrToggle() {

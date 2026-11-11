@@ -956,4 +956,9 @@ export default Object.freeze({
   "Tu sesión en línea se cerró: este pomodoro no sumará en el ranking. Vuelve a entrar en Ajustes → Tu cuenta.": "Your online session was closed: this pomodoro won’t count on the leaderboard. Sign in again in Settings → Your account.",
   "Empezaste muchos pomodoros seguidos: este no sumará en el ranking, pero sí en tu progreso.": "You started a lot of pomodoros in a row: this one won’t count on the leaderboard, but it does count in your progress.",
   "No pudimos avisarle al ranking que empezaste: este pomodoro no sumará allí, pero sí en tu progreso.": "We couldn’t tell the leaderboard you started: this pomodoro won’t count there, but it does count in your progress.",
+
+  // ---------------------------------------------------------------- v4.3.1: ponerle nombre tocándolo
+  '¡Todavía no tengo nombre! Tócame para ponerme uno.': 'I don’t have a name yet! Tap me to give me one.',
+  '¿Cómo me vas a llamar? Tócame y elige mi nombre.': 'What are you going to call me? Tap me and pick my name.',
+  'Psst… tócame: quiero un nombre.': 'Psst… tap me: I want a name.',
 });

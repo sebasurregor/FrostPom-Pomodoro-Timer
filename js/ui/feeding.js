@@ -24,6 +24,7 @@ export const trayOpen = () => !tray().hidden;
 export function openTray() {
   closeSheet({ restore: false }); // (v4.3) en el celular, la tienda y la duración no se abren a la vez
   tray().hidden = false;
+  document.documentElement.classList.add('tray-open'); // (v4.3.1) en el celular, el reloj se achica
   $('#shopBtn').setAttribute('aria-expanded', 'true');
   renderTray();
   const first = $('#trayFoods .tray-food:not([disabled])');
@@ -48,6 +49,7 @@ function showPetAboveTray() {
 
 export function closeTray() {
   tray().hidden = true;
+  document.documentElement.classList.remove('tray-open');
   $('#shopBtn').setAttribute('aria-expanded', 'false');
 }
 const toggleTray = () => (trayOpen() ? closeTray() : openTray());
@@ -316,9 +318,12 @@ export function bindFeeding() {
   // (v4.3) Al ir a otra pantalla la tienda se cierra (si no, al volver tapaba los botones de abajo)
   window.addEventListener('hashchange', () => { if (trayOpen()) closeTray(); });
   $('#reviveBtn').addEventListener('click', revive);
-  // Tocar la tumba abre la tienda (ahí se revive); tocar al compañero lo hace hablar
+  // Tocar la tumba abre la tienda (ahí se revive); sin nombre, tocarlo abre "Ponle nombre" (v4.3.1);
+  // con nombre, habla
   $('#buddy').addEventListener('click', () => {
-    if (P.isDead(state, P.currentPetId(state))) openTray();
+    const petId = P.currentPetId(state);
+    if (P.isDead(state, petId)) openTray();
+    else if (!P.petName(state, petId)) nameFlow();
     else buddySays();
   });
   const list = $('#trayFoods');

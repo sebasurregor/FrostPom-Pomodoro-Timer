@@ -91,9 +91,18 @@ export async function pull() {
  *  { ok: false, kind }                            → no se pudo (offline, sin sesión…)
  */
 let pushing = null;
-export function push(state) {
+// (v4.3) Freno de seguridad: nunca se intenta guardar más de una vez cada 5 s, y si el choque de
+// versiones no se resuelve 3 veces seguidas, se deja de intentar hasta volver a abrir la app
+// (un aparato atascado llegó a llamar al servidor una vez por segundo durante horas).
+const MIN_GAP_MS = 5000;
+let lastTry = 0;
+let conflicts = 0;
+export function push(state, { force = false } = {}) {
   if (!enabled()) return Promise.resolve({ ok: false, kind: 'off' });
-  if (pushing) return pushing.then(() => push(state));
+  if (pushing) return pushing.then(() => push(state, { force }));
+  if (conflicts >= 3) return Promise.resolve({ ok: false, kind: 'stuck' });
+  if (!force && Date.now() - lastTry < MIN_GAP_MS) return Promise.resolve({ ok: false, kind: 'wait' });
+  lastTry = Date.now();
   pushing = (async () => {
     try {
       if (!BOARD.hasAccountSession()) return { ok: false, kind: 'nosession' };
@@ -115,9 +124,13 @@ export function push(state) {
         return { ok: true };
       }
     } catch (e) {
+      if (e.kind === 'conflict') {
+        conflicts += 1;
+        console.warn(`[FrostPom] No se pudo guardar en tu cuenta: otro equipo guardó al mismo tiempo (${conflicts}/3).`);
+      }
       return { ok: false, kind: e.kind || 'server' };
     }
-  })().finally(() => { pushing = null; });
+  })().then((r) => { if (r.ok) conflicts = 0; return r; }).finally(() => { pushing = null; });
   return pushing;
 }
 
