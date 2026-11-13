@@ -1,5 +1,75 @@
 # Cambios de la v2 a la v3
 
+## v4.4.1: "Siempre encima" (el reloj encima de las otras ventanas)
+
+El autor pidió poder dejar el reloj **siempre encima** de las demás ventanas, con dos íconos suyos (el pin y el pin tachado). La ventanita sigue el mockup de su widget.
+
+- **El botón del pin**, arriba a la derecha del reloj en Enfocar (solo en el computador). Al tocarlo se abre una **ventanita que queda encima de todas las ventanas** de Windows (o de Mac/Linux), aunque estés en Word o en una clase en línea. Mientras está abierta, el botón muestra el pin tachado; tocarlo la cierra.
+  - Usa *Document Picture-in-Picture*, que tienen Chrome y Edge desde la versión 116. La app de Microsoft Store corre en Edge, así que también debería tenerla (compruébalo al instalarla).
+  - En `docs/microsoft-store/FICHA.md` se agregó a las características: "Reloj siempre encima de tus otras ventanas".
+  - En el celular, en Safari y en navegadores sin esa función el botón no aparece. En Android, lo equivalente será la notificación y el widget de la fase 5.
+- **La ventanita**, como el mockup:
+  - de noche con la aurora y, a la derecha, los animales junto a la fogata;
+  - a la izquierda, una tarjeta con "MODO ENFOQUE" (o "DESCANSO"), la hora, una frase ("Hora de concentrarse", "En pausa"…) y la barra con **tu compañero encima**, que avanza con el pomodoro (o su tumba, si se murió de hambre);
+  - un globito: "¡Estudiando juntos!", "¿Empezamos?", "¡A descansar!".
+- **Sus cinco botones** hacen lo mismo que los de Enfocar: ▶/⏸ empezar o pausar (también con la barra espaciadora), ⏮ reiniciar el bloque, 🔁 "lo siguiente empieza solo" (el mismo ajuste de Ajustes; dorado = encendido), ⏭ saltar y ✓ terminar y guardar. El pin tachado de la ventanita también la cierra.
+- **Se ajusta a cualquier tamaño:** se puede agrandar. Si queda angosta, la tarjeta ocupa todo el ancho; si queda bajita, solo quedan la hora, la barra y los botones.
+- **No se atrasa:** si la ventana principal está minimizada, el navegador la frena y el pomodoro terminaría tarde. Mientras la ventanita está abierta, ella revisa el reloj 4 veces por segundo, y los avisos de la app ("Necesitas al menos 1 minuto…", "¡Sesión completa!") también salen en ella.
+- **Los íconos del pin** son los que entregó el autor, pasados a trazos (SVG) para que se vean nítidos y tomen el color del tema.
+- **Premium en Android (antes de subir a Google Play):** si algún día se enciende el cobro de Microsoft Store, la app de Android **no** lo usa. Antes, diría "instala FrostPom desde Microsoft Store", y Google Play prohíbe mandar a pagar por fuera. En Android, Premium sigue en modo prueba (gratis) hasta tener Google Play Billing (fase 6).
+- **Planes para aprobar** (sin código todavía):
+  - `docs/MULTI-DISPOSITIVO.md` (fase 4: reloj en vivo entre aparatos y mezcla del progreso sin pérdidas);
+  - `docs/ANDROID-NOTIFICACION-WIDGET.md` (fase 5: notificación tipo Spotify y widget con el diseño del autor);
+  - `docs/GOOGLE-PLAY-BILLING.md` (fase 6: cobrar Premium en Android).
+- **Pruebas:**
+  - `tests/e2e_encima.py` (29 comprobaciones):
+    - el botón aparece solo en el computador y no tapa la hora ni la tienda;
+    - la ventanita carga sus estilos y su paisaje, tiene los cinco botones y la hora es la misma de la app;
+    - cada botón mueve el reloj de la app;
+    - los avisos salen en ella;
+    - se cierra desde los dos pines;
+    - en inglés habla inglés;
+    - sin errores en la consola.
+
+  Ojo: esa prueba no usa el servidor simulado, porque Playwright deja de cargar los archivos de la ventanita cuando intercepta las peticiones.
+  - `tests/e2e_mascota.py`: "la fogata se ve de noche" fallaba a veces. La prueba pone la noche a mano, pero la app, cada minuto, vuelve a poner la fase según la hora real; si ese minuto caía justo ahí, la noche se quitaba. Ahora la prueba vuelve a poner la noche si la app la quitó y espera a que termine el cambio de día a noche (hasta 12 s) en vez de un tiempo fijo.
+- **Pruebas visuales:** el pin aparece en las fotos del computador (`escritorio-*`). Hay que volver a tomar esas fotos **en el computador del autor**, porque las letras se dibujan distinto en Windows y en Linux (ver `docs/PRUEBAS-VISUALES.md`).
+  - Cómo se comprobó aquí: se tomaron fotos de la v4.4.0 sin tocar en Linux y se compararon con la v4.4.1. Las 252 fotos de celulares y tableta salen idénticas; en el computador cambian solo las 17 pantallas donde se ve Enfocar (inicio, corriendo, bandeja, tumba y el diálogo del nombre encima), y lo único distinto es el botón del pin.
+
+## v4.4.0: los estilos, ordenados (la app se ve igual)
+
+Nada cambia en la pantalla: las 315 fotos de `tests/visual.py` salen idénticas. Lo que cambió es por dentro. `css/styles.css` tenía unas 2.800 líneas con arreglos apilados versión tras versión (un bloque de la v3.7 que cambiaba lo de la v3.1, otro de la v4.3 que cambiaba lo de la v3.7…). Por eso, al tocar algo en un lugar, se dañaba otra cosa en otro.
+
+- **Seis archivos en vez de uno**, que se cargan en este orden: `tokens.css` (las variables: colores, bordes redondeados, sombras y espacios, del tema claro y del oscuro), `base.css` (letras, la página y los campos del navegador), `layout.css` (el contenedor, las vistas y sus rejillas), `components.css` (una sección por componente: la barra de arriba, el menú, el reloj, el compañero, la tienda, las ventanas, el ranking, las tarjetas…), `scenery.css` (el paisaje, los animales y el paisaje de entrar) y `utilities.css` (ayudas sueltas, las pausas para que el celular vaya rápido y "Menos animaciones"). `css/legal.css` sigue aparte.
+- **Un mapa** al principio de `tokens.css` dice dónde vive cada cosa y por qué importa el orden.
+- **Los puntos de quiebre, juntos:** antes había 25 bloques `@media` repartidos por todo el archivo. Ahora, al final de cada archivo hay un solo bloque por punto de quiebre (computador, celular, celular de pie, celular bajito y unos pocos ajustes finos), siempre en el mismo orden.
+- **Una regla por cosa:** las reglas que se pisaban unas a otras se unieron en una sola (50 uniones), y se quitaron 175 propiedades que nunca se veían porque otra regla más abajo las cambiaba.
+- **Lo que no se usaba, fuera:** 80 clases que ya no existen en `index.html` ni en el JavaScript (115 reglas enteras y 9 a medias, por ejemplo `.task`, `.streak`, `.showcase__rank` o `.avail`), 3 animaciones sin uso (`bob`, `flicker` y `hop-fox`) y 3 variables sin uso (`--polar-1`, `--polar-2`, `--polar-3`).
+- **Variables nuevas** para valores que se repetían: `--r-pill` (999px), `--r-round` (50 %), `--shadow-chip`, `--gold-edge`, `--cream`, `--good-text` y una escala de espacios `--sp-1` a `--sp-10` para los `gap`. Cada una vale exactamente lo mismo que el número que reemplaza.
+- **Comentarios:** se quedan los que explican *por qué* existe algo y se quitaron las marcas de versión ("v3.7 —", "(v4.3.1)"…): esa historia ya está en este archivo.
+- **Cómo se comprobó que se ve igual:** se hizo en 5 pasos, y después de cada uno corrió la prueba visual completa (315 fotos, todas iguales). Además, una comparación del estilo calculado de **cada elemento** de las 315 pantallas contra la hoja original, y una revisión que calcula, para cada selector y cada tamaño de pantalla, qué regla gana.
+- **Pruebas:** `npm test` comprueba que cada CSS de `index.html` existe, va en el orden correcto, está en el `PRECACHE` del service worker y no usa `@import`, y que ya nadie pide `css/styles.css`.
+
+## v4.3.3: pruebas visuales (fotos de cada pantalla)
+
+Nada cambia en la app: esta versión agrega una prueba que **mira** la app, para pillar los errores que se ven (un botón encima de otro, un texto cortado, un color que cambió sin querer) antes de que lleguen al celular.
+
+- **`tests/visual.py`** abre la app en un navegador de verdad y le toma una foto a cada pantalla: las puertas de entrada (crear cuenta, iniciar sesión, "¡Hola de nuevo!"), Enfocar quieto y con el reloj corriendo, la bandeja de comida, las 7 ventanas del celular (Duración, Tu estudio, Historial, Compañeros, Temporadas, Temas, Logros), Progreso, Ranking (la lista y la tarjeta de estado), Perfil, Ajustes, 8 diálogos y la tumba de la mascota. Cada foto se compara, punto por punto, con la foto aprobada.
+- **En 12 combinaciones:** celulares de 360 × 640, 384 × 832 y 412 × 915, tableta de 768 × 1024 y computador de 1366 × 768, con tema claro y oscuro, en español; y en inglés en un celular y en el computador. Son **315 fotos** y tarda unos 6 a 7 minutos.
+- **Siempre sale la misma foto:** la fecha y la hora están fijas (martes 10 de marzo de 2026, 10:00 a. m.), "Menos animaciones" está encendido, los datos son siempre los mismos, el servidor es el simulado, el azar siempre da los mismos números, y se tapa lo que se mueve al azar (la nieve, los animales que caminan y sus globos, el confeti y los avisos).
+- **Si algo cambió**, la prueba falla, dice cuáles pantallas y deja en `tests/visual/out/` tres imágenes de cada una: la esperada, la actual y la diferencia (lo que cambió, en fucsia). Se perdona un cambio de color muy pequeño en un punto (hasta 24 de 255) y que cambien hasta 40 puntos (menos que una letra).
+- **Cómo se usa:** `npm run test:visual` compara; `npm run test:visual:update` vuelve a tomar las fotos aprobadas (solo después de que el autor apruebe un cambio visual). La guía corta está en `docs/PRUEBAS-VISUALES.md`.
+- **Las fotos aprobadas** viven en `tests/visual/baseline/` (315 archivos, unos 49 MB) y se suben a GitHub; `tests/visual/out/` no se sube.
+- **Un error viejo en `package-lock.json`:** al subir la versión de la app en la v4.3.1 y la v4.3.2 se cambió por accidente la versión anotada de una librería de desarrollo (`ansi-styles`, que es la 4.3.0), y la versión de la app en ese archivo seguía en 4.2.0. Ya quedaron bien las dos. No afectaba a la app.
+
+## v4.3.2: dos arreglos visuales
+
+- **La barra de abajo dejaba un hueco a la derecha.** La barra estaba hecha para 5 pestañas (`repeat(5, 1fr)`), pero desde que Ajustes vive dentro de Perfil son 4, y la quinta columna quedaba vacía. Ahora la barra reparte el espacio entre las pestañas que haya, sean las que sean (`grid-auto-flow: column`). En el computador el menú sigue en una sola columna a la izquierda, y al abrir una ventana la barra se sigue escondiendo.
+- **El botón de la tienda tapaba la cara del compañero.** Estaba abajo a la derecha del reloj, encima del zorro. Ahora está al lado contrario (abajo a la izquierda, en espejo), en todas las pantallas y también con la bandeja abierta (cuando el reloj se achica). El "!" de hambre, su animación, el orden del teclado y arrastrar la comida siguen igual.
+- **El sol de día se veía como una mancha detrás de "Silencio"** en el celular (en 412 × 915 quedaba justo detrás del botón). En el celular de pie se corre a la derecha, al borde de la pantalla, sin tocar los botones. En el computador no cambia.
+- **Una ventana que salía chiquita en Progreso.** Si tocabas "Tu estudio" o "Historial" justo al llegar a Progreso (en el primer cuarto de segundo, mientras la sección aparece con su animación), la ventana salía corrida y pequeña, atrapada dentro de la sección, hasta que la animación terminaba. Ahora, con una ventana abierta, esa animación no corre. (La prueba `e2e_smoke.py` "Tu estudio se abre encima de todo" fallaba a veces por esto.)
+- **Pruebas:** `e2e_mascota.py` comprueba en 360 × 640, 384 × 832, 412 × 915 y 1280 × 800, con la bandeja cerrada y abierta, que el botón de la tienda no se monta sobre el compañero ni sobre su nombre; que las 4 pestañas llenan la barra parejo; y que el sol de día no toca los botoncitos en el celular.
+
 ## v4.3.1: tres arreglos del celular
 
 - **Entrar y crear cuenta:** la ventana quedaba muy bajita (46 % de la pantalla). Ahora se apoya 16 px por encima de la cabeza del oso (arriba queda el cielo) y crece hacia arriba hasta el 65 % de la pantalla, así que los animales y la fogata se ven enteros y el formulario muestra más campos sin deslizarse (en un celular de 360 × 640 llega hasta "Correo"; "Inicia sesión" cabe completo).

@@ -31,6 +31,7 @@ import { t, translateDom, isEnglish } from './i18n.js';
 import { applyTheme } from './ui/theme.js';
 import { mountGateSnow } from './ui/gate-snow.js';
 import { initSheets, renderSheetTiles } from './ui/sheets.js';
+import { initPip } from './ui/pip.js';
 import { bootBoard } from './ui/board-ui.js';
 import { bootCloud } from './ui/cloud-ui.js';
 import { initNative, isNative } from './ui/native-ui.js';
@@ -243,6 +244,7 @@ function boot() {
   setInterval(() => { updatePhase(); checkNewDay(); checkSeason(); checkPet(); }, 60 * 1000);
   startChatter(() => session.running && session.state.mode === 'study');
   for (const bind of [bindPremium, bindSound, bindReminders, bindFocus, bindProgress, bindActivity, bindProfile, bindRanking, bindSettings, bindFeeding, bindGlobal]) bind();
+  initPip(); // (v4.4.1) "Siempre encima" (solo donde el navegador lo permite)
   renderAll();
   route(false);
   setInterval(tick, 250);

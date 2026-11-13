@@ -1,0 +1,102 @@
+/* FrostPom — base: letras, la página, los títulos, el foco del teclado y los campos del navegador.
+   El mapa de todos los estilos está al principio de tokens.css. */
+
+/* =====================================================================
+   Letras
+   ===================================================================== */
+@font-face {
+  font-family: "Lilita One";
+  src: url("../assets/fonts/lilita-one-latin.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+/* Banderas en emoji para Windows (que no las dibuja por sí solo). Solo cubre los caracteres de banderas. */
+@font-face {
+  font-family: "Twemoji Country Flags";
+  src: url("../assets/fonts/twemoji-country-flags.woff2") format("woff2");
+  unicode-range: U+1F1E6-1F1FF, U+1F3F4, U+E0062-E0063, U+E0065, U+E0067, U+E006C, U+E006E, U+E0073-E0074, U+E0077, U+E007F;
+  font-display: swap;
+}
+/* Letra de píxeles para la etiqueta con el nombre de tu compañero (OFL, ver assets/fonts) */
+@font-face {
+  font-family: "Pixelify Sans";
+  src: url("../assets/fonts/pixelify-sans-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Pixelify Sans";
+  src: url("../assets/fonts/pixelify-sans-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1E00-1E9F, U+1EF2-1EFF, U+2C60-2C7F, U+A720-A7FF;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Nunito";
+  src: url("../assets/fonts/nunito-latin-wght.woff2") format("woff2");
+  font-weight: 200 1000;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* =====================================================================
+   Base: la página, los títulos y el foco del teclado
+   ===================================================================== */
+*, *::before, *::after { box-sizing: border-box; }
+html {
+  background: #2d68bc;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+body {
+  margin: 0;
+  min-height: 100dvh;
+  font-family: var(--font-body);
+  font-size: 1rem;
+  line-height: 1.45;
+  color: var(--on-night);
+  /* El paisaje vive en .scenery; este degradado es solo el respaldo mientras carga */
+  background: linear-gradient(180deg, #173F80 0%, #2d68bc 45%, #93c0ed 85%, #DDEBFA 100%) fixed;
+  -webkit-tap-highlight-color: transparent;
+}
+h1, h2, h3 { margin: 0; font-weight: 400; }
+p { margin: 0; }
+button, input, select { font: inherit; color: inherit; }
+b, strong { font-weight: 800; }
+:focus-visible {
+  outline: 3px solid var(--gold);
+  outline-offset: 3px;
+}
+
+.skip-link {
+  position: absolute; left: 12px; top: -60px; z-index: 50;
+  padding: 10px 14px; border-radius: var(--r-sm);
+  background: var(--gold); color: var(--text); font-weight: 800; text-decoration: none;
+  border: var(--line);
+}
+.skip-link:focus { top: 12px; }
+
+.noscript { padding: 24px; text-align: center; font-weight: 800; }
+
+/* =====================================================================
+   Campos de texto y listas (los controles del navegador)
+   ===================================================================== */
+input[type="text"], input[type="number"], input[type="date"], input[type="password"], select {
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 12px;
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 600;
+}
+input::placeholder { color: #8FA2BD; font-weight: 500; }
+select { appearance: none; background-image: linear-gradient(45deg, transparent 50%, var(--text) 50%), linear-gradient(135deg, var(--text) 50%, transparent 50%); background-position: calc(100% - 20px) 50%, calc(100% - 14px) 50%; background-size: 6px 6px; background-repeat: no-repeat; padding-right: 36px; }
+select:disabled { opacity: 0.6; }
+input[type="text"], input[type="email"], input[type="number"], input[type="date"], input[type="password"],
+input[type="time"], select, .acc-input, .rem-row input, .country-list {
+  border: 2px solid var(--card-line-2);
+}
+input[type="email"] { width: 100%; min-height: 46px; padding: 10px 12px; border-radius: var(--r-sm); background: var(--surface); color: var(--text); font-size: 1rem; font-weight: 600; }
+input:focus-visible, select:focus-visible, .acc-input:focus-visible, .rem-row input:focus-visible { outline: 3px solid #8DB4F5; outline-offset: 1px; border-color: var(--blue); }

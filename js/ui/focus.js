@@ -392,3 +392,6 @@ export function bindFocus() {
     $('.stepper__input', st).addEventListener('change', (e) => setCustomValue(key, e.target.value));
   }
 }
+
+// (v4.4.1) La ventanita "Siempre encima" (pip.js) usa los mismos botones que Enfocar
+export { finishEarly as finishBlock, skip as skipBlock, resetTimer as resetBlock };

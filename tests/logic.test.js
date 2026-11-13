@@ -1094,3 +1094,22 @@ test('las reglas de seguridad de _headers son las mismas de index.html (más fra
   assert.deepEqual(fromHeaders, parts(meta), 'si cambias la CSP de index.html, cámbiala también en _headers');
   assert.ok(parts(hdr).includes("frame-ancestors 'none'"), '_headers impide que otros sitios metan la app en un marco');
 });
+
+test('estilos (v4.4.0): cada CSS de index.html existe, va en orden y queda guardado para usar sin internet', () => {
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const sw = readFileSync(new URL('../service-worker.js', import.meta.url), 'utf8');
+  const links = [...html.matchAll(/<link rel="stylesheet" href="([^"]+)">/g)].map((m) => m[1]);
+  assert.deepEqual(links, ['tokens', 'base', 'layout', 'components', 'scenery', 'utilities'].map((n) => `css/${n}.css`),
+    'el orden importa: si dos reglas pesan lo mismo, gana la del archivo que va después');
+  for (const href of links) {
+    assert.ok(existsSync(new URL(`../${href}`, import.meta.url)), `existe ${href}`);
+    assert.ok(sw.includes(`'./${href}'`), `${href} está en el PRECACHE de service-worker.js`);
+    // CSP: style-src 'self' no deja cargar @import de otro lado; los archivos no se importan entre sí
+    assert.ok(!readFileSync(new URL(`../${href}`, import.meta.url), 'utf8').includes('@import'), `${href} no usa @import`);
+  }
+  assert.ok(!existsSync(new URL('../css/styles.css', import.meta.url)), 'css/styles.css ya no existe (se repartió en los archivos de arriba)');
+  assert.ok(!html.includes('styles.css') && !sw.includes('styles.css'), 'nadie pide css/styles.css');
+  // Las variables nuevas viven en tokens.css, el primero
+  const tokens = readFileSync(new URL('../css/tokens.css', import.meta.url), 'utf8');
+  for (const v of ['--r-pill', '--shadow-chip', '--sp-4', '--card']) assert.ok(tokens.includes(`${v}:`), `tokens.css define ${v}`);
+});

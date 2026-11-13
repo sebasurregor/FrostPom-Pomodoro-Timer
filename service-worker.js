@@ -7,13 +7,18 @@
  *  - Solo se guarda en caché lo de este mismo sitio y respuestas correctas. Nunca respuestas de APIs
  *    ni de otros dominios (podrían contener datos personales).
  */
-const VERSION = '4.3.1';
+const VERSION = '4.4.1';
 const CACHE = `frostpom-${VERSION}`;
 const PRECACHE = [
   './',
   './index.html',
   './manifest.webmanifest',
-  './css/styles.css',
+  './css/tokens.css',
+  './css/base.css',
+  './css/layout.css',
+  './css/components.css',
+  './css/scenery.css',
+  './css/utilities.css',
   './privacidad.html',
   './normas.html',
   './eliminar-cuenta.html',
@@ -31,6 +36,8 @@ const PRECACHE = [
   './js/ui/snow.js',
   './js/ui/password.js',
   './js/ui/sheets.js',
+  './js/ui/pip.js',
+  './css/pip.css',
   './js/ui/board-ui.js',
   './js/board.js',
   './js/sync.js',

@@ -12,10 +12,15 @@
  */
 import { config } from './config.js';
 import { locale } from './i18n.js';
+import { isNative } from './native.js';
 
 const METHOD = 'https://store.microsoft.com/billing';
 const cfg = () => config.premium || {};
-export const charging = () => !!cfg().chargesEnabled;
+// (v4.4.1) En la app de Android, nunca: ahí Premium solo se podrá comprar con Google Play Billing
+// (fase 6, docs/GOOGLE-PLAY-BILLING.md). Sin esto, al encender el cobro de Microsoft Store la app de
+// Android diría "instala FrostPom desde Microsoft Store", y Google Play prohíbe mandar a pagar por
+// fuera de Google Play. Mientras tanto, en Android Premium sigue en modo prueba (gratis).
+export const charging = () => !!cfg().chargesEnabled && !isNative();
 export const productId = () => cfg().storeProductId || '';
 
 let servicePromise = null;

@@ -1,0 +1,88 @@
+/* FrostPom — estructura: el contenedor, las vistas y las rejillas.
+   El mapa de todos los estilos está al principio de tokens.css. */
+
+/* =====================================================================
+   Estructura: el contenedor y las vistas
+   ===================================================================== */
+.shell {
+  position: relative;
+  z-index: 1;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: calc(10px + var(--safe-t)) 16px calc(var(--tabbar-h) + 28px + var(--safe-b));
+}
+
+.views { outline: none; }
+
+.view { padding-top: 14px; }
+.view__title {
+  font-family: var(--font-display);
+  font-size: clamp(1.9rem, 4vw + 1rem, 2.6rem);
+  line-height: 1.05;
+  text-shadow: 0 4px 0 var(--ink);
+  margin: 4px 0 16px;
+}
+.view__head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-6); flex-wrap: wrap; }
+.view__head .view__title { margin-bottom: 16px; }
+.view--focus { display: grid; gap: var(--sp-10); }
+.view--paper { --pp-line: #E3E9F2; --pp-muted: #5E6E86; --pp-orange: #FF9600; --pp-orange-soft: #FFE2BD; color: var(--text); }
+/* Backwards y no both: al terminar no se queda con un transform (si no, las ventanas del celular
+   quedaban atrapadas dentro de la sección en vez de cubrir la pantalla) */
+.view--paper:not([hidden]) { animation: paper-in .28s ease-out backwards; }
+@keyframes paper-in { from { opacity: 0; transform: translateY(6px); } }
+/* Y mientras la animación corre (0,28 s) tampoco: si tocabas un botón de sección justo al
+   llegar a Progreso, la ventana salía chiquita y corrida (atrapada por el transform) hasta que terminaba */
+.sheet-open .view--paper:not([hidden]) { animation: none; }
+html[data-theme="dark"] .view--paper { --pp-line: #2A3B5F; --pp-muted: #A7B5CD; --pp-orange-soft: #5A3A12; }
+
+/* =====================================================================
+   Rejillas de cada vista
+   ===================================================================== */
+.focus-main { display: grid; justify-items: center; gap: var(--sp-9); padding-top: 6px; }
+
+/* Columnas de paneles. En celular .col no existe (display: contents) y los paneles van en
+   una sola fila; en escritorio cada .col es una columna independiente, así que cuando un
+   panel crece (por ejemplo al abrir la (i)) solo bajan los de abajo y no quedan huecos. */
+.col { display: contents; }
+
+.ord-1 { order: 1; }
+
+.ord-2 { order: 2; }
+
+.ord-3 { order: 3; }
+
+.ord-4 { order: 4; }
+
+.ord-5 { order: 5; }
+
+.ord-6 { order: 6; }
+
+.ord-7 { order: 7; }
+
+.ord-9 { order: 9; }
+
+.profile-grid { display: grid; gap: var(--sp-8); }
+
+.settings-grid { display: grid; gap: var(--sp-8); }
+
+/* =====================================================================
+   Computador (900 px o más)
+   ===================================================================== */
+@media (min-width: 900px) {
+  /* --- Estructura: el contenedor y las vistas --- */
+  .shell {
+    display: grid;
+    grid-template-columns: 108px 1fr;
+    grid-template-rows: auto 1fr;
+    grid-template-areas: "hud hud" "tabs main";
+    column-gap: 26px;
+    padding-bottom: 40px;
+  }
+  .views { grid-area: main; min-width: 0; }
+  .view--focus { grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr); align-items: start; gap: 30px; padding-top: 24px; }
+
+  /* --- Rejillas de cada vista --- */
+  .view--focus .focus-side { align-self: center; }
+  .col { display: grid; gap: var(--sp-8); align-content: start; min-width: 0; }
+  .profile-grid, .settings-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+}

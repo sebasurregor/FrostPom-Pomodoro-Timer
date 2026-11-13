@@ -4,7 +4,7 @@
  * Antes la app no tenía ojo propio: en Windows se veía el de Edge, que desaparece apenas sales del
  * campo y solo vuelve si borras toda la contraseña (por eso, al llegar a "Repite la contraseña", no
  * se podía revisar la primera). En Android no había ninguno. Ahora cada campo de contraseña tiene
- * su ojo, siempre visible, y el de Edge se esconde (ver styles.css).
+ * su ojo, siempre visible, y el de Edge se esconde (ver css/components.css).
  */
 import { tr } from '../i18n.js';
 

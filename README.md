@@ -1,4 +1,4 @@
-# FrostPom: Pomodoro Timer (v4.3.1)
+# FrostPom: Pomodoro Timer (v4.4.1)
 
 > Antes se llamaba **StudyTimer**. Publicada en **https://sebasurregor.github.io/FrostPom-Pomodoro-Timer/**
 
@@ -34,7 +34,7 @@ Diseño: paisaje polar simple (montañas en #2d68bc, #749eda y #93c0ed) con ping
 
 | Vista | Para qué sirve |
 |---|---|
-| **Enfocar** | Temporizador con modos (Mini 15+5, Clásico 25+5, Enfoque 45+10, Profundo 50+10, Largo 60+15) y **Mi ritmo**, donde eliges tus minutos de estudio y descanso. El descanso largo llega solo cada 4 pomodoros. Solo registra *cuánto* estudiaste, no *qué*. Junto al reloj está tu compañero (v4.2): con la tienda le das de comer (corazones al comer), le pones **nombre** (etiqueta sobre su cabeza) y se le nota el hambre (triste, llora); si pasa 3 días en 0 queda una tumba y se revive con 30 gemas. |
+| **Enfocar** | Temporizador con modos (Mini 15+5, Clásico 25+5, Enfoque 45+10, Profundo 50+10, Largo 60+15) y **Mi ritmo**, donde eliges tus minutos de estudio y descanso. El descanso largo llega solo cada 4 pomodoros. Solo registra *cuánto* estudiaste, no *qué*. Junto al reloj está tu compañero (v4.2): con la tienda le das de comer (corazones al comer), le pones **nombre** (etiqueta sobre su cabeza) y se le nota el hambre (triste, llora); si pasa 3 días en 0 queda una tumba y se revive con 30 gemas. **Siempre encima** (v4.4.1, en el computador con Chrome o Edge): el botón del pin abre una ventanita con el reloj que queda encima de las demás ventanas, con el diseño del widget del autor y sus cinco botones. |
 | **Premium 👑** | Corona en la barra superior. Modo prueba sin cobro: duración libre, todos los temas, sonidos y tonos, y recordatorios de enfoque. **Regalo de bienvenida (una sola vez):** 1000 gemas para alimentar a la mascota y una mascota de edición limitada que el usuario elige. |
 | **Progreso** | Salud de tu polo, rango (Bronce → Leyenda), racha, misiones diarias, **Tu estudio** (pestañas: gráfica de los últimos 7 días o calendario del mes con los minutos de cada día) e historial (las 5 últimas sesiones, con "Ver más"). |
 | **Ranking** | **Ranking global** (`docs/RANKING-GLOBAL.md`): podio y tabla de la semana y la temporada, el servidor mide el tiempo, máximo 4 h al día, aparecen los de 13+ con su nombre de usuario y se puede salir (y borrar los minutos). Con `mode: 'local'`: tu marca y el aviso "llega pronto". |
@@ -81,7 +81,14 @@ manifest.webmanifest    Datos para instalarla como app
 service-worker.js       Modo sin conexión
 _headers                Encabezados de seguridad para cuando la publiques en la web
 package.json            Solo para `npm test` (no hay dependencias)
-css/styles.css          Estilos
+css/                    Estilos, en este orden (el mapa de dónde vive cada cosa está al principio de tokens.css)
+  tokens.css            Variables: colores, bordes, sombras y medidas (tema claro y oscuro)
+  base.css              Letras, la página y los campos del navegador
+  layout.css            El contenedor, las vistas y sus rejillas
+  components.css        Una sección por componente (barra de arriba, reloj, compañero, tienda, ventanas…)
+  scenery.css           El paisaje de fondo, los animales y el paisaje de entrar
+  utilities.css         Ayudas sueltas, pausas de rendimiento y "Menos animaciones"
+  legal.css             Solo las páginas de privacidad, normas y eliminar cuenta
 js/                     Lógica pura: sin DOM, se prueba en Node
   config.js             Configuración pública (aquí NUNCA van secretos)
   util.js               Fechas, formatos, limpieza de texto
@@ -137,8 +144,11 @@ python tests/e2e_sonidos.py http://localhost:8000/   # sonidos grabados: bucle s
 python tests/e2e_captcha.py http://localhost:8000/   # CAPTCHA con Supabase y Turnstile simulados
 python tests/e2e_android.py http://localhost:8000/   # reportar y ocultar, normas, borrar cuenta y app de Android (simulada)
 python tests/e2e_mascota.py http://localhost:8000/   # v4.2: corazones, hambre, tumba, revivir y nombre de tu compañero
+python tests/e2e_encima.py http://localhost:8000/    # v4.4.1: "Siempre encima" (la ventanita con el reloj)
 python tests/store_check.py http://localhost:8000/   # lista para Microsoft Store: manifiesto, instalable,
                                                      # sin conexión, 8 tamaños de ventana y accesibilidad (axe)
+npm run test:visual                                  # v4.3.3: fotos de cada pantalla comparadas con las aprobadas
+                                                     # (guía: docs/PRUEBAS-VISUALES.md)
 ```
 
 Para las pruebas del servidor del ranking necesitas PostgreSQL: `server/supabase/test/run_local.sh` (37 comprobaciones).
@@ -165,3 +175,4 @@ Sigue `docs/MICROSOFT-STORE.md`: GitHub Pages, cuenta individual en Partner Cent
 - [`docs/CAMBIOS-v3.md`](docs/CAMBIOS-v3.md): reorganización del código y errores corregidos en la v3.
 - [`docs/CAMBIOS-v2.md`](docs/CAMBIOS-v2.md): errores que tenía la v1 y cómo se corrigieron.
 - [`docs/HOJA-DE-RUTA.md`](docs/HOJA-DE-RUTA.md): pasos para llegar a App Store y Play Store, e ideas.
+- Planes por aprobar (v4.4.1): [`docs/MULTI-DISPOSITIVO.md`](docs/MULTI-DISPOSITIVO.md) (tu cuenta en todos tus aparatos, con el reloj en vivo), [`docs/ANDROID-NOTIFICACION-WIDGET.md`](docs/ANDROID-NOTIFICACION-WIDGET.md) (notificación tipo Spotify y widget) y [`docs/GOOGLE-PLAY-BILLING.md`](docs/GOOGLE-PLAY-BILLING.md) (cobrar Premium en Android).

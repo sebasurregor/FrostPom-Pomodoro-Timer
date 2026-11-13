@@ -1,0 +1,143 @@
+/*
+ * FrostPom — la ventanita "Siempre encima" (js/ui/pip.js).
+ *
+ * Vive en otra ventana, así que no ve los estilos de la app: tiene los suyos aquí. Sigue el mockup
+ * del widget del autor: de noche, con la aurora; a la izquierda una tarjeta oscura con la sesión y a
+ * la derecha los animales junto a la fogata. La ventanita se puede agrandar o achicar: todo se mide
+ * con su tamaño (cqw = 1 % del ancho, cqh = 1 % del alto) y, si queda muy pequeña, se esconde lo
+ * que no cabe.
+ */
+@font-face { font-family: "Nunito"; src: url("../assets/fonts/nunito-latin-wght.woff2") format("woff2"); font-weight: 200 1000; font-display: swap; }
+@font-face { font-family: "Lilita One"; src: url("../assets/fonts/lilita-one-latin.woff2") format("woff2"); font-display: swap; }
+
+:root {
+  color-scheme: dark;
+  --ink: #0D2346;
+  --gold: #FFC531;
+  --mint: #2ED8A3;
+  --night: #0B1A3C;
+  --accent: var(--gold);
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--night); color: #fff; font-family: "Nunito", system-ui, sans-serif; overflow: hidden; user-select: none; }
+[hidden] { display: none !important; }
+button { font: inherit; color: inherit; }
+
+.pip { position: relative; height: 100%; container-type: size; overflow: hidden; }
+.pip[data-mode="break"], .pip[data-mode="long"] { --accent: var(--mint); }
+
+/* El paisaje de la entrada: la aurora y los animales a la derecha */
+.pip__scene {
+  position: absolute; inset: 0;
+  background: var(--night) url("../assets/scenes/artico-amigos.webp") 100% 60% / cover no-repeat;
+}
+.pip__scene::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(90deg, rgba(5, 12, 30, 0.55) 0%, rgba(5, 12, 30, 0.3) 45%, rgba(5, 12, 30, 0) 65%);
+}
+
+/* La tarjeta de la sesión */
+.pip__card {
+  position: absolute; left: 3cqh; top: 4cqh; bottom: 4cqh; width: 49cqw;
+  display: grid; align-content: center; gap: 2.2cqh;
+  padding: 4cqh 4.5cqh;
+  border-radius: 16px;
+  background: rgba(13, 24, 52, 0.74);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+.pip__head { display: flex; align-items: center; gap: 2.5cqh; min-width: 0; }
+.pip__glass { width: 8.5cqh; height: 8.5cqh; flex: none; }
+.pip__title {
+  margin: 0; flex: 1; min-width: 0;
+  font-size: min(6.4cqh, 3.5cqw); font-weight: 900; letter-spacing: 0.05em; text-transform: uppercase;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pip__unpin {
+  flex: none; width: 10cqh; height: 10cqh; padding: 1.6cqh; margin: -1cqh -1.5cqh -1cqh 0;
+  display: grid; place-items: center; border: 0; border-radius: 50%; background: transparent; cursor: pointer;
+  color: rgba(255, 255, 255, 0.75);
+}
+.pip__unpin:hover { color: #fff; background: rgba(255, 255, 255, 0.12); }
+.pip__unpin svg { width: 100%; height: 100%; fill: currentColor; }
+
+.pip__clock {
+  margin: 0; font-family: "Lilita One", "Nunito", system-ui, sans-serif; font-weight: 400;
+  font-size: min(25cqh, 10.5cqw); line-height: 0.95; letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 3px 0 rgba(0, 0, 0, 0.25);
+}
+.pip__clock.is-long { font-size: min(21cqh, 8cqw); }
+.pip__sub { margin: -1cqh 0 0; font-size: 6.4cqh; font-weight: 700; color: rgba(255, 255, 255, 0.92); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* La barra, con tu compañero encima */
+.pip__bar { position: relative; height: 3.4cqh; margin: 4.5cqh 0 0; border-radius: 99px; background: rgba(255, 255, 255, 0.9); }
+.pip__fill { position: absolute; left: 0; top: 0; bottom: 0; width: calc(var(--done, 0) * 100%); border-radius: 99px; background: var(--accent); }
+.pip__pet {
+  position: absolute; bottom: -1.6cqh; left: calc((100% - 12.5cqh) * var(--done, 0));
+  width: 12.5cqh; height: 12.5cqh; object-fit: contain;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.35));
+}
+.pip__times { display: flex; justify-content: space-between; margin-top: -0.6cqh; font-size: 5.4cqh; font-weight: 700; color: rgba(255, 255, 255, 0.72); font-variant-numeric: tabular-nums; }
+
+/* Los botones: ▶ ⏮ 🔁 ⏭ ✓ */
+.pip__controls { display: flex; align-items: center; justify-content: space-between; gap: 2cqh; margin-top: 1cqh; }
+.pip__btn {
+  width: 11cqh; height: 11cqh; padding: 1.4cqh;
+  display: grid; place-items: center; flex: none;
+  border: 0; border-radius: 50%; background: transparent; color: #fff; cursor: pointer;
+}
+.pip__btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.14); }
+.pip__btn:disabled { opacity: 0.35; cursor: default; }
+.pip__btn svg { width: 100%; height: 100%; }
+.pip__btn--main, .pip__btn--round { background: #fff; color: var(--ink); box-shadow: 0 3px 0 rgba(0, 0, 0, 0.3); }
+.pip__btn--main { width: 15cqh; height: 15cqh; padding: 3.2cqh; }
+.pip__btn--round { width: 12.5cqh; height: 12.5cqh; padding: 2.2cqh; }
+.pip__btn--main:hover:not(:disabled), .pip__btn--round:hover:not(:disabled) { background: #fff; transform: translateY(-1px); }
+.pip__btn[data-act="auto"][aria-pressed="true"] { color: var(--accent); }
+.pip__btn[data-act="auto"][aria-pressed="false"] { color: rgba(255, 255, 255, 0.6); }
+.pip__btn:focus-visible, .pip__unpin:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+svg .i-fill { fill: currentColor; }
+svg .i-line { fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.pip__glass .i-line { stroke-width: 2; }
+.pip__pause { display: none; }
+.pip[data-status="running"] .pip__play { display: none; }
+.pip[data-status="running"] .pip__pause { display: block; }
+
+/* El globito de los animales y los avisos */
+.pip__bubble {
+  position: absolute; right: 5cqw; top: 9cqh; max-width: 30cqw; margin: 0;
+  padding: 2cqh 3cqh; border-radius: 10px;
+  background: rgba(240, 246, 255, 0.95); color: var(--ink);
+  font-size: 5.8cqh; font-weight: 800; line-height: 1.15; text-align: center;
+  transform: rotate(-3deg);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+}
+.pip__notice {
+  position: absolute; left: calc(49cqw + 6cqh); right: 3cqh; bottom: 4cqh; margin: 0;
+  padding: 2cqh 3cqh; border-radius: 10px;
+  background: rgba(13, 35, 70, 0.94); border: 1px solid rgba(255, 255, 255, 0.18);
+  font-size: 5.2cqh; font-weight: 700; line-height: 1.25;
+}
+
+/* Ventanita angosta: la tarjeta ocupa todo el ancho y los animales quedan de fondo */
+@container (max-width: 360px) {
+  .pip__card { width: auto; right: 3cqh; }
+  .pip__clock { font-size: min(25cqh, 20cqw); }
+  .pip__clock.is-long { font-size: min(21cqh, 15cqw); }
+  .pip__bubble { display: none; }
+  .pip__notice { left: 3cqh; }
+}
+/* Ventanita bajita: solo la hora, la barra y los botones */
+@container (max-height: 170px) {
+  .pip__head, .pip__sub, .pip__times, .pip__bubble { display: none; }
+  .pip__card { gap: 3cqh; padding-block: 5cqh; }
+  .pip__clock { font-size: min(30cqh, 10.5cqw); }
+}
+
+@media (forced-colors: active) {
+  .pip__card { border: 1px solid CanvasText; }
+  .pip__fill { background: Highlight; }
+}

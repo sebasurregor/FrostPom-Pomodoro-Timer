@@ -9,6 +9,8 @@ export function toast(text, tone = 'info', { icon, ms = 3800 } = {}) {
   const el = h('div', { class: `toast toast--${tone}`, role: 'status' }, icon ? h('span', { class: 'toast__icon', 'aria-hidden': 'true' }, icon) : null, h('span', { class: 'toast__text', text }));
   const box = $('#toasts');
   box.append(el);
+  // (v4.4.1) Si la ventanita "Siempre encima" está abierta, el aviso también sale allá (pip.js)
+  document.dispatchEvent(new CustomEvent('frostpom:toast', { detail: { text: el.textContent, tone } }));
   while (box.children.length > 3) box.firstElementChild.remove();
   setTimeout(() => {
     el.classList.add('is-leaving');

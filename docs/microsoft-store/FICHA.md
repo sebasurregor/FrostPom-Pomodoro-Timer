@@ -33,6 +33,7 @@ Disponible en español e inglés.
 ## Características (Product features, una por línea)
 
 - Pomodoro con duraciones listas o a tu medida
+- Reloj siempre encima de tus otras ventanas (con el pin)
 - Rangos, temporadas, misiones diarias y logros
 - Compañeros de edición limitada que se ganan estudiando
 - Tienda para alimentar a tu compañero arrastrando la comida
@@ -146,6 +147,7 @@ Privacy first: we don't ask for your real name and your photo never leaves your 
 ## Product features
 
 - Pomodoro with ready-made or custom lengths
+- Always-on-top mini timer over your other windows (with the pin)
 - Ranks, seasons, daily missions and achievements
 - Limited-edition buddies you earn by studying
 - Shop to feed your buddy by dragging food, and a name tag for it

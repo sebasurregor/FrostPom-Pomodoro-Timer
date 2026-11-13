@@ -1,0 +1,36 @@
+/* FrostPom — ayudas sueltas, pausas de rendimiento y "Menos animaciones".
+   El mapa de todos los estilos está al principio de tokens.css. */
+
+/* =====================================================================
+   Utilidades
+   ===================================================================== */
+[hidden] { display: none !important; }
+
+.sr-only {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0);
+  white-space: nowrap; border: 0;
+}
+
+/* =====================================================================
+   Rendimiento: lo que no se ve no se anima
+   ===================================================================== */
+/* Sobre todo para el celular: se pausa lo que queda tapado o lo que en ese momento no se nota. */
+/* Con la pantalla de entrada abierta, la app de abajo queda tapada: no se pinta ni se anima */
+.gate-open .scenery, .gate-open .shell { visibility: hidden; }
+.gate-open .scenery *, .gate-open .shell * { animation-play-state: paused !important; }
+/* Mientras escribes en el celular (html.is-typing, ver main.js), el paisaje y la fogata se quedan quietos */
+.is-typing .scenery *, .is-typing .gate-scene * { animation-play-state: paused !important; }
+/* Con una ventana abierta (fondo oscuro y borroso), la app de atrás se queda quieta */
+.dlg-open .scenery *, .dlg-open .shell * { animation-play-state: paused !important; }
+/* Con una sección abierta como ventana, lo de atrás se queda quieto */
+.sheet-full .scenery *, .sheet-full .gate-scene * { animation-play-state: paused !important; }
+
+/* =====================================================================
+   Menos animaciones
+   ===================================================================== */
+/* Ajuste de la app (html.reduce-motion). La preferencia del sistema no lo detiene todo:
+   main.js avisa una vez dónde está este ajuste (cumple WCAG 2.2.2). */
+.reduce-motion *, .reduce-motion *::before, .reduce-motion *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }

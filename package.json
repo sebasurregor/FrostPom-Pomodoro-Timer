@@ -1,10 +1,12 @@
 {
   "name": "frostpom",
-  "version": "4.3.1",
+  "version": "4.4.1",
   "private": true,
   "type": "module",
   "scripts": {
     "test": "node --test",
+    "test:visual": "python tests/visual.py",
+    "test:visual:update": "python tests/visual.py --update",
     "android:www": "node tools/app-www.mjs",
     "android:crear": "npm run android:www && npx cap add android && node tools/app-android.mjs && npx cap sync android",
     "android:actualizar": "npm run android:www && node tools/app-android.mjs && npx cap sync android",

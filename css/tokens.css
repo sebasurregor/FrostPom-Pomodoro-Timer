@@ -1,0 +1,181 @@
+/* =====================================================================
+   FrostPom — estilos
+   Idea visual: un polo kawaii. Paisaje simple con montañas en #93c0ed, #749eda y #2d68bc,
+   tarjetas claras de esquinas grandes y botones de juego que se hunden al tocarlos.
+
+   MAPA: DÓNDE VIVE CADA COSA
+   Los archivos se cargan en este orden (index.html). Si dos reglas pesan lo mismo, gana la que
+   está más abajo: por eso el orden de los archivos y de las secciones importa.
+
+   1. tokens.css      variables: colores, bordes, sombras y medidas; tema claro y tema oscuro
+   2. base.css        letras, la página, los títulos, el foco del teclado y los campos del navegador
+        · Letras
+        · Base: la página, los títulos y el foco del teclado
+        · Campos de texto y listas (los controles del navegador)
+   3. layout.css      el contenedor, las vistas y las rejillas de cada vista
+        · Estructura: el contenedor y las vistas
+        · Rejillas de cada vista
+   4. components.css  una sección por componente, en este orden:
+        · Sprites e íconos
+        · Botones
+        · Formularios: campos, interruptores, selectores numéricos y opciones
+        · Paneles y avisos fijos
+        · Tarjetas: el estilo que comparten los recuadros
+        · HUD: la barra de arriba
+        · Tabs: el menú
+        · Pestañas pequeñas
+        · Enfocar: la placa de estado
+        · Enfocar: la duración
+        · Ring: el reloj
+        · Buddy: tu compañero
+        · Enfocar: los botones del reloj
+        · Tray: la tienda de comida
+        · Sonido
+        · Sheets: las secciones que se abren como ventana en el celular
+        · Progreso: rango, racha y escalera
+        · Progreso: misiones y salud del polo
+        · Progreso: calendario y gráfica de 7 días
+        · Progreso: logros, estilos, historial y temporadas
+        · Ranking
+        · Banderas y país
+        · Perfil: tarjeta, foto, estadísticas y compañeros
+        · Cuenta
+        · Ajustes: recordatorios y créditos
+        · Avisos (toasts) y textos flotantes
+        · Dialogs: las ventanas
+        · Gate: entrar y crear cuenta
+        · Modo oscuro: lo que comparten varios componentes
+   5. scenery.css     el paisaje de fondo, los animales que pasan y el paisaje de entrar
+        · Paisaje polar (fondo fijo detrás de todo)
+        · Animales que pasan caminando por la nieve
+        · El paisaje de entrar y crear cuenta
+   6. utilities.css   ayudas sueltas, pausas de rendimiento y "Menos animaciones"
+        · Utilidades
+        · Rendimiento: lo que no se ve no se anima
+        · Menos animaciones
+   (css/legal.css es aparte: solo lo usan las páginas de privacidad, normas y eliminar cuenta.)
+
+   Una regla vive con el componente que pinta, que es el último del selector:
+   ".view--paper .cal__day" está en Calendario, no en Estructura.
+
+   PUNTOS DE QUIEBRE
+   Los cuatro de siempre: computador (min-width: 900px), celular (max-width: 899px), celular de pie
+   (… and (orientation: portrait)) y celular bajito (… and (max-height: 739px)). Hay unos pocos
+   ajustes finos con otro ancho y el alto contraste del sistema (forced-colors).
+   Dentro de cada archivo, primero va lo que vale para todos los tamaños y al final un solo bloque
+   @media por punto de quiebre (solo los que ese archivo usa), siempre en este orden:
+     · Desde 560 px de ancho:                     (min-width: 560px)
+     · Computador (900 px o más):                 (min-width: 900px)
+     · Computador ancho (1000 px o más):          (min-width: 1000px)
+     · Celular (menos de 900 px):                 (max-width: 899px)
+     · Celular: hasta 640 px de ancho:            (max-width: 640px)
+     · Celular: hasta 520 px de ancho:            (max-width: 520px)
+     · Celular: hasta 420 px de ancho:            (max-width: 420px)
+     · Celular de pie:                            (max-width: 899px) and (orientation: portrait)
+     · Celular de pie y angosto (hasta 560 px):   (max-width: 560px) and (orientation: portrait)
+     · Celular bajito (menos de 740 px de alto):  (max-width: 899px) and (max-height: 739px)
+     · Alto contraste del sistema:                (forced-colors: active)
+   Primero los de "desde X px" de menor a mayor y después los de "hasta X px" de mayor a menor:
+   así, cuando dos bloques valen a la vez, gana el más específico (el que va más abajo).
+   Dentro de cada bloque las reglas van agrupadas por sección, en el mismo orden de arriba.
+   ===================================================================== */
+
+:root {
+  /* Paleta base */
+  --ink: #0D2346;          /* contornos y texto sobre papel: azul marino */
+  --text: var(--ink);      /* texto de las tarjetas (en modo oscuro se vuelve claro) */
+  --surface: #fff;         /* fondo de recuadros y campos */
+  --track: #E9EEF5;        /* fondo de barras de progreso */
+  --night: #1E4F96;        /* azul profundo del cielo */
+  --night-deep: #0E2A55;
+  --glass: rgba(13, 35, 70, 0.55); /* barras translúcidas sobre el paisaje */
+  --hairline: rgba(255, 255, 255, 0.18);
+  --paper: #F4F9FF;        /* paneles: nieve */
+  --paper-2: #E2EEFB;
+  --gold: #FFC531;         /* acción principal y XP */
+  --gold-deep: #E0A100;
+  --mint: #2ED8A3;         /* descanso */
+  --coral: #FF5E7E;        /* peligro / racha */
+  --blue: #5B8CFF;         /* estudio */
+  --gem: #45C6EE;          /* gemas (azul hielo, como el ícono) */
+  --on-night: #FFFFFF;
+  --on-night-muted: #D6E6F8;
+  --on-paper-muted: #4D6384;
+  --font-display: "Twemoji Country Flags", "Lilita One", "Nunito", system-ui, sans-serif;
+  --font-body: "Twemoji Country Flags", "Nunito", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 22px;
+  --line: 3px solid var(--ink);
+  --drop: 0 5px 0 var(--ink);
+  --tier-a: #F6A971;
+  --tier-b: #9C4A1E;
+  --ring-a: #5B8CFF;
+  --ring-b: #A9C6FF;
+  --tabbar-h: 68px;
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-t: env(safe-area-inset-top, 0px);
+  color-scheme: dark;
+  --card: #FFFFFF;
+  --card-line: #E3E9F2;      /* borde de las tarjetas */
+  --card-line-2: #D3DCE8;    /* borde de los recuadros de adentro */
+  --card-muted: #5E6E86;     /* texto secundario */
+  --card-soft: #F2F6FB;      /* fondo de los recuadros de adentro */
+  --card-shadow: 0 10px 28px rgba(13, 35, 70, 0.16);
+  --r-card: 22px;
+
+  /* Medidas y colores que se repiten (los mismos en los dos temas) */
+  --r-pill: 999px;                            /* pastilla: los extremos del todo redondos */
+  --r-round: 50%;                             /* círculo */
+  --shadow-chip: 0 3px 0 var(--card-line-2);  /* escalón suave de los recuadros de adentro */
+  --gold-edge: #B07F00;                       /* borde y escalón de lo dorado */
+  --cream: #FFF6D6;                           /* fondo crema de lo listo o lo elegido */
+  --good-text: #0E8A63;                       /* texto de "todo bien" */
+  /* Escala de espacios (la que ya usaba la app), para los gap */
+  --sp-1: 2px; --sp-2: 4px; --sp-3: 6px; --sp-4: 8px; --sp-5: 10px;
+  --sp-6: 12px; --sp-7: 14px; --sp-8: 16px; --sp-9: 18px; --sp-10: 22px;
+}
+/* Modo oscuro (Ajustes → Apariencia). html[data-theme="dark"] lo pone js/ui/theme.js.
+   Casi todo cambia solo porque usa variables: aquí se cambian los valores. Los pocos colores
+   escritos a mano se cambian en cada componente (reglas html[data-theme="dark"] …).
+   El paisaje se oscurece un poco para no encandilar. */
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --text: #E7EEF9;
+  --surface: #1C2A47;
+  --paper: #172340;
+  --paper-2: #22325A;
+  --on-paper-muted: #A7B5CD;
+  --track: #2A3B60;
+  --card: #142037;
+  --card-line: #26375A;
+  --card-line-2: #33476F;
+  --card-muted: #A7B5CD;
+  --card-soft: #1C2A47;
+  --card-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+}
+
+/* =====================================================================
+   Computador (900 px o más)
+   ===================================================================== */
+@media (min-width: 900px) {
+  :root { --tabbar-h: 0px; }
+}
+
+/* =====================================================================
+   Celular de pie
+   ===================================================================== */
+@media (max-width: 899px) and (orientation: portrait) {
+  /* Alto y posición del dibujo, en un solo lugar: los usan el dibujo y la ventana de entrar */
+  html {
+    --gate-art-h: max(100vh, calc(100vw * 2160 / 1206)); --gate-art-top: calc((100vh - var(--gate-art-h)) * 0.5);
+    --gate-bear-top: calc(var(--gate-art-top) + var(--gate-art-h) * 0.495); /* donde empieza la cabeza del oso */
+  }
+}
+
+/* =====================================================================
+   Celular de pie y angosto (hasta 560 px)
+   ===================================================================== */
+@media (max-width: 560px) and (orientation: portrait) {
+  html { --gate-art-top: 24vh; }
+}

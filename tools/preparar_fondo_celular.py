@@ -10,7 +10,7 @@ La llama se anima encima del dibujo (crece y se mece, nunca se hace más pequeñ
 igual que la fogata del computador. Por eso la capa de la llama tiene el centro pintado de naranja:
 el centro amarillo va en su propia capa y late aparte.
 
-Al final imprime las posiciones en % (para .campfire__tall en css/styles.css). Si cambia el dibujo,
+Al final imprime las posiciones en % (para .campfire__tall en css/scenery.css). Si cambia el dibujo,
 hay que ajustar RECORTE (un cuadro alrededor de la fogata, en píxeles del dibujo original) y copiar
 las posiciones nuevas al CSS (también las del brillo y las chispas).
 

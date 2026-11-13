@@ -35,7 +35,7 @@ Google revisa que las direcciones de la ficha (privacidad y borrar cuenta) abran
 5. Espera unos minutos y abre en una ventana InPrivate:
    - https://sebasurregor.github.io/FrostPom-Pomodoro-Timer/eliminar-cuenta.html
    - https://sebasurregor.github.io/FrostPom-Pomodoro-Timer/normas.html
-   - la app: al final de **Ajustes** debe decir **versión 4.3.0** (o la que estés publicando).
+   - la app: al final de **Ajustes** debe decir **versión 4.4.1** (o la que estés publicando).
 
 ✅ **Quedó bien si** las dos páginas abren, y en el ranking tocas **⋯** junto a un nombre y aparecen **Reportar nombre** y **No ver más a esta persona**.
 
@@ -86,7 +86,7 @@ npm run android:abrir
 ```
 
 - `npm install` descarga Capacitor (las versiones exactas que probé: 8.6).
-- `android:crear` copia la app a `www/`, crea la carpeta `android/`, pone los íconos de FrostPom y la versión de `package.json` (hoy 4.3.0, `versionCode 40300`), y conecta todo.
+- `android:crear` copia la app a `www/`, crea la carpeta `android/`, pone los íconos de FrostPom y la versión de `package.json` (hoy 4.4.1, `versionCode 40401`), y conecta todo.
 - `android:abrir` abre el proyecto en Android Studio.
 
 En Android Studio, espera abajo a que termine **Gradle sync** (la primera vez descarga cosas y tarda unos minutos).
@@ -159,7 +159,7 @@ Mientras pruebas desde Android Studio puedes ver la consola de la app: en Chrome
 Como tu cuenta personal es nueva, **Google no deja publicar** hasta que **al menos 12 personas** estén inscritas en una **prueba cerrada** durante **14 días seguidos**.
 
 1. **Probar y publicar → Pruebas → Prueba cerrada → Crear versión**. Si te pregunta por **Play App Signing**, acéptalo.
-2. Sube `app-release.aab`. Nombre de la versión: `4.3.0`. En las notas: "Primera versión de prueba".
+2. Sube `app-release.aab`. Nombre de la versión: `4.4.1`. En las notas: "Primera versión de prueba".
 3. **Testers**: crea una lista con los **correos de Gmail** de tus probadores. Invita a **15 o más**, por si alguien se sale.
 4. **Países:** elige al menos Colombia (y los de tus probadores).
 5. Envía la versión a revisión. Cuando la aprueben (puede tardar unos días), copia el **enlace para unirse** y mándaselo.
@@ -182,7 +182,7 @@ Como tu cuenta personal es nueva, **Google no deja publicar** hasta que **al men
 ## Cada vez que cambies FrostPom
 
 1. Haz el cambio y pruébalo en la web, como siempre.
-2. Sube la versión en los **tres** lugares: `js/config.js` (`version`), `service-worker.js` (`VERSION`) y `package.json` (`version`). Por ejemplo, de 4.3.0 a 4.3.1.
+2. Sube la versión en los **tres** lugares: `js/config.js` (`version`), `service-worker.js` (`VERSION`) y `package.json` (`version`). Por ejemplo, de 4.4.1 a 4.4.2.
 3. Ejecuta:
    ```
    npm run android:actualizar

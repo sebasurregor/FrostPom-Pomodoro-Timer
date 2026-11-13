@@ -1,0 +1,380 @@
+/* FrostPom — el paisaje: el fondo, los animales que pasan y el paisaje de entrar.
+   El mapa de todos los estilos está al principio de tokens.css. */
+
+/* =====================================================================
+   Paisaje polar (fondo fijo detrás de todo)
+   ===================================================================== */
+.scenery {
+  --p: 0.3;
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.scenery__svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.scenery [class^="sc-"] { transition: opacity 2.5s ease; }
+/* Animales que pasan caminando por la nieve */
+.scenery__walkers {
+  position: absolute;
+  left: 0; right: 0;
+  bottom: calc(var(--tabbar-h) + var(--safe-b) + 6px);
+  height: 64px;
+}
+/* Nieve (y ceniza cuando el polo está contaminado): un solo <canvas>, ver js/ui/snow.js */
+.scenery__snow { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.reduce-motion .scenery__snow { display: none; }
+/* El paisaje, más apagado */
+html[data-theme="dark"] .scenery::after { content: ""; position: absolute; inset: 0; background: rgba(3, 9, 24, 0.42); pointer-events: none; }
+/* Ráfagas de viento: 2 con buen tiempo y las 5 cuando nieva fuerte */
+.scenery:not([data-weather="medium"]):not([data-weather="heavy"]) :is(.sc-gust--2, .sc-gust--3, .sc-gust--4) { display: none; }
+
+.sc-sky, .sc-sun, .sc-moon, .sc-stars, .sc-aurora, .sc-glow, .sc-camp, .sc-nighttint { opacity: 0; }
+/* Fases del día (según la hora real) */
+.scenery[data-phase="day"] .sc-sky--day, .scenery[data-phase="dawn"] .sc-sky--dawn,
+.scenery[data-phase="dusk"] .sc-sky--dusk, .scenery[data-phase="night"] .sc-sky--night {
+  opacity: 1;
+}
+
+.scenery[data-phase="day"] .sc-sun--day, .scenery[data-phase="dawn"] .sc-sun--dawn,
+.scenery[data-phase="dusk"] .sc-sun--dusk {
+  opacity: calc(0.95 - var(--p) * 0.6);
+}
+
+.scenery[data-phase="night"] .sc-moon { opacity: calc(1 - var(--p) * 0.5); }
+
+.scenery[data-phase="night"] .sc-stars { opacity: calc(1 - var(--p)); }
+.scenery[data-phase="dawn"] .sc-stars { opacity: calc((1 - var(--p)) * 0.35); }
+
+.scenery[data-phase="night"] .sc-aurora { opacity: calc((1 - var(--p)) * 0.75); }
+
+.scenery[data-phase="dawn"] .sc-glow, .scenery[data-phase="dusk"] .sc-glow { opacity: calc((1 - var(--p)) * 0.55); }
+
+.scenery[data-phase="night"] .sc-camp { opacity: 1; }
+/* La fogata (con el oso y el zorro) y la luz del iglú solo se animan de noche, que es cuando se ven */
+.scenery:not([data-phase="night"]) .sc-camp *, .scenery:not([data-phase="night"]) .sc-igloo-glow { animation: none !important; }
+
+.scenery[data-phase="night"] .sc-nighttint { opacity: 0.42; mix-blend-mode: multiply; }
+
+/* Iglú: la entrada brilla solo de noche */
+.sc-igloo-glow { opacity: 0; }
+.scenery[data-phase="night"] .sc-igloo-glow { opacity: 0.85; animation: igloo-glow 3s ease-in-out infinite alternate; }
+@keyframes igloo-glow { from { opacity: 0.6; } to { opacity: 0.95; } }
+
+/* Fogata */
+.sc-flame { transform-box: fill-box; transform-origin: 50% 100%; animation: flicker-fire 0.9s ease-in-out infinite alternate; }
+@keyframes flicker-fire { from { transform: scale(1, 1) skewX(0deg); } 50% { transform: scale(0.94, 1.08) skewX(-3deg); } to { transform: scale(1.04, 0.95) skewX(3deg); } }
+
+.sc-spark { transform-box: fill-box; animation: spark 2.2s ease-out infinite; }
+@keyframes spark { from { transform: translate(0, 0); opacity: 1; } to { transform: translate(8px, -60px); opacity: 0; } }
+.sc-spark--1 { animation-delay: -0.7s; }
+.sc-spark--2 { animation-delay: -1.4s; }
+
+/* Humo de la fogata */
+.sc-firesmoke { transform-box: fill-box; transform-origin: center; opacity: 0; animation: firesmoke 4.5s ease-out infinite; }
+@keyframes firesmoke { 0% { transform: translate(0, 0) scale(0.5); opacity: 0.55; } 100% { transform: translate(30px, -170px) scale(2.6); opacity: 0; } }
+.sc-firesmoke--1 { animation-delay: -1.1s; }
+.sc-firesmoke--2 { animation-delay: -2.2s; }
+.sc-firesmoke--3 { animation-delay: -3.3s; }
+.reduce-motion .sc-firesmoke, .reduce-motion .sc-gust, .reduce-motion .sc-oil-drip { display: none; }
+
+.sc-fire-art { animation-duration: 0.7s; }
+
+/* 5 cuadros con su propio ritmo: mira → sonríe → se le antoja → ¡se quema! → lo sopla */
+.sc-roast__strip { animation: bear-roast 8s infinite; animation-timing-function: step-end; }
+@keyframes bear-roast {
+  0% { transform: translateX(0); }
+  20% { transform: translateX(-182.5px); }
+  38% { transform: translateX(-365px); }
+  58% { transform: translateX(-547.5px); }
+  72%, 100% { transform: translateX(-730px); }
+}
+.reduce-motion .sc-roast__strip { animation: none !important; transform: translateX(-182.5px); }
+
+/* De noche el zorro también asa un malvavisco, al otro lado de la fogata */
+.sc-roast2__strip { animation: fox-roast 9s infinite; animation-timing-function: step-end; animation-delay: -3.5s; }
+@keyframes fox-roast {
+  0% { transform: translateX(0); }
+  22% { transform: translateX(-174.8px); }
+  40% { transform: translateX(-349.6px); }
+  60% { transform: translateX(-524.4px); }
+  76%, 100% { transform: translateX(-699.2px); }
+}
+.reduce-motion .sc-roast2__strip { animation: none !important; transform: translateX(-349.6px); }
+
+.sc-snowcap { opacity: calc(1 - var(--p) * 0.85); }
+
+.sc-factory { opacity: clamp(0, calc((var(--p) - 0.25) * 2.5), 1); }
+
+.sc-smog { opacity: calc(var(--p) * 0.9); }
+
+.sc-dirt { opacity: clamp(0, calc((var(--p) - 0.2) * 0.75), 0.55); mix-blend-mode: multiply; }
+
+.sc-trash { opacity: clamp(0, calc((var(--p) - 0.45) * 3), 1); }
+
+.sc-oil { opacity: clamp(0, calc((var(--p) - 0.6) * 3), 1); }
+.scenery:is([data-level="limpio"], [data-level="neblina"]) .sc-oil * { animation: none; }
+
+/* Petróleo que se extiende y brilla, y gotea de la fábrica */
+.sc-oil-pool { transform-box: fill-box; transform-origin: center; animation: oil-spread 6s ease-in-out infinite alternate; }
+@keyframes oil-spread { to { transform: scale(1.12, 1.18); } }
+
+.sc-oil-sheen { animation: oil-sheen 3s ease-in-out infinite alternate; }
+@keyframes oil-sheen { from { opacity: 0.2; } to { opacity: 0.6; transform: translateX(14px); } }
+
+.sc-oil-drip { animation: oil-drip 2.4s ease-in infinite; }
+@keyframes oil-drip { 0% { transform: translateY(0); opacity: 1; } 100% { transform: translateY(130px); opacity: 0; } }
+
+.sc-puff { transform-box: fill-box; transform-origin: center; animation: puff 6s ease-in infinite; }
+@keyframes puff {
+  0% { transform: translate(0, 0) scale(0.6); opacity: 0.9; }
+  100% { transform: translate(-60px, -150px) scale(2.4); opacity: 0; }
+}
+.sc-puff--1 { animation-delay: -1.5s; }
+.sc-puff--2 { animation-delay: -3s; }
+.sc-puff--3 { animation-delay: -4.5s; }
+/* El humo de la fábrica y el petróleo solo se animan cuando hay contaminación */
+.scenery[data-level="limpio"] .sc-puff { animation: none; }
+
+/* Viento: ráfagas blancas cuando está limpio, grises cuando hay esmog */
+.sc-gust { opacity: 0; stroke-dasharray: 60 200; animation: gust 7s linear infinite; }
+@keyframes gust { 0% { stroke-dashoffset: 260; opacity: 0; transform: translateX(-60px); } 20% { opacity: 0.7; } 80% { opacity: 0.5; } 100% { stroke-dashoffset: 0; opacity: 0; transform: translateX(140px); } }
+.sc-gust--1 { animation-delay: -1.5s; }
+.sc-gust--2 { animation-delay: -3s; }
+.sc-gust--3 { animation-delay: -4.5s; }
+.sc-gust--4 { animation-delay: -5.8s; }
+.scenery[data-level="contaminado"] .sc-gust, .scenery[data-level="critico"] .sc-gust { stroke: #8B8472; }
+.scenery[data-weather="heavy"] .sc-gust { animation-duration: 3.5s; }
+
+/* Clima: cuántos copos y cuánto viento lo decide js/ui/snow.js (WEATHER); aquí, la ventisca */
+.sc-blizzard { opacity: 0; }
+.scenery[data-weather="medium"] .sc-blizzard { opacity: 0.25; }
+.scenery[data-weather="heavy"] .sc-blizzard { opacity: 0.6; }
+
+/* =====================================================================
+   Animales que pasan caminando por la nieve
+   ===================================================================== */
+.walker {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  animation: walk-ltr var(--dur) linear infinite;
+  animation-delay: var(--delay);
+}
+@keyframes walk-ltr { from { transform: translateX(-100px); } to { transform: translateX(calc(100vw + 100px)); } }
+.walker--rtl { animation-name: walk-rtl; }
+@keyframes walk-rtl { from { transform: translateX(calc(100vw + 100px)); } to { transform: translateX(-100px); } }
+.walker--rtl .walker__art { transform: scaleX(-1); }
+.walker--bear .walker__art { width: 76px; height: 76px; }
+.walker__body { transform-origin: 50% 100%; animation: waddle 0.55s ease-in-out infinite alternate; }
+@keyframes waddle { from { transform: rotate(-6deg); } to { transform: rotate(6deg) translateY(-2px); } }
+.walker--bear .walker__body { animation-duration: 0.8s; }
+/* Con mucha contaminación, casi todos se van y el que queda camina más lento */
+.scenery[data-level="contaminado"] .walker:nth-child(n + 3), .scenery[data-level="critico"] .walker:nth-child(n + 2) { display: none; }
+.scenery[data-level="critico"] .walker { animation-duration: calc(var(--dur) * 1.6); }
+.reduce-motion .walker { animation: none !important; left: calc(4% + var(--i) * 16%); }
+.reduce-motion .walker__hop { animation: none !important; }
+.reduce-motion .walker__body { animation: none !important; }
+/* Salticos: el contenedor salta, el cuerpo se bambolea y el sprite camina */
+.walker__hop { position: relative; }
+.walker--penguin .walker__hop { animation: hop-penguin 3.4s ease-in-out infinite; animation-delay: calc(var(--i) * -0.9s); }
+/* El zorro camina con su ciclo de 4 cuadros y mira a la derecha, como el pingüino y el oso */
+@keyframes hop-penguin {
+  0%, 60%, 100% { transform: translateY(0); }
+  66% { transform: translateY(-20px); }
+  72% { transform: translateY(0); }
+  78% { transform: translateY(-10px); }
+  84% { transform: translateY(0); }
+}
+.walker--seal .walker__hop { animation: hop-seal 0.9s ease-in-out infinite; }
+@keyframes hop-seal { 0%, 100% { transform: translateY(0) scaleY(1); } 50% { transform: translateY(-8px) scaleY(1.04); } }
+.walker--seal .walker__body { animation-duration: 0.9s; }
+.walker--seal .walker__art { width: 66px; height: 66px; }
+.walker--rtl.walker--seal .walker__art { transform: none; } /* la foca ya mira a la izquierda */
+.walker--fox .walker__art { width: 66px; height: 66px; }
+.walker--fox .walker__hop { animation: none; }
+.walker--fox .walker__body { animation-duration: 0.4s; }
+
+/* Globos con onomatopeyas */
+.say {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 6px);
+  z-index: 2;
+  padding: 4px 10px;
+  border-radius: 14px;
+  border: 2.5px solid var(--ink);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  line-height: 1.1;
+  white-space: nowrap;
+  box-shadow: 0 3px 0 var(--ink);
+  transform: translateX(-50%);
+  transform-origin: 50% 100%;
+  animation: say-in 0.35s cubic-bezier(.2, 1.6, .4, 1) both;
+  pointer-events: none;
+}
+@keyframes say-in { from { opacity: 0; transform: translateX(-50%) scale(0.3); } }
+.say::after {
+  content: "";
+  position: absolute;
+  left: calc(50% - 7px);
+  top: 100%;
+  border: 7px solid transparent;
+  border-top-color: var(--text);
+}
+.say.is-leaving { animation: say-out 0.3s ease forwards; }
+@keyframes say-out { to { opacity: 0; transform: translateX(-50%) translateY(-8px); } }
+.buddy .say { bottom: calc(100% - 4px); font-size: 1.05rem; }
+.buddy.has-tag .say { bottom: calc((1 - var(--head, 0)) * 100% + 34px); }
+
+/* =====================================================================
+   El paisaje de entrar y crear cuenta
+   ===================================================================== */
+/* El paisaje es un elemento de verdad (#gateScene) para poder animar la fogata.
+   Se muestra mientras hay un diálogo de entrada abierto (feedback.js pone html.gate-open). */
+.gate-scene { display: none; position: fixed; inset: 0; z-index: 900; overflow: hidden; background: #0B1A3C; }
+.gate-open .gate-scene { display: block; }
+/* Igual que background-size: cover, pero con medidas reales para que la llama quede encima de los troncos */
+.gate-scene__art {
+  --aw: 1920; --ah: 1072; /* tamaño del dibujo (en el celular de pie es otro: ver el bloque "Celular de pie" al final de este archivo) */
+  --w: max(100vw, calc(100vh * var(--aw) / var(--ah)));
+  --h: max(100vh, calc(100vw * var(--ah) / var(--aw)));
+  position: absolute; width: var(--w); height: var(--h);
+  left: calc((100vw - var(--w)) * 0.72); top: calc((100vh - var(--h)) * 0.5);
+}
+.gate-scene__img, .campfire { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.gate-scene__art::after { content: ''; position: absolute; inset: 0; background: rgba(4, 10, 24, 0.42); }
+
+/* La fogata: llama (cuerpo naranja + centro amarillo), brillo en la nieve y gotitas de fuego que suben. Cada parte es su propia capa, ubicada en % sobre el dibujo de 1920 × 1072: así se anima
+   con transform/opacity sin volver a pintar nada. */
+.campfire { pointer-events: none; }
+.campfire > *, .campfire__body, .campfire__core { position: absolute; display: block; overflow: visible; }
+.campfire__body { inset: 0; width: 100%; height: 100%; }
+.campfire__body path { fill: #F88F2E; stroke: #E46C1E; stroke-width: 4; stroke-linejoin: round; }
+.campfire__core path { fill: #FBCC56; }
+.campfire__spark path { fill: #F88F2E; stroke: #E46C1E; stroke-width: 2; }
+.campfire__glow {
+  left: 63.4375%; top: 67.3507%; width: 19.7917%; height: 14.5522%;
+  border-radius: var(--r-round);
+  background: radial-gradient(closest-side, rgba(255, 179, 71, 0.75), rgba(255, 154, 60, 0.25) 55%, rgba(255, 154, 60, 0));
+  mix-blend-mode: screen;
+  will-change: transform, opacity;
+  animation: fire-glow 2.3s ease-in-out infinite;
+}
+@keyframes fire-glow {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(1.08); }
+}
+.campfire__flame {
+  left: 70.5208%; top: 63.9925%; width: 5.625%; height: 12.6866%;
+  transform-origin: 50% 97.4%; will-change: transform;
+  animation: fire-flicker 1.7s ease-in-out infinite;
+}
+/* La llama nunca se hace más pequeña que la del dibujo: solo crece, se estira y se mece */
+@keyframes fire-flicker {
+  0%, 100% { transform: scale(1, 1) skewX(0deg); }
+  22% { transform: scale(1.03, 1.08) skewX(-1deg); }
+  48% { transform: scale(1.015, 1.03) skewX(0.6deg); }
+  74% { transform: scale(1.04, 1.1) skewX(1deg); }
+}
+.campfire__core {
+  left: 24.074%; top: 36.765%; width: 51.852%; height: 55.147%;
+  transform-origin: 50% 97.3%; will-change: transform;
+  animation: fire-core 0.85s ease-in-out infinite alternate;
+}
+@keyframes fire-core {
+  from { transform: scale(0.9, 0.84); }
+  to { transform: scale(1.05, 1.08); }
+}
+.campfire__spark { width: 0.7292%; height: 1.8657%; opacity: 0; will-change: transform, opacity; animation: 2.6s ease-out infinite; }
+.campfire__spark--1 { left: 71.8229%; top: 63.153%; animation-name: fire-spark-1; animation-delay: 0s; }
+/* Las chispas suben y se desvían un poco a un lado (en % de su propio tamaño: escalan con el dibujo) */
+@keyframes fire-spark-1 { 0% { opacity: 0; transform: translate(0, 170%) scale(0.5); } 15% { opacity: 1; } 100% { opacity: 0; transform: translate(-100%, -230%) scale(1.05); } }
+.campfire__spark--2 { left: 73.125%; top: 61.567%; animation-name: fire-spark-2; animation-delay: 0.7s; }
+@keyframes fire-spark-2 { 0% { opacity: 0; transform: translate(0, 170%) scale(0.5); } 15% { opacity: 1; } 100% { opacity: 0; transform: translate(42.86%, -230%) scale(1.05); } }
+.campfire__spark--3 { left: 74.1146%; top: 63.3396%; animation-name: fire-spark-3; animation-delay: 1.4s; }
+@keyframes fire-spark-3 { 0% { opacity: 0; transform: translate(0, 170%) scale(0.5); } 15% { opacity: 1; } 100% { opacity: 0; transform: translate(114.3%, -230%) scale(1.05); } }
+.campfire__spark--4 { left: 72.4479%; top: 64.3657%; animation-name: fire-spark-4; animation-delay: 2s; }
+@keyframes fire-spark-4 { 0% { opacity: 0; transform: translate(0, 170%) scale(0.5); } 15% { opacity: 1; } 100% { opacity: 0; transform: translate(-42.86%, -230%) scale(1.05); } }
+/* "Menos animaciones": la fogata queda quieta, como en el dibujo original */
+.reduce-motion .campfire__flame, .reduce-motion .campfire__core, .reduce-motion .campfire__glow { animation: none; }
+.reduce-motion .campfire__spark { animation: none; opacity: 1; }
+/* El paisaje de entrar en el celular (de pie): un dibujo vertical, hecho para la pantalla
+   del teléfono, con la misma fogata animada. Se baja un poco: arriba queda cielo liso detrás de la
+   ventana, y debajo se ven la aurora y los animales (el hielo vacío de abajo se recorta). */
+.campfire__tall, .campfire__tall-core { display: none; }
+
+/* Nevada suave en la pantalla de entrada (js/ui/gate-snow.js; un solo <canvas>) */
+.gate-snow { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.reduce-motion .gate-snow { display: none; }
+
+/* =====================================================================
+   Computador (900 px o más)
+   ===================================================================== */
+@media (min-width: 900px) {
+  /* --- Paisaje polar (fondo fijo detrás de todo) --- */
+  .scenery__walkers { bottom: 10px; height: 80px; }
+
+  /* --- Animales que pasan caminando por la nieve --- */
+  .walker--bear .walker__art { width: 92px; height: 92px; }
+  .walker--seal .walker__art { width: 80px; height: 80px; }
+  .walker--fox .walker__art { width: 80px; height: 80px; }
+}
+
+/* =====================================================================
+   Celular (menos de 900 px)
+   ===================================================================== */
+@media (max-width: 899px) {
+  .gate-scene__art { left: calc((100vw - var(--w)) * 0.70); top: calc(100vh - var(--h)); }
+}
+
+/* =====================================================================
+   Celular de pie
+   ===================================================================== */
+@media (max-width: 899px) and (orientation: portrait) {
+  /* --- Paisaje polar (fondo fijo detrás de todo) --- */
+  /* En el celular de pie el sol de día quedaba justo detrás del botón "Silencio" y se veía como una
+     mancha: se corre a la derecha (110 unidades del dibujo), al borde de la pantalla. En el computador no cambia. */
+  .sc-sun--day { transform: translateX(110px); }
+
+  /* --- El paisaje de entrar y crear cuenta --- */
+  .gate-scene { background: rgb(18, 23, 66); } /* el color del cielo de arriba, con la capa oscura */
+  .gate-scene__art {
+    --aw: 1206; --ah: 2160;
+    background: #181D54;
+    left: calc((100vw - var(--w)) * 0.97);
+    --h: var(--gate-art-h);
+    top: var(--gate-art-top);
+  }
+  .gate-scene__art::after { background: rgba(4, 10, 24, 0.3); }
+  .campfire__flame { display: none; }
+  .campfire__tall {
+    display: block; left: 71.0709%; top: 59.472%; width: 5.2156%; height: 4.0373%;
+    background: url("../assets/scenes/fogata-llama.webp") center / 100% 100% no-repeat;
+    transform-origin: 50% 97%; will-change: transform;
+    animation: fire-flicker 1.7s ease-in-out infinite;
+  }
+  .campfire__tall-core {
+    display: block; position: absolute; left: 20%; top: 37.5%; width: 60%; height: 56.73%;
+    background: url("../assets/scenes/fogata-centro.webp") center / 100% 100% no-repeat;
+    transform-origin: 50% 97%; will-change: transform;
+    animation: fire-core 0.85s ease-in-out infinite alternate;
+  }
+  .campfire__glow { left: 64.5%; top: 60.37%; width: 18.36%; height: 4.66%; }
+  .campfire__spark { width: 0.676%; height: 0.539%; }
+  .campfire__spark--1 { left: 72.27%; top: 59.2%; }
+  .campfire__spark--2 { left: 73.48%; top: 58.7%; }
+  .campfire__spark--3 { left: 74.4%; top: 59.27%; }
+  .campfire__spark--4 { left: 72.86%; top: 59.59%; }
+  .reduce-motion .campfire__tall, .reduce-motion .campfire__tall-core { animation: none; }
+}
+
+/* =====================================================================
+   Celular de pie y angosto (hasta 560 px)
+   ===================================================================== */
+@media (max-width: 560px) and (orientation: portrait) {
+  .gate-scene__img { -webkit-mask-image: linear-gradient(transparent, #000 9%); mask-image: linear-gradient(transparent, #000 9%); }
+}

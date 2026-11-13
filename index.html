@@ -19,7 +19,13 @@
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
   <link rel="preload" href="assets/fonts/lilita-one-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="assets/fonts/nunito-latin-wght.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="css/styles.css">
+  <!-- Estilos: el orden importa (el mapa está al principio de css/tokens.css) -->
+  <link rel="stylesheet" href="css/tokens.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/scenery.css">
+  <link rel="stylesheet" href="css/utilities.css">
   <script type="module" src="js/main.js"></script>
 </head>
 <body>
@@ -137,6 +143,8 @@
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8.5h14l-1.3 11.5H6.3zM9 8.5V7a3 3 0 0 1 6 0v1.5"/></svg>
               <span class="shop-btn__hungry" id="shopHungry" hidden aria-hidden="true">!</span>
             </button>
+            <!-- v4.4.1: "Siempre encima": el reloj en una ventanita encima de las demás (computador; js/ui/pip.js) -->
+            <button type="button" class="pin-btn" id="pinBtn" aria-pressed="false" hidden></button>
           </div>
 
           <div class="controls">

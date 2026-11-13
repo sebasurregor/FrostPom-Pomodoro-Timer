@@ -1,4 +1,7 @@
 node_modules/
+__pycache__/
+# Pruebas visuales (v4.3.3): lo que cambió en la última corrida (las fotos aprobadas sí se suben)
+tests/visual/out/
 # App de Android (v4.1)
 www/
 *.jks

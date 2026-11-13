@@ -22,6 +22,9 @@ Comprueba que:
   K. (v4.3.1) En el celular (360 × 640, 384 × 832 y 412 × 915), con la bandeja de comida abierta el
      compañero y su nombre quedan enteros por encima de ella, el reloj se lee y se le puede arrastrar
      la comida.
+  M. (v4.3.2) En 360 × 640, 384 × 832, 412 × 915 y 1280 × 800, con la bandeja cerrada y abierta, el botón de
+     la tienda no se monta sobre el compañero ni sobre su nombre; las 4 pestañas llenan la barra parejo; en el
+     celular el sol de día no toca los botoncitos de duración y sonido.
   L. Sin errores en la consola ni archivos que falten.
 
 Uso (con la app servida: python -m http.server 8000):
@@ -310,11 +313,25 @@ def main():
         ctx, pg, errs, missing = open_app(browser, state(None, {'pinguino': {'fullness': 80, 'at': ago(0.1)}}), width=1280)
         check(pg.evaluate("document.querySelector('.walker--fox .sprite--zorro-camina') !== null"), 'el zorro camina con su sprite de 4 cuadros')
         check(pg.evaluate("document.querySelector('.sc-roast2 image').getAttribute('href')") == 'assets/sprites/zorro-malvavisco.webp', 'de noche el zorro asa malvaviscos junto a la fogata')
-        pg.evaluate("document.querySelector('.scenery').dataset.phase = 'night'")
-        pg.wait_for_timeout(2800)  # el paisaje cambia de fase con una transición de 2,5 s
-        check(pg.evaluate("getComputedStyle(document.querySelector('.sc-camp')).opacity") == '1', 'la fogata se ve de noche')
+        # La prueba "pone la noche" a mano. Pero la app, cada minuto, vuelve a poner la fase según la hora real
+        # (updatePhase en main.js): si ese minuto cae justo aquí, la noche se quita y la prueba fallaba a veces.
+        # Por eso NIGHT vuelve a poner la noche si la app la quitó. Además, el paisaje cambia de fase con una
+        # transición de 2,5 s, que con el equipo ocupado tarda un poco más: se espera a que termine (hasta 12 s)
+        # en vez de un tiempo fijo. (Sin wait_for_function: con Trusted Types, Playwright no puede usarlo aquí.)
+        NIGHT = "(() => { const s = document.querySelector('.scenery'); if (s.dataset.phase !== 'night') s.dataset.phase = 'night'; })()"
+        CAMP = "getComputedStyle(document.querySelector('.sc-camp')).opacity"
+        pg.evaluate(NIGHT)
+        camp = ''
+        for _ in range(60):
+            pg.wait_for_timeout(200)
+            pg.evaluate(NIGHT)
+            camp = pg.evaluate(CAMP)
+            if camp == '1':
+                break
+        check(camp == '1', f'la fogata se ve de noche (opacidad {camp})')
         xs = set()
         for _ in range(26):
+            pg.evaluate(NIGHT)
             xs.add(pg.evaluate("getComputedStyle(document.querySelector('.sc-roast2__strip')).transform"))
             pg.wait_for_timeout(400)
         check(len(xs) >= 3, f'el zorro cambia de cuadro ({len(xs)} distintos)')
@@ -396,6 +413,35 @@ def main():
             pg.click('#trayClose')
             pg.wait_for_timeout(200)
             check(not pg.evaluate("document.documentElement.classList.contains('tray-open')"), f'{w}×{hgt}: al cerrar la bandeja, el reloj vuelve a su tamaño')
+            done(ctx, errs, missing)
+
+        # ------------------------------------------------------------------ M
+        print('M. El botón de la tienda no tapa al compañero; la barra de abajo, pareja; el sol, lejos de los botones')
+        RECT = "(sel) => { const e = document.querySelector(sel); if (!e) return null; const r = e.getBoundingClientRect(); return [r.left, r.top, r.right, r.bottom]; }"
+
+        def overlap(a, b):
+            return bool(a and b and a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3])
+
+        for w, hgt in [(360, 640), (384, 832), (412, 915), (1280, 800)]:
+            ctx, pg, errs, missing = open_app(browser, state('zorro-artico', {'zorro-artico': {'fullness': 20, 'at': ago(0.1), 'name': 'Zorrito'}}), width=w, height=hgt)
+            for opened in (False, True):
+                if opened:
+                    pg.click('#shopBtn')
+                    pg.wait_for_timeout(500)
+                shop, buddy, tag = pg.evaluate(RECT, '#shopBtn'), pg.evaluate(RECT, '#buddy'), pg.evaluate(RECT, '#buddy .nametag')
+                how = 'bandeja abierta' if opened else 'bandeja cerrada'
+                check(not overlap(shop, buddy) and not overlap(shop, tag), f'{w}×{hgt}, {how}: el botón de la tienda no se monta sobre el compañero ni su nombre')
+                check(shop[2] < buddy[0], f'{w}×{hgt}, {how}: el botón queda al lado contrario del compañero')
+            tabs = pg.evaluate("[...document.querySelectorAll('.tabs .tab')].map((t) => t.getBoundingClientRect().width)")
+            bar = pg.evaluate("(() => { const n = document.querySelector('.tabs'); const r = n.getBoundingClientRect(); const c = getComputedStyle(n); return r.width - parseFloat(c.paddingLeft) - parseFloat(c.paddingRight) - parseFloat(c.borderLeftWidth) - parseFloat(c.borderRightWidth); })()")
+            if w < 900:
+                check(len(tabs) == 4 and abs(sum(tabs) - bar) < 2 and max(tabs) - min(tabs) < 1, f'{w}×{hgt}: las 4 pestañas llenan la barra parejo ({[round(t) for t in tabs]} de {bar:.0f})')
+                pg.evaluate("document.querySelector('.scenery').dataset.phase = 'day'")
+                sun = pg.evaluate(RECT, '.sc-sun--day')
+                chips = [pg.evaluate(RECT, '#ambientBtn'), pg.evaluate(RECT, '#durationChip')]
+                check(not any(overlap(sun, c) for c in chips), f'{w}×{hgt}: el sol de día no toca los botones de sonido y duración ({[round(v) for v in sun]})')
+            else:
+                check(len(tabs) == 4 and max(tabs) - min(tabs) < 1 and pg.evaluate("getComputedStyle(document.querySelector('.tabs')).gridAutoFlow") == 'row', 'computador: el menú sigue en una sola columna')
             done(ctx, errs, missing)
 
         browser.close()

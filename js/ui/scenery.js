@@ -175,7 +175,7 @@ function camp() {
 }
 
 // Animales que caminan: [tipo, dirección, duración (s), retraso (s)].
-// El orden importa: con contaminación se van primero los últimos (ver styles.css).
+// El orden importa: con contaminación se van primero los últimos (ver css/scenery.css).
 const WALKERS = [
   ['penguin', 'ltr', 46, -6],
   ['penguin', 'ltr', 46, -8.4],

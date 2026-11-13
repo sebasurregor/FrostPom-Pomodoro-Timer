@@ -44,6 +44,9 @@ function img(src, size, className, title) {
 const ART_DY = Object.freeze({ 'tiburon-martillo': -22, 'zorro-artico': -8, pinguino: -2, 'oso-marino': -1 });
 export const artOffset = (id) => (config.companionImages && config.companionImages[id] ? 0 : ART_DY[id] || 0);
 
+/** Dirección de la imagen del compañero (la usa la ventanita "Siempre encima"). */
+export const companionSrc = (id) => imageFor(id);
+
 export function companion(id, { size = 96, locked = false, title } = {}) {
   return img(imageFor(id) || '', size, `companion companion--img${locked ? ' is-locked' : ''}`, title);
 }
