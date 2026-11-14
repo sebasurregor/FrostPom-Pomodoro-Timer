@@ -1,11 +1,25 @@
 """
-Supabase SIMULADO para las pruebas en navegador (e2e_ranking.py y e2e_cuentas.py): Auth
-(cuentas anónimas, correo + contraseña, códigos de recuperación) y las funciones del servidor
-(ranking y progreso de las cuentas en línea), en memoria. Las reglas reales se prueban aparte en
-PostgreSQL: server/supabase/test/run_local.sh
+Supabase SIMULADO para las pruebas en navegador (e2e_ranking.py, e2e_cuentas.py y
+e2e_multidispositivo.py): Auth (cuentas anónimas, correo + contraseña, códigos de recuperación) y
+las funciones del servidor (ranking, progreso de las cuentas en línea y, desde la v4.5, el reloj en
+vivo), en memoria. Las reglas reales se prueban aparte en PostgreSQL: server/supabase/test/run_local.sh
 """
-import json
+import json, re, time, datetime
 from urllib.parse import urlparse, parse_qs
+
+BLOCK_RE = re.compile(r'^[A-Za-z0-9-]{8,64}$')
+DEVICE_RE = re.compile(r'^[A-Za-z0-9-]{4,32}$')
+
+
+def iso(ms):
+    return datetime.datetime.fromtimestamp(ms / 1000, tz=datetime.timezone.utc).isoformat(timespec='milliseconds')
+
+
+def parse_iso(v):
+    try:
+        return int(datetime.datetime.fromisoformat(str(v).replace('Z', '+00:00')).timestamp() * 1000)
+    except Exception:
+        return None
 
 
 class FakeSupabase:
@@ -28,6 +42,10 @@ class FakeSupabase:
         self.captcha_tokens = []       # (ruta, token) recibidos
         self.used_tokens = set()       # cada token de Turnstile sirve una sola vez
         self.reports = []              # (v4.1) (quien reporta, uid reportado, motivo)
+        self.timers = {}               # (v4.5) uid -> {state, version, at (ms), device, window_start, window_count}
+        self.claims = {}               # (v4.5) (uid, bloque) -> aparato
+        self.skew_ms = 0               # (v4.5) la prueba adelanta el reloj del servidor junto con los aparatos
+        self.missing = set()           # funciones que "todavía no existen" (schema.sql viejo)
         seeds = [('Zorro.lector', 'MX', '🦊', 180, None), ('Luna_K', 'ES', '🦉', 95, 'luna@example.com'),
                  ('pingu.sabio', 'CL', '🐧', 60, None), ('Ana_23', 'AR', '🦭', 30, None)]
         for i, (name, country, av, mins, email) in enumerate(seeds):
@@ -61,6 +79,31 @@ class FakeSupabase:
 
     def fn_calls(self, fn):
         return [c for c in self.calls if c[0] == fn]
+
+    def now_ms(self):
+        return int(time.time() * 1000) + self.skew_ms
+
+    def timer_row(self, uid, accepted=None):
+        t = self.timers.get(uid)
+        row = {'state': t['state'], 'version': t['version'], 'action_at': iso(t['at']), 'device': t['device']} if t else \
+              {'state': None, 'version': 0, 'action_at': None, 'device': None}
+        row['server_now'] = iso(self.now_ms())
+        row['progress_version'] = (self.saves.get(uid) or {}).get('version', 0)
+        if accepted is not None:
+            row['accepted'] = accepted
+        return row
+
+    @staticmethod
+    def timer_valid(p):
+        if not isinstance(p, dict) or len(json.dumps(p)) > 2048:
+            return False
+        if p.get('mode') not in ('study', 'break', 'long') or p.get('status') not in ('idle', 'running', 'paused'):
+            return False
+        d = p.get('durationSec')
+        if isinstance(d, bool) or not isinstance(d, (int, float)) or not 60 <= d <= 10800:
+            return False
+        b = p.get('block')
+        return b is None or (isinstance(b, str) and BLOCK_RE.match(b) is not None)
 
     def handle(self, route):
         req = route.request
@@ -146,6 +189,8 @@ class FakeSupabase:
         if fn in self.abort:
             return route.abort()
         self.calls.append((fn, body, uid))
+        if fn in self.missing:
+            return ok({'code': 'PGRST202', 'message': 'Could not find the function'}, 404)
         if fn == 'username_available':
             name = str(body.get('p_username', '')).lower()
             return ok(not any(p['username'].lower() == name and k != uid for k, p in self.profiles.items()))
@@ -185,7 +230,7 @@ class FakeSupabase:
             return route.fulfill(status=204, body='')
         if fn == 'start_session':
             self.n += 1
-            sid = f'sid-{self.n}'
+            sid = f'5e550000-0000-4000-8000-{self.n:012d}'  # como los de Supabase (UUID)
             self.sessions[sid] = {'uid': uid, 'planned': body['p_planned_sec'], 'status': 'active'}
             return ok(sid)
         if fn == 'finish_session':
@@ -237,5 +282,43 @@ class FakeSupabase:
             return ok(v)
         if fn == 'delete_my_cloud_account':
             self.saves.pop(uid, None); self.profiles.pop(uid, None); self.minutes.pop(uid, None); self.users.pop(uid, None)
+            self.timers.pop(uid, None)
+            for k in [k for k in self.claims if k[0] == uid]:
+                self.claims.pop(k)
             return route.fulfill(status=204, body='')
+        # (v4.5) El reloj en vivo: mismas reglas que server/supabase/schema.sql
+        if fn in ('get_timer', 'set_timer', 'claim_block') and self.users.get(uid, {}).get('anon'):
+            return ok({'code': '42501', 'message': 'account_required'}, 403)
+        if fn == 'get_timer':
+            return ok([self.timer_row(uid)])
+        if fn == 'set_timer':
+            st, dev = body.get('p_state'), str(body.get('p_device') or '')
+            if not self.timer_valid(st) or not DEVICE_RE.match(dev):
+                return ok({'code': '22023', 'message': 'timer_invalid'}, 400)
+            now = self.now_ms()
+            at = parse_iso(body.get('p_action_at')) or now
+            at = min(max(at, now - 86400000), now)
+            t = self.timers.get(uid)
+            if not t:
+                self.timers[uid] = {'state': st, 'version': 1, 'at': at, 'device': dev, 'window_start': now, 'window_count': 1}
+                return ok([self.timer_row(uid, True)])
+            if t['window_start'] > now - 60000:
+                if t['window_count'] >= 30:
+                    return ok({'code': '54000', 'message': 'timer_rate'}, 400)
+                t['window_count'] += 1
+            else:
+                t['window_start'], t['window_count'] = now, 1
+            accepted = at > t['at'] or (at == t['at'] and dev == t['device'])
+            if accepted:
+                t.update(state=st, version=t['version'] + 1, at=at, device=dev)
+            return ok([self.timer_row(uid, accepted)])
+        if fn == 'claim_block':
+            block, dev = body.get('p_block'), (str(body.get('p_device') or '')[:32] or None)
+            if not isinstance(block, str) or not BLOCK_RE.match(block):
+                return ok({'code': '22023', 'message': 'block_invalid'}, 400)
+            key = (uid, block)
+            if key not in self.claims:
+                self.claims[key] = dev
+                return ok(True)
+            return ok(dev is not None and self.claims[key] == dev)
         return ok({'code': 'PGRST202', 'message': 'Could not find the function'}, 404)

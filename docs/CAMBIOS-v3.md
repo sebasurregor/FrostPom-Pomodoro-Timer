@@ -1,5 +1,75 @@
 # Cambios de la v2 a la v3
 
+## v4.5.0: tu cuenta en todos tus aparatos (y Android, listo para compilar)
+
+El autor aprobó las fases 4 y 5 (`docs/MULTI-DISPOSITIVO.md` y `docs/ANDROID-NOTIFICACION-WIDGET.md`) para tenerlas listas y publicarlas como actualizaciones durante la prueba cerrada de Google Play.
+
+**Antes de publicar:** haz la copia de seguridad (`docs/COPIA-DE-SEGURIDAD.md`) y corre el `server/supabase/schema.sql` nuevo en Supabase. Si no lo corres, la app funciona como la v4.4.1 (cada aparato con su reloj) y en F12 sale el aviso "El reloj en vivo no está disponible todavía".
+
+### El reloj en vivo (solo cuentas en línea)
+
+- **El mismo pomodoro en todos tus aparatos:** empiezas en el computador y el celular muestra la misma cuenta regresiva en menos de 12 s. Puedes pausar, continuar, saltar, reiniciar o terminar desde cualquiera.
+- **Se nota de dónde vino:** un aviso corto, por ejemplo "Pausado desde otro aparato" o "Empezado desde otro aparato". Solo de cambios recientes (al abrir la app no salen avisos viejos) y no cuando lo siguiente empezó solo.
+- **Cómo se entera:** pregunta cada 10 s mientras la app se ve (también con la ventanita "Siempre encima"), al abrirla, al volver a ella y al recuperar el internet. Gana la **acción más reciente**.
+- **La hora del servidor manda:** cada aparato mide cuánto se adelanta o atrasa su reloj, así que todos muestran lo mismo aunque la hora del teléfono esté mal.
+- **Sin internet** funciona igual: lo que tocas queda anotado con su hora y se envía al volver.
+- **Las cuentas solo de este aparato** (menores de 13) siguen exactamente como antes.
+
+### Un pomodoro se guarda una sola vez
+
+- Cuando el bloque llega a cero en dos aparatos a la vez, el servidor (`claim_block`) dice "sí" a uno solo: ese guarda la XP, los minutos y el ranking. El otro avisa **"Sesión completa: se guardó desde tu otro aparato."** y sigue con lo que hizo el primero.
+- **Sin internet**, el aparato lo guarda igual y pregunta después. Si otro ya lo había guardado, la mezcla del progreso (abajo) lo cuenta una sola vez apenas se juntan las dos copias (por un momento, ese aparato muestra la XP de más).
+- Cada bloque tiene un número y la sesión del historial usa ese número: el mismo pomodoro **nunca** se guarda dos veces en el mismo aparato.
+- **Al abrir la app** con un bloque que "terminó" mientras estaba cerrada, primero se pregunta al servidor (y, en Android, se aplica lo que tocaste en la notificación): si lo pausaste o lo terminaste antes en otro lado, no se guarda como completo.
+
+### Ranking sin abandonos
+
+- Solo el aparato que **empieza** el bloque crea la sesión del ranking; su número viaja con el reloj. El que lo guarda la termina, aunque no la haya empezado. Antes, empezar en otro aparato "abandonaba" la sesión del primero.
+
+### El progreso, sin pérdidas: la mezcla de tres copias (`js/merge.js`)
+
+- Antes, si dos aparatos guardaban a la vez, ganaba **entera** la copia con más tiempo estudiado (se perdía, por ejemplo, un tema comprado en el otro). Ahora cada aparato recuerda la última copia que sincronizó (la "base", `st2_sync_base`) y se juntan los cambios de los dos:
+  - XP, gemas, totales y cada día del calendario: base + lo que sumó (o restó) cada uno; nunca bajan de 0.
+  - Historial: se une por número de sesión; lo que uno quitó, queda quitado.
+  - El mismo pomodoro guardado en los dos (sin internet): se cuenta una vez.
+  - Logros, misiones, temas y regalos se unen; mejor racha, mejor combo y sesión más larga: el mayor.
+  - Combo, ciclo y "descanso ganado": del aparato que estudió de último.
+  - Mascotas: cada una aparte (la comida no se pierde y el nombre que se puso tampoco).
+  - Ajustes y perfil: gana el que cambió; si cambiaron los dos lo mismo, el más reciente.
+  - Temporada: gana la más nueva; la XP de la temporada vieja va a la temporada archivada, y el premio de cerrar la temporada cuenta una vez.
+  - Premium: activo si está activo en cualquiera.
+- **La primera vez** que un aparato sincroniza con la v4.5 no hay base: se usa la regla de antes una última vez.
+- **Lo que hiciste mientras se esperaba al servidor tampoco se pierde:** se junta con lo que llegó y se vuelve a subir.
+- **El progreso de otro aparato llega solo:** cada vez que pregunta por el reloj, el servidor dice también la versión del progreso; si otro aparato guardó algo (XP, gemas, una compra), se trae y se junta sin avisos.
+
+### En el servidor (`server/supabase/schema.sql`)
+
+- Tablas `private.timers` (el reloj de cada cuenta) y `private.timer_claims` (qué bloques ya se guardaron), con RLS y sin políticas: solo se usan con las funciones `get_timer`, `set_timer` y `claim_block`, y solo cuentas con correo.
+- Límites: 30 cambios por minuto por persona, 500 bloques anotados; los bloques anotados se borran a los 3 días y los relojes sin uso, a los 400. Se borran con la cuenta y salen en "exportar mis datos".
+- **Privacidad:** no se guarda ningún identificador del aparato. Cada acción lleva un número al azar NUEVO (solo sirve para reconocer un reintento). `privacidad.html` lo explica (ES e inglés).
+
+### Android: la notificación en curso y el widget (fase 5, listo para compilar)
+
+- **La parte web ya está en esta versión** (`js/native.js`, `js/ui/native-ui.js`): le cuenta al teléfono cada cambio del reloj, aplica con su hora lo que se tocó en la notificación o en el widget (también con la app cerrada), deja de programar el aviso del final con LocalNotifications cuando el complemento lo hace, y pide **una vez**, después del primer pomodoro completo, el permiso "Alarmas y recordatorios" con una explicación.
+- **El código nativo** (Kotlin) está en `native/frostpom-timer/`: notificación en curso con la cuenta regresiva y los botones Pausar/Continuar, Saltar y Terminar y guardar; widget 4 × 2 y 2 × 2 con el diseño del mockup y el arte `artico-amigos`; aviso exacto si hay permiso; botones con la app cerrada; vuelve después de reiniciar el teléfono. Sin servicio en primer plano y sin `USE_EXACT_ALARM`.
+- **Todavía no está activado:** se activa y se prueba con Claude Code en tu PC (`native/frostpom-timer/LEEME.md` trae el mensaje para pegar). Eso será la v4.6.0. Mientras tanto, la app de Android funciona como la v4.4.1.
+
+### Limitaciones conocidas
+
+- Un aparato que no se está viendo (el celular en el bolsillo) no pregunta. Si pausas en el computador, el aviso del final del celular puede sonar igual; al abrir el celular, el reloj se corrige.
+- En una mezcla rara sin internet (los dos aparatos subieron de rango con el mismo pomodoro), pueden sobrar unas gemas del premio por subir de rango.
+- "Terminar y guardar" desde la notificación con la app cerrada se cuenta (XP y ranking) cuando abres la app.
+
+### Pruebas
+
+- `tests/e2e_multidispositivo.py` (nuevo, 51 comprobaciones): dos navegadores con la misma cuenta y el servidor simulado: empezar en A y verlo en B; pausar en B y que A se pause; llegar a cero en los dos y guardarlo una vez (XP, historial y ranking); "Terminar y guardar" en B; los dos sin internet (se suman los minutos, no se pierde la compra y el pomodoro que terminó en los dos se cuenta una vez); el servidor sin la v4.5.
+- `tests/e2e_android.py`, sección F (15 comprobaciones nuevas, 60 en total) con el complemento FrostTimer simulado.
+- **Pruebas visuales:** se tomaron las 315 fotos de la v4.4.1 en Linux y se compararon con la v4.5.0: **las 315 salen idénticas** (esta versión no cambia nada de lo que se ve, salvo los avisos nuevos). No hace falta volver a tomar fotos por esta versión.
+- `tests/logic.test.js`: 13 pruebas nuevas (90 en total): la mezcla, el reloj compartido, qué hacer con lo que tiene el servidor, las acciones sin enviar, la sesión y que cada módulo de la app quede guardado para usarla sin internet (`store_check.py` encontró que faltaba `js/merge.js`).
+- Servidor: 9 comprobaciones nuevas del reloj en vivo en `server/supabase/test/tests.sql` (50 en total).
+- Kotlin: `native/frostpom-timer/android/src/test/…/TimerStateTest.kt` (4 pruebas; pasan en la JVM).
+- `tests/_fake_supabase.py` simula `get_timer`, `set_timer` y `claim_block`, con el reloj del servidor que la prueba adelanta junto con los aparatos.
+
 ## v4.4.1: "Siempre encima" (el reloj encima de las otras ventanas)
 
 El autor pidió poder dejar el reloj **siempre encima** de las demás ventanas, con dos íconos suyos (el pin y el pin tachado). La ventanita sigue el mockup de su widget.

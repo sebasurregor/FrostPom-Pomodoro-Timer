@@ -20,6 +20,7 @@ import { $, h } from './dom.js';
 import { toast, openDialog, confirmDialog, dlg } from './feedback.js';
 import { penguin } from './companions.js';
 import { birthField, ensureJoined } from './board-ui.js';
+import { settleClaims } from './live.js';
 import { markUnlocked, rememberDevice, forgetDevice, keepSignedInField, newPasswordError, verifyWithGuard } from './account.js';
 import { state, store, mutate, replaceState } from './context.js';
 import { t, tr, locale } from '../i18n.js';
@@ -120,7 +121,7 @@ async function finishSignIn({ email, password, remote, keep }) {
   let next;
   if (remote && remote.data && remote.data.profile && checkUsername(remote.data.profile.nick).ok) {
     next = SYNC.restore(remote.data, null);
-    SYNC.adopted(remote.version);
+    SYNC.adopted(remote.version, remote.data);
   } else {
     // La cuenta existe pero todavía no tiene progreso guardado: se elige el nombre de usuario
     const username = await chooseNameFlow();
@@ -307,7 +308,7 @@ export async function connectFlow({ pending = false } = {}) {
       dismissable: false,
     });
     useRemote = pick === 'remote';
-    SYNC.adopted(remote.version);
+    SYNC.adopted(remote.version, remote.data);
   }
   mutate((s) => {
     s.account.email = email;
@@ -483,24 +484,40 @@ function adoptState(next) {
 }
 const applyRemote = (data) => adoptState(SYNC.restore(data, state));
 
+/**
+ * (v4.5) Usa lo que llegó de la nube SIN perder lo que hiciste mientras se esperaba la respuesta
+ * (si hubo cambios aquí, se juntan y quedan pendientes de subir).
+ */
+function adoptFromCloud(r) {
+  const { state: next, changed } = SYNC.rebase(r.adopt, r.from, state);
+  adoptState(next);
+  if (changed) {
+    SYNC.markDirty();
+    clearTimeout(timer);
+    timer = setTimeout(flush, 8000);
+  }
+}
+
 async function flush() {
   clearTimeout(timer);
   if (!isOnline()) return;
+  // (v4.5) Antes de subir: los pomodoros guardados sin internet que otro aparato ya había guardado se quitan
+  await settleClaims().catch(() => {});
   const r = await SYNC.push(state);
   if (r.kind === 'wait') { timer = setTimeout(flush, 5000); return; } // (v4.3) muy seguido: se guarda en un momento
-  if (r.adopt) {
-    adoptState(r.adopt);
-    toast('Trajimos tu progreso más reciente de tu cuenta.', 'info');
-  }
+  if (r.adopt) adoptFromCloud(r); // (v4.5) se juntaron los cambios de los dos equipos: sin aviso
   document.dispatchEvent(new CustomEvent('frostpom:cloud'));
 }
 
-async function startOrResume() {
-  const r = await SYNC.syncOnOpen(state);
+/** Al abrir la app (y cuando otro equipo guardó algo: quiet = sin aviso). */
+async function startOrResume({ quiet = false } = {}) {
+  await settleClaims().catch(() => {});
+  const r = await SYNC.syncOnOpen(() => state); // el estado de después de traer lo de la nube
   if (r.adopt) {
-    adoptState(r.adopt);
-    toast('Trajimos tu progreso más reciente de tu cuenta.', 'info');
+    adoptFromCloud(r);
+    if (!quiet) toast('Trajimos tu progreso más reciente de tu cuenta.', 'info');
   }
+  if (r.push) await flush();
   document.dispatchEvent(new CustomEvent('frostpom:cloud'));
 }
 
@@ -516,6 +533,8 @@ export async function bootCloud() {
       timer = setTimeout(flush, 8000);
     });
     window.addEventListener('online', () => { if (isOnline() && SYNC.load().dirty) flush(); });
+    // (v4.5) Otro aparato guardó un pomodoro que también terminó aquí: se trae su progreso
+    document.addEventListener('frostpom:pull', () => { if (isOnline() && BOARD.hasAccountSession()) startOrResume({ quiet: true }).catch(() => {}); });
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && isOnline() && SYNC.load().dirty) flush(); });
   }
   if (isOnline()) {

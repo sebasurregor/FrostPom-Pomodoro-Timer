@@ -34,6 +34,7 @@ import { initSheets, renderSheetTiles } from './ui/sheets.js';
 import { initPip } from './ui/pip.js';
 import { bootBoard } from './ui/board-ui.js';
 import { bootCloud } from './ui/cloud-ui.js';
+import { bootLive } from './ui/live.js';
 import { initNative, isNative } from './ui/native-ui.js';
 
 // =====================================================================
@@ -251,8 +252,9 @@ function boot() {
   setInterval(checkReminder, 20 * 1000);
   if (session.isDue()) onDue();
   checkNewDay();
-  // Cuentas en línea (v4.0) primero: si hay progreso más nuevo en la nube, se trae antes del ranking
-  Promise.resolve(greet()).then(bootCloud).then(bootBoard).catch(() => {}).finally(() => { checkSeason(); checkPet(); });
+  // Cuentas en línea (v4.0) primero: si hay progreso más nuevo en la nube, se trae antes del ranking.
+  // (v4.5) Después, el reloj en vivo con tus otros aparatos.
+  Promise.resolve(greet()).then(bootCloud).then(() => bootLive().catch(() => {})).then(bootBoard).catch(() => {}).finally(() => { checkSeason(); checkPet(); });
   syncStorePremium(); // con cobro real: Premium sigue a la suscripción de Microsoft Store
   hintReducedMotion();
   registerServiceWorker();

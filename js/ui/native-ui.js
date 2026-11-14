@@ -7,12 +7,15 @@
  *    segundo plano el código de la app se detiene). Al volver, el aviso se cancela.
  *  - Los recordatorios (Premium) los programa el teléfono, así llegan con la app cerrada.
  *  - La vibración usa el motor del teléfono.
+ *  - (v4.6) Con el complemento FrostTimer (native/frostpom-timer): la notificación en curso "como
+ *    Spotify" con sus botones, el widget y el aviso exacto del final. Lo que tocas ahí con la app
+ *    cerrada se aplica al volver, con la hora en que lo tocaste.
  */
 import { sheetOpen, closeSheet } from './sheets.js';
 import * as N from '../native.js';
 import { $ } from './dom.js';
-import { dlg } from './feedback.js';
-import { state, store, session, isPremium } from './context.js';
+import { dlg, confirmDialog } from './feedback.js';
+import { state, store, session, isPremium, prefs } from './context.js';
 import { closeTray, trayOpen } from './feeding.js';
 import { tr } from '../i18n.js';
 
@@ -60,11 +63,108 @@ function timerTexts() {
 }
 
 export async function onAppActive(active) {
-  if (active) return N.cancelTimerEnd();
+  if (active) {
+    applyNativeActions(); // (v4.6) lo que tocaste en la notificación o el widget mientras no estabas
+    return N.cancelTimerEnd();
+  }
+  // (v4.6) Con el complemento, el aviso del final lo lleva él (y lo mueve si pausas desde la notificación)
+  if (await N.hasTimerPlugin()) return undefined;
   if (!session.running) return undefined;
   const remaining = session.remainingMs();
   if (!(remaining > 2000)) return undefined;
   return N.scheduleTimerEnd({ at: Date.now() + remaining, ...timerTexts() });
+}
+
+// ---------------------------------------------------------------------
+// (v4.6) La notificación en curso y el widget (complemento FrostTimer)
+// ---------------------------------------------------------------------
+const handlers = { apply() {} };
+/** Enfocar se conecta aquí (focus.js: applyNative aplica cada acción). */
+export function connectNative(h) { Object.assign(handlers, h); }
+
+let plugin = null; // null = todavía no se sabe; true / false
+let lastSig = '';
+let readyDone = null;
+const readyPromise = new Promise((r) => { readyDone = r; });
+/**
+ * Se cumple cuando ya se aplicó lo que tocaste en la notificación o en el widget con la app
+ * cerrada (o enseguida, en la web o sin el complemento). Enfocar lo espera antes de guardar un
+ * bloque que llegó a cero: quizás lo pausaste antes desde la notificación.
+ */
+export function nativeReady() {
+  if (!N.isNative()) return Promise.resolve();
+  return Promise.race([readyPromise, new Promise((r) => setTimeout(r, 3000))]);
+}
+
+/** Los textos de la notificación y del widget, en el idioma de la app (el teléfono los guarda). */
+function nativeTexts() {
+  return {
+    modes: { study: tr('Modo enfoque'), break: tr('Descanso'), long: tr('Descanso largo') },
+    paused: tr('En pausa'),
+    phrases: { study: tr('Hora de concentrarse'), studyIdle: tr('Listo cuando tú lo estés'), break: tr('Hora de descansar'), breakIdle: tr('Tu descanso te espera') },
+    bubble: { study: tr('¡Estudiando juntos!'), break: tr('¡A descansar!') },
+    start: tr('Empezar'), pause: tr('Pausar'), resume: tr('Continuar'), skip: tr('Saltar'), finish: tr('Terminar y guardar'), reset: tr('Reiniciar'),
+    endStudy: { title: tr('¡Sesión completa!'), body: tr('Vuelve a FrostPom para guardar tu sesión y ganar tu XP.') },
+    endBreak: { title: tr('Descanso terminado'), body: tr('Cuando quieras, empieza otra sesión.') },
+    done: tr('Abre FrostPom para guardar tu sesión.'),
+    channel: tr('Pomodoro en curso'),
+    channelDesc: tr('La cuenta regresiva de tu pomodoro, con sus botones.'),
+  };
+}
+
+/** Le cuenta al teléfono cómo está el reloj (solo si cambió algo desde la última vez). */
+export function syncNativeTimer() {
+  if (!N.isNative() || plugin === false) return;
+  const st = session.state;
+  const total = st.durationSec * 1000;
+  const d = prefs().durations;
+  const info = {
+    status: st.status,
+    mode: st.mode,
+    durationSec: st.durationSec,
+    // Corriendo: la hora del fin (el cronómetro de Android baja solo). En pausa o en reposo: lo que falta.
+    endAt: st.status === 'running' ? Math.round(st.runStartMs + total - st.accumulatedMs) : 0,
+    remainingMs: st.status === 'running' ? 0 : Math.max(0, Math.round(total - st.accumulatedMs)),
+    block: st.block || '',
+    canFinish: st.mode === 'study' && st.status !== 'idle',
+    durations: { study: d.study * 60, break: d.brk * 60, long: d.long * 60 }, // para saltar con la app cerrada
+    companion: state.profile.companion || 'pinguino',
+    theme: state.settings.theme, // 'auto' sigue al teléfono
+    texts: nativeTexts(),
+  };
+  const sig = JSON.stringify(info);
+  if (sig === lastSig) return;
+  lastSig = sig;
+  N.timerUpdate(info);
+}
+
+let applying = false;
+/** Aplica, en orden y con su hora, lo que tocaste en la notificación o en el widget. */
+export async function applyNativeActions() {
+  if (!N.isNative() || plugin === false || applying) return;
+  applying = true;
+  try {
+    for (const a of await N.takeTimerActions()) {
+      try { handlers.apply(a); } catch { /* una acción rara no frena las demás */ }
+    }
+  } finally {
+    applying = false;
+  }
+}
+
+/**
+ * (v4.6) Desde Android 14 el permiso de "Alarmas y recordatorios" viene apagado: sin él, el aviso
+ * del final puede llegar unos minutos tarde. Se pide una sola vez, después del primer pomodoro
+ * completo, con una explicación (nunca por sorpresa).
+ */
+export async function maybeAskExactAlarms() {
+  if (!N.isNative() || store.pref.get('exact_asked') || dlg.open) return;
+  if (!(await N.hasTimerPlugin()) || (await N.exactAlarms()) !== 'denied') return;
+  store.pref.set('exact_asked', '1');
+  const ok = await confirmDialog('¿Te aviso justo a tiempo?',
+    'Para avisarte en el segundo exacto en que termina cada pomodoro (aunque el teléfono esté en reposo), Android pide el permiso "Alarmas y recordatorios". Si prefieres no darlo, el aviso puede llegar unos minutos tarde.',
+    'Abrir ajustes', 'btn--gold');
+  if (ok) N.openExactAlarmSettings();
 }
 
 // ---------------------------------------------------------------------
@@ -114,6 +214,14 @@ export function initNative() {
   N.onBackButton(handleBack);
   N.onAppState(onAppActive);
   syncReminders();
+  // (v4.6) ¿Trae la app la notificación en curso y el widget?
+  N.hasTimerPlugin().then(async (has) => {
+    plugin = has;
+    if (!has) return;
+    N.onTimerActions(applyNativeActions);
+    await applyNativeActions();
+    syncNativeTimer();
+  }).catch(() => {}).finally(() => readyDone());
   // Enlaces a las páginas de FrostPom (privacidad…): en el navegador del teléfono, sin salir de la app
   document.addEventListener('click', (e) => {
     const a = e.target && e.target.closest ? e.target.closest('a[data-page]') : null;

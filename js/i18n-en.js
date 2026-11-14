@@ -978,4 +978,21 @@ export default Object.freeze({
   '¡A descansar!': 'Break time!',
   'Lo siguiente empieza solo (encendido)': 'The next one starts on its own (on)',
   'Lo siguiente empieza solo (apagado)': 'The next one starts on its own (off)',
+  // ---------------------------------------------------------------- v4.5: el reloj en vivo en todos tus aparatos
+  'Empezado desde otro aparato.': 'Started from another device.',
+  'Pausado desde otro aparato.': 'Paused from another device.',
+  'Reanudado desde otro aparato.': 'Resumed from another device.',
+  'Saltado desde otro aparato.': 'Skipped from another device.',
+  'Reiniciado desde otro aparato.': 'Reset from another device.',
+  'Terminado y guardado desde otro aparato.': 'Finished and saved from another device.',
+  'Sesión completa: se guardó desde tu otro aparato.': 'Session complete: it was saved from your other device.',
+  'Esta sesión ya se había guardado desde tu otro aparato.': 'This session was already saved from your other device.',
+  'Descanso terminado.': 'Break over.',
+  // ---------------------------------------------------------------- v4.6: la notificación en curso y el widget de Android
+  'Abre FrostPom para guardar tu sesión.': 'Open FrostPom to save your session.',
+  'Abrir ajustes': 'Open settings',
+  'Pomodoro en curso': 'Pomodoro in progress',
+  'La cuenta regresiva de tu pomodoro, con sus botones.': 'Your pomodoro countdown, with its buttons.',
+  '¿Te aviso justo a tiempo?': 'Want an on-time alert?',
+  'Para avisarte en el segundo exacto en que termina cada pomodoro (aunque el teléfono esté en reposo), Android pide el permiso "Alarmas y recordatorios". Si prefieres no darlo, el aviso puede llegar unos minutos tarde.': 'To alert you the exact second each pomodoro ends (even when your phone is idle), Android needs the "Alarms & reminders" permission. If you’d rather not allow it, the alert may arrive a few minutes late.',
 });

@@ -669,4 +669,157 @@ begin
   raise notice 'OK  move_name, who_has_name y ranking_check solo los usa el dueño';
 end $$;
 reset role;
+
+-- ===================== (v4.5) El reloj en vivo en todos tus aparatos =====================
+insert into auth.users (id, is_anonymous) values
+  ('d5000000-0000-0000-0000-000000000001', false),
+  ('d5000000-0000-0000-0000-000000000002', false),
+  ('d5000000-0000-0000-0000-000000000003', true);
+set role authenticated;
+set request.jwt.claim.sub = 'd5000000-0000-0000-0000-000000000001';
+do $$
+declare r record; t0 timestamptz := now();
+begin
+  select * into r from public.get_timer();
+  assert r.version = 0 and r.state is null, 'FALLO: una cuenta nueva no debería tener reloj';
+  assert r.progress_version = 0, 'FALLO: una cuenta sin progreso debería decir versión 0';
+  perform public.save_progress('{"progress":{"xp":1}}'::jsonb, 0);
+  assert (select g.progress_version from public.get_timer() g) = 1, 'FALLO: get_timer no dice la versión del progreso';
+  assert abs(extract(epoch from (r.server_now - clock_timestamp()))) < 5, 'FALLO: get_timer no devuelve la hora del servidor';
+  select * into r from public.set_timer('{"mode":"study","status":"running","durationSec":1500,"block":"blk-0000-aaaa"}', t0 - interval '10 minutes', 'pc-1234');
+  assert r.accepted and r.version = 1 and r.device = 'pc-1234', 'FALLO: no se guardó la primera acción';
+  -- El celular pausa después: gana
+  select * into r from public.set_timer('{"mode":"study","status":"paused","durationSec":1500,"block":"blk-0000-aaaa"}', t0 - interval '5 minutes', 'cel-5678');
+  assert r.accepted and r.version = 2 and r.state->>'status' = 'paused', 'FALLO: la acción más nueva no ganó';
+  -- Una acción vieja (de un aparato que estaba sin internet) no pisa la nueva: devuelve lo más nuevo
+  select * into r from public.set_timer('{"mode":"break","status":"idle","durationSec":300}', t0 - interval '7 minutes', 'pc-1234');
+  assert not r.accepted and r.version = 2 and r.state->>'status' = 'paused', 'FALLO: una acción vieja pisó a una nueva';
+  -- El mismo aparato puede reenviar su acción (con el número del ranking, que llega un momento después)
+  select * into r from public.set_timer('{"mode":"study","status":"paused","durationSec":1500,"block":"blk-0000-aaaa","rank":"x"}', t0 - interval '5 minutes', 'cel-5678');
+  assert r.accepted and r.version = 3 and r.state->>'rank' = 'x', 'FALLO: el mismo aparato no pudo completar su acción';
+  select * into r from public.set_timer('{"mode":"study","status":"running","durationSec":1500}', t0 - interval '5 minutes', 'otro-9999');
+  assert not r.accepted, 'FALLO: otro aparato con la misma hora ganó';
+  -- Una hora en el futuro se ajusta a la del servidor (nadie puede "congelar" el reloj de los demás)
+  select * into r from public.set_timer('{"mode":"study","status":"idle","durationSec":1500}', t0 + interval '3 hours', 'pc-1234');
+  assert r.accepted and r.action_at <= clock_timestamp(), 'FALLO: aceptó una hora en el futuro';
+  raise notice 'OK  reloj en vivo: gana la última acción, una vieja no pisa la nueva y el futuro se ajusta';
+end $$;
+
+do $$
+declare bad jsonb;
+begin
+  foreach bad in array array['[1]'::jsonb, '{"mode":"dormir","status":"idle","durationSec":1500}',
+      '{"mode":"study","status":"idle","durationSec":5}', '{"mode":"study","status":"idle","durationSec":"1500"}',
+      '{"mode":"study","status":"idle","durationSec":1500,"block":"<script>"}',
+      jsonb_build_object('mode', 'study', 'status', 'idle', 'durationSec', 1500, 'x', repeat('a', 3000))] loop
+    begin
+      perform public.set_timer(bad, now(), 'pc-1234');
+      raise exception 'FALLO: aceptó un estado raro: %', left(bad::text, 60);
+    exception when invalid_parameter_value then null;
+    end;
+  end loop;
+  begin
+    perform public.set_timer('{"mode":"study","status":"idle","durationSec":1500}', now(), 'a b');
+    raise exception 'FALLO: aceptó un aparato con un nombre raro';
+  exception when invalid_parameter_value then null;
+  end;
+  raise notice 'OK  reloj en vivo: rechaza estados raros, enormes o de un aparato inválido';
+end $$;
+
+reset role;
+update private.timers set window_start = now(), window_count = 0 where user_id = 'd5000000-0000-0000-0000-000000000001';
+set role authenticated;
+do $$
+declare i int; n int := 0;
+begin
+  for i in 1..40 loop
+    begin
+      perform public.set_timer('{"mode":"study","status":"idle","durationSec":1500}', now(), 'pc-1234');
+      n := n + 1;
+    exception when program_limit_exceeded then exit;
+    end;
+  end loop;
+  assert n = 30, 'FALLO: el límite debería ser 30 cambios por minuto y fue ' || n;
+  raise notice 'OK  reloj en vivo: máximo 30 cambios por minuto por persona';
+end $$;
+
+do $$
+begin
+  assert public.claim_block('blk-0000-aaaa', 'pc-1234'), 'FALLO: el primer aparato no pudo guardar el pomodoro';
+  assert not public.claim_block('blk-0000-aaaa', 'cel-5678'), 'FALLO: el mismo pomodoro se guardó dos veces';
+  assert public.claim_block('blk-0000-aaaa', 'pc-1234'), 'FALLO: el mismo aparato, al reintentar, perdió su pomodoro';
+  assert not public.claim_block('blk-0000-aaaa'), 'FALLO: sin decir el aparato, un pomodoro ya guardado volvió a guardarse';
+  assert public.claim_block('blk-0000-bbbb', 'cel-5678'), 'FALLO: otro pomodoro no se pudo guardar';
+  begin
+    perform public.claim_block('x', 'pc-1234');
+    raise exception 'FALLO: aceptó un pomodoro con un número raro';
+  exception when invalid_parameter_value then null;
+  end;
+  assert public.export_my_data()->'timer'->>'device' = 'pc-1234', 'FALLO: la copia de tus datos no trae el reloj';
+  begin
+    perform 1 from private.timers;
+    raise exception 'FALLO: alguien con sesión leyó la tabla del reloj';
+  exception when insufficient_privilege then null;
+  end;
+  raise notice 'OK  claim_block: cada pomodoro se guarda una sola vez (el mismo aparato puede reintentar)';
+end $$;
+
+-- Cada persona tiene su propio reloj y sus propios pomodoros guardados
+set request.jwt.claim.sub = 'd5000000-0000-0000-0000-000000000002';
+do $$
+begin
+  assert public.claim_block('blk-0000-aaaa', 'pc-1234'), 'FALLO: los pomodoros de otra persona chocaron con los tuyos';
+  assert (select r.version from public.get_timer() r) = 0, 'FALLO: se ve el reloj de otra persona';
+  raise notice 'OK  el reloj y los pomodoros guardados son de cada persona';
+end $$;
+
+-- Solo cuentas con correo (las anónimas del ranking no), y sin sesión nada
+set request.jwt.claim.sub = 'd5000000-0000-0000-0000-000000000003';
+do $$
+begin
+  begin
+    perform public.get_timer();
+    raise exception 'FALLO: una cuenta anónima usó el reloj en vivo';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    perform public.claim_block('blk-0000-cccc', 'pc-1234');
+    raise exception 'FALLO: una cuenta anónima guardó un pomodoro compartido';
+  exception when insufficient_privilege then null;
+  end;
+  raise notice 'OK  el reloj en vivo es solo para cuentas con correo';
+end $$;
+set role anon;
+set request.jwt.claim.sub = '';
+do $$
+begin
+  begin
+    perform public.set_timer('{"mode":"study","status":"idle","durationSec":1500}', now(), 'pc-1234');
+    raise exception 'FALLO: sin sesión se cambió un reloj';
+  exception when insufficient_privilege then null;
+  end;
+  raise notice 'OK  sin sesión no hay reloj en vivo';
+end $$;
+
+-- La limpieza borra los pomodoros anotados de hace más de 3 días, y eliminar la cuenta borra todo
+reset role;
+insert into private.timer_claims (user_id, block, device, claimed_at)
+values ('d5000000-0000-0000-0000-000000000002', 'blk-viejo-0001', 'pc-1234', now() - interval '4 days');
+do $$ begin perform private.cleanup(90); end $$;
+do $$
+begin
+  assert not exists (select 1 from private.timer_claims where block = 'blk-viejo-0001'), 'FALLO: la limpieza no borró un pomodoro anotado viejo';
+  assert exists (select 1 from private.timer_claims where user_id = 'd5000000-0000-0000-0000-000000000002'), 'FALLO: la limpieza borró uno reciente';
+  raise notice 'OK  limpieza: los pomodoros anotados se guardan solo 3 días';
+end $$;
+set role authenticated;
+set request.jwt.claim.sub = 'd5000000-0000-0000-0000-000000000001';
+do $$ begin perform public.delete_my_cloud_account(); end $$;
+reset role;
+do $$
+begin
+  assert not exists (select 1 from private.timers where user_id = 'd5000000-0000-0000-0000-000000000001'), 'FALLO: quedó el reloj de una cuenta eliminada';
+  assert not exists (select 1 from private.timer_claims where user_id = 'd5000000-0000-0000-0000-000000000001'), 'FALLO: quedaron sus pomodoros anotados';
+  raise notice 'OK  eliminar la cuenta en línea borra también el reloj en vivo';
+end $$;
 \echo 'Todas las pruebas del servidor pasaron.'

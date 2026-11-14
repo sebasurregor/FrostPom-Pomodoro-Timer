@@ -12,6 +12,10 @@ Comprueba que:
      atrás (ventanas, pantallas y minimizar); permiso de notificaciones al primer pomodoro;
      aviso programado al salir de la app y cancelado al volver; vibración nativa;
      recordatorios semanales con el día correcto; enlaces a páginas en el navegador del teléfono.
+  F. (v4.6) Con el complemento FrostTimer simulado (la notificación en curso y el widget): cada
+     cambio del reloj le llega con sus datos; lo que se toca en la notificación o en el widget con
+     la app cerrada se aplica al volver con su hora; el aviso del final ya no lo programa
+     LocalNotifications; el permiso de alarmas exactas se pide una vez, después del primer pomodoro.
 
 Uso (con la app servida: python -m http.server 8000):
     python tests/e2e_android.py http://localhost:8000/
@@ -20,6 +24,7 @@ import json
 import os
 import sys
 import time
+from datetime import datetime
 from playwright.sync_api import sync_playwright
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _fake_supabase import FakeSupabase
@@ -68,12 +73,36 @@ FAKE_CAP = r"""
 """
 
 
-def device(browser, fake, locale='es-CO', native=False):
+# (v4.6) El complemento FrostTimer de mentira (native/frostpom-timer): anota lo que recibe y deja
+# simular botones tocados en la notificación o en el widget (pending + el evento actionsPending).
+FAKE_TIMER = r"""
+(() => {
+  const cap = window.Capacitor; const st = window.__cap;
+  st.pending = []; st.exact = false;
+  cap.PluginHeaders.push({ name: 'FrostTimer', methods: [
+    ...['update', 'getPendingActions', 'canScheduleExactAlarms', 'openExactAlarmSettings'].map((name) => ({ name, rtype: 'promise' })),
+    ...['addListener', 'removeListener'].map((name) => ({ name, rtype: 'callback' })),
+  ] });
+  const base = cap.nativePromise;
+  cap.nativePromise = (plugin, method, options) => {
+    if (plugin !== 'FrostTimer') return base(plugin, method, options);
+    st.calls.push([plugin, method, JSON.parse(JSON.stringify(options || {}))]);
+    if (method === 'getPendingActions') return Promise.resolve({ actions: st.pending.splice(0) });
+    if (method === 'canScheduleExactAlarms') return Promise.resolve({ value: st.exact });
+    return Promise.resolve({});
+  };
+})();
+"""
+
+
+def device(browser, fake, locale='es-CO', native=False, timer=False):
     ctx = browser.new_context(viewport={'width': 412, 'height': 900}, locale=locale,
                               service_workers='allow' if native else 'block')
     ctx.route(f'{SUPA}/**', fake.handle)
     if native:
         ctx.add_init_script(FAKE_CAP)
+    if timer:
+        ctx.add_init_script(FAKE_TIMER)
     pg = sheets_patch(ctx.new_page())
     errs = []
     pg.on('pageerror', lambda e: errs.append(str(e)))
@@ -302,6 +331,84 @@ with sync_playwright() as p:
           'la política de privacidad se abre en el navegador del teléfono')
     bad = [e for e in errs if 'Failed to load resource' not in e]
     check(not bad, 'sin errores en la consola dentro de la app' + (': ' + ' | '.join(bad[:3]) if bad else ''))
+    ctx.close()
+
+    # ---------- F. (v4.6) La notificación en curso y el widget (complemento FrostTimer simulado) ----------
+    fake = FakeSupabase()
+    ctx, pg, errs = device(browser, fake, native=True, timer=True)
+    pg.clock.install(time=datetime(2026, 11, 11, 16, 0))
+    pg.goto(URL); pg.wait_for_timeout(1500); pg.clock.run_for(500)
+    register(pg, 'droid_widget', '2015-03')  # cuenta solo de este aparato (el complemento no necesita internet)
+    close_dialogs(pg)
+    pg.goto(URL + '#/enfocar'); pg.wait_for_timeout(500); pg.clock.run_for(300)
+
+    def ups():
+        return [c[2] for c in calls(pg, 'FrostTimer', 'update')]
+
+    first = ups()
+    check(first and first[-1]['status'] == 'idle' and first[-1]['texts']['modes']['study'] == 'Modo enfoque' and first[-1]['durations']['study'] == 25 * 60,
+          'al abrir, el teléfono recibe el reloj en reposo con los textos y las duraciones')
+    pg.click('#mainBtn'); pg.wait_for_timeout(300); pg.clock.run_for(300)
+    now = pg.evaluate('Date.now()')
+    u = ups()[-1]
+    check(u['status'] == 'running' and u['mode'] == 'study' and abs(u['endAt'] - (now + 25 * 60_000)) < 3000 and len(u['block']) >= 8,
+          'al empezar, el teléfono recibe la hora del fin (la notificación cuenta sola) y el número del bloque')
+    n = len(ups())
+    pg.clock.run_for(3000)
+    check(len(ups()) == n, 'mientras corre no se le manda nada cada segundo (solo cuando algo cambia)')
+    pg.clock.run_for(10_000)
+    pg.click('#mainBtn'); pg.wait_for_timeout(300); pg.clock.run_for(300)
+    u = ups()[-1]
+    check(u['status'] == 'paused' and 24 * 60_000 < u['remainingMs'] < 25 * 60_000 and u['endAt'] == 0, 'en pausa recibe lo que falta (sin hora de fin)')
+    # Con la app "cerrada" se toca Continuar en la notificación hace 2 minutos; al volver se aplica con esa hora
+    block = u['block']
+    left = u['remainingMs']
+    now = pg.evaluate('Date.now()')
+    pg.evaluate(f"window.__cap.pending.push({{ act: 'resume', at: {now - 120_000}, block: '{block}' }})")
+    sch_before = len(calls(pg, 'LocalNotifications', 'schedule'))
+    pg.evaluate("window.__cap.listeners['App.appStateChange']({ isActive: false })"); pg.wait_for_timeout(300)
+    check(len(calls(pg, 'LocalNotifications', 'schedule')) == sch_before, 'con el complemento, el aviso del final ya no lo programa LocalNotifications (lo lleva el complemento)')
+    pg.evaluate("window.__cap.listeners['App.appStateChange']({ isActive: true })"); pg.wait_for_timeout(500); pg.clock.run_for(300)
+    st = pg.evaluate("JSON.parse(localStorage.getItem('st2_timer'))")
+    check(st['status'] == 'running' and abs(st['runStartMs'] - (now - 120_000)) < 50, 'al volver, se aplica "Continuar" con la hora en que se tocó')
+    u = ups()[-1]
+    check(u['status'] == 'running' and abs(u['endAt'] - (now - 120_000 + left)) < 1500, 'y el teléfono recibe la hora del fin corregida')
+    # Con la app abierta: "Terminar y guardar" en la notificación (llega el evento actionsPending)
+    sessions0 = len(pg.evaluate("JSON.parse(localStorage.getItem('st2_state')).sessions"))
+    now = pg.evaluate('Date.now()')
+    pg.evaluate(f"window.__cap.pending.push({{ act: 'finish', at: {now}, block: '{block}' }})")
+    pg.evaluate("window.__cap.listeners['FrostTimer.actionsPending']({})"); pg.wait_for_timeout(600); pg.clock.run_for(500)
+    stt = pg.evaluate("JSON.parse(localStorage.getItem('st2_state'))")
+    check(len(stt['sessions']) == sessions0 + 1 and stt['sessions'][0]['id'] == block and not stt['sessions'][0]['completed'] and stt['sessions'][0]['actualSec'] >= 130,
+          f"\"Terminar y guardar\" desde la notificación guarda la sesión ({stt['sessions'][0]['actualSec']} s)")
+    check(ups()[-1]['status'] == 'idle', 'y el teléfono quita el pomodoro de la notificación')
+    # Una acción vieja (de otro bloque) no se aplica
+    pg.evaluate("window.__cap.pending.push({ act: 'pause', at: Date.now(), block: 'otro-bloque-0000' })")
+    pg.evaluate("window.__cap.listeners['FrostTimer.actionsPending']({})"); pg.wait_for_timeout(400)
+    check(pg.get_attribute('#ring', 'data-status') == 'idle', 'una acción de otro bloque se ignora')
+    # Empezar desde el widget hace 3 minutos (app cerrada)
+    if pg.get_attribute('#ring', 'data-mode') != 'study':
+        pg.click('#skipBtn'); pg.wait_for_timeout(300)
+    now = pg.evaluate('Date.now()')
+    pg.evaluate(f"window.__cap.pending.push({{ act: 'start', at: {now - 180_000}, block: '' }})")
+    pg.evaluate("window.__cap.listeners['FrostTimer.actionsPending']({})"); pg.wait_for_timeout(500); pg.clock.run_for(500)
+    clock = [int(x) for x in pg.inner_text('#clock').split(':')]
+    left_sec = clock[0] * 60 + clock[1]
+    check(pg.get_attribute('#ring', 'data-status') == 'running' and 21 * 60 + 50 <= left_sec <= 22 * 60, f'"Empezar" desde el widget cuenta desde que se tocó (faltan {pg.inner_text("#clock")} de 25:00)')
+    # Primer pomodoro completo: se pide (una vez) el permiso de alarmas exactas
+    pg.clock.fast_forward('22:00'); pg.clock.run_for(3000)
+    close_dialogs_but = None
+    for _ in range(4):
+        if dlg_open(pg) and '¿Te aviso justo a tiempo?' not in title(pg):
+            pg.click('#dlg .dlg__actions button:last-child'); pg.wait_for_timeout(300)
+    pg.clock.run_for(4500); pg.wait_for_timeout(500)
+    check(title(pg) == '¿Te aviso justo a tiempo?' and 'Alarmas y recordatorios' in pg.inner_text('#dlg'),
+          'después del primer pomodoro completo explica y pide el permiso de alarmas exactas')
+    pg.click("#dlg button:has-text('Abrir ajustes')"); pg.wait_for_timeout(400)
+    check(calls(pg, 'FrostTimer', 'openExactAlarmSettings'), '"Abrir ajustes" abre la pantalla de Android de ese permiso')
+    check(pg.evaluate("localStorage.getItem('st2_exact_asked')") == '1', 'y no se vuelve a preguntar')
+    bad = [e for e in errs if 'Failed to load resource' not in e]
+    check(not bad, 'sin errores con el complemento' + (': ' + ' | '.join(bad[:3]) if bad else ''))
     ctx.close()
 
     # ---------- E. En la web nada de esto cambia ----------

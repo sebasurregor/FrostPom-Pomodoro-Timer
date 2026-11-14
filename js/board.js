@@ -214,7 +214,7 @@ export async function startSession(startMs, plannedSec) {
     const id = await call('start_session', { p_planned_sec: Math.round(plannedSec) });
     if (typeof id !== 'string') throw Object.assign(new Error('server'), { kind: 'server' });
     save({ active: { start: startMs, id } });
-    return { ok: true };
+    return { ok: true, id };
   } catch (e) {
     save({ active: null });
     console.warn(`[FrostPom] El ranking no pudo anotar el inicio de este pomodoro (${e.kind || 'server'}).`);
@@ -222,19 +222,27 @@ export async function startSession(startMs, plannedSec) {
   }
 }
 
-/** Se guardó un bloque de estudio (completo o "Terminar y guardar"). */
-export async function finishSession(startMs, actualSec, xp) {
+/**
+ * Se guardó un bloque de estudio (completo o "Terminar y guardar").
+ * (v4.5) rankId = el número de la sesión del ranking que viajó con el reloj en vivo: así la
+ * termina el aparato que guardó el pomodoro aunque lo haya empezado otro.
+ */
+export async function finishSession(startMs, actualSec, xp, rankId = '') {
   if (!enabled()) return { ok: false, kind: 'off' };
   const st = load();
-  if (!st.active || st.active.start !== startMs) return { ok: false, kind: 'nostart' };
-  save({ active: null, pending: [...st.pending, { id: st.active.id, actualSec: Math.round(actualSec), xp: Math.max(0, Math.round(xp || 0)) }] });
+  const rank = typeof rankId === 'string' && /^[A-Za-z0-9-]{8,64}$/.test(rankId) ? rankId : '';
+  const mine = st.active && (st.active.start === startMs || (rank && st.active.id === rank)) ? st.active.id : '';
+  const id = mine || rank;
+  if (!id) return { ok: false, kind: 'nostart' };
+  if (st.pending.some((p) => p.id === id)) return flush(); // ya estaba anotado
+  save({ active: mine ? null : st.active, pending: [...st.pending, { id, actualSec: Math.round(actualSec), xp: Math.max(0, Math.round(xp || 0)) }] });
   return flush();
 }
 
 /** Se saltó o reinició el bloque: el servidor lo da por abandonado al empezar el siguiente. */
-export function dropSession(startMs) {
+export function dropSession(startMs, rankId = '') {
   const st = load();
-  if (st.active && st.active.start === startMs) save({ active: null });
+  if (st.active && (st.active.start === startMs || (rankId && st.active.id === rankId))) save({ active: null });
 }
 
 /** Envía los avisos de fin pendientes (por ejemplo, si se fue el internet). */

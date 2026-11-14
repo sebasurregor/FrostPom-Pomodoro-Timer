@@ -1,6 +1,6 @@
 # Fase 5 (v4.6.0): la notificación tipo Spotify y el widget de Android
 
-> **Estado: PLAN para aprobar.** Todavía no hay código de esta fase. Al final están la lista de pruebas que harás en tu celular y las decisiones que necesito de ti.
+> **Estado: PROGRAMADO, falta compilarlo en tu PC.** La parte web está en la v4.5.0 (se prende sola cuando la app trae el complemento) y el código nativo está en `native/frostpom-timer/`. Para activarlo y probarlo: `native/frostpom-timer/LEEME.md` (trae el mensaje para Claude Code). Con eso sale la v4.6.0. Decisiones aprobadas: Claude Code en tu PC, widget 4 × 2 y 2 × 2, el compañero de la barra se mueve con los cambios y cada 15 min, el permiso de alarmas exactas se pide una vez después del primer pomodoro, y el arte es `artico-amigos.webp`.
 
 ## 0. Antes que nada: dónde conviene programarla
 
@@ -124,3 +124,14 @@ Basado en tu mockup ("FOCUS SESSION · 25:00 · Hora de concentrarse", la barra 
 3. **¿Está bien** que el pingüino de la barra del widget se mueva solo con los cambios (y cada 15 min), mientras la hora sí baja cada segundo?
 4. **¿Pedir el permiso de alarmas exactas** (con una explicación) para que el aviso del final sea puntual? (Recomendado: sí, una vez, después del primer pomodoro.)
 5. **El arte del widget:** ¿uso tu `artico-amigos.webp` (los animales en la fogata), o tienes una versión del mockup sin textos ni botones (solo el fondo y los animales) para usarla tal cual?
+
+## 10. Cómo quedó (v4.5.0 + el complemento listo para compilar)
+
+- **Contrato entre la web y el teléfono** (complemento `FrostTimer`):
+  - `update(estado)`: modo, si corre o está en pausa, hora del fin, lo que falta, el número del bloque, las duraciones (para saltar con la app cerrada), tu compañero, el tema y los textos en el idioma de la app. Solo se envía cuando algo cambia.
+  - `getPendingActions()`: los botones tocados `{ act, at, block }` (empezar, pausar, continuar, saltar, reiniciar, terminar), en orden. La app los aplica a su hora y solo si siguen siendo del mismo bloque.
+  - Evento `actionsPending`: con la app abierta, el botón se aplica enseguida.
+  - `canScheduleExactAlarms()` y `openExactAlarmSettings()`.
+- **El widget, con los límites de Android:** la hora baja cada segundo (cronómetro); la barra con el compañero es un dibujo que se rehace con cada cambio y cada 15 min; ⏮ y ✓ solo aparecen cuando sirven; con el bloque terminado, ▶ abre la app para guardarlo.
+- **La fuente de la hora** es Lilita One (como la app) desde Android 8; antes, la del sistema.
+- **Comprobado en la nube:** el Kotlin compila contra una versión mínima de Android y Capacitor, sus 4 pruebas pasan, y la parte web pasa 15 comprobaciones con el complemento simulado (`tests/e2e_android.py`, sección F). Lo que falta (compilar con el SDK real y probar en el celular) es lo que hará Claude Code en tu PC.

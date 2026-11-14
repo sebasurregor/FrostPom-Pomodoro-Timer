@@ -1,6 +1,8 @@
 /*
  * FrostPom — vista Enfocar: el anillo del temporizador, los modos y "Mi ritmo".
  * El bloque en curso vive en session.js; aquí se decide qué se ve y qué suena.
+ * (v4.5) Con cuenta en línea, cada acción viaja a tus otros aparatos (live.js) y, cuando un
+ * bloque termina, solo UN aparato lo guarda (la XP y los minutos no se cuentan doble).
  */
 import * as U from '../util.js';
 import * as G from '../game.js';
@@ -9,7 +11,7 @@ import * as E from '../engine.js';
 import * as FX from './effects.js';
 import { $, $$, h } from './dom.js';
 import { toast, notify } from './feedback.js';
-import { askOnFirstSession } from './native-ui.js';
+import { askOnFirstSession, syncNativeTimer, connectNative, maybeAskExactAlarms, nativeReady } from './native-ui.js';
 import { petArt, headTop, say } from './companions.js';
 import { openSheet, closeSheet } from './sheets.js';
 import { pickVoice, COMPANION_KIND } from '../voices.js';
@@ -19,6 +21,7 @@ import { premiumDialog } from './premium.js';
 import { syncAmbient } from './sound.js';
 import { pic } from './pics.js';
 import { onStudyStart, onStudyRecorded, onStudyDropped } from './board-ui.js';
+import * as LIVE from './live.js';
 import { state, mutate, prefs, today, session, isPremium, poleNow } from './context.js';
 import { t, tr } from '../i18n.js';
 
@@ -35,6 +38,12 @@ function timerChanged() {
   wakeLock(session.running);
   renderTimer();
 }
+
+/**
+ * Opciones de una acción: { at, auto, quiet }. at = cuándo se tocó (por ejemplo, en la
+ * notificación de Android con la app cerrada); quiet = sin sonidos. Un clic llega con el evento.
+ */
+const opt = (o) => (o && typeof o === 'object' && !(typeof Event !== 'undefined' && o instanceof Event) ? o : {});
 
 // (v4.3.1) Sin nombre, de vez en cuando te recuerda que se lo pongas (tocándolo; ver feeding.js)
 const NAME_HINTS = [
@@ -58,47 +67,136 @@ export function buddySays(ctx = {}) {
   say($('#buddy'), text, { ms: hint ? 3200 : 2400 });
 }
 
-export function startOrToggle() {
-  FX.sfx.unlock();
-  const action = session.toggle();
-  if (action === 'pause') FX.sfx.pause();
-  else FX.sfx.start();
-  if (action === 'start') {
-    FX.buzz(25);
-    buddySays();
-    askOnFirstSession(); // app de Android: pide permiso para avisarte del final (una sola vez)
-    if (session.state.mode === 'study') onStudyStart(session.state); // ranking global: el servidor anota la hora
+/** opts.auto = lo empezó la app sola ("Lo siguiente empieza solo"). También es el clic del botón. */
+export function startOrToggle(opts) {
+  const { auto = false, at, quiet = false } = opt(opts);
+  if (!quiet) FX.sfx.unlock();
+  const action = session.toggle({ at });
+  if (!quiet) {
+    if (action === 'pause') FX.sfx.pause();
+    else FX.sfx.start();
   }
+  if (action === 'start') {
+    if (!quiet) {
+      FX.buzz(25);
+      buddySays();
+    }
+    askOnFirstSession(); // app de Android: pide permiso para avisarte del final (una sola vez)
+    if (session.state.mode === 'study') {
+      // Ranking global: el servidor anota la hora. (v4.5) Su número viaja con el reloj en vivo.
+      const block = session.state.block;
+      Promise.resolve(onStudyStart(session.state)).then((r) => { if (r && r.ok && r.id) LIVE.rankReady(block, r.id); });
+    }
+  }
+  LIVE.local(action, { auto, at });
   timerChanged();
 }
 
-function finishEarly() {
-  const res = session.finishEarly();
+function finishEarly(opts) {
+  const { at } = opt(opts);
+  const res = session.finishEarly({ at });
   if (!res) return;
   if (res.tooShort) toast('Necesitas al menos 1 minuto para guardar la sesión.', 'warn');
-  else afterRecord(res.rec, { auto: false });
+  else settle(res.rec, { auto: false });
 }
 
-function skip() {
-  const startMs = session.state.sessionStartMs;
+function skip(opts) {
+  const { at } = opt(opts);
+  const { sessionStartMs: startMs, rank } = session.state;
   const { skippedStudy, lost } = session.skip();
-  if (skippedStudy) onStudyDropped(startMs);
+  if (skippedStudy) onStudyDropped(startMs, rank);
   if (skippedStudy) mutate((s) => E.skipStudy(s));
+  LIVE.local('skip', { at });
   timerChanged();
   if (lost) toast('Saltaste la sesión y ese tiempo no se guardó. Usa "Terminar y guardar" si quieres que cuente.');
 }
 
-function resetTimer() {
-  if (session.state.mode === 'study') onStudyDropped(session.state.sessionStartMs);
+function resetTimer(opts) {
+  const { at } = opt(opts);
+  if (session.state.mode === 'study') onStudyDropped(session.state.sessionStartMs, session.state.rank);
   session.reset();
+  LIVE.local('reset', { at });
   timerChanged();
 }
 
+/**
+ * (v4.6) Lo que tocaste en la notificación o en el widget de Android, con la hora en que lo
+ * tocaste: a = { act, at, block }. Solo vale para el bloque que sigue aquí (si mientras tanto
+ * cambió, por ejemplo desde otro aparato, la acción ya no aplica).
+ */
+export function applyNative(a) {
+  const st = session.state;
+  const same = !a.block || !st.block || a.block === st.block;
+  const o = { at: a.at, quiet: true };
+  if (a.act === 'pause' && st.status === 'running' && same) startOrToggle(o);
+  else if (a.act === 'resume' && st.status === 'paused' && same) startOrToggle(o);
+  else if (a.act === 'start' && st.status === 'idle') startOrToggle(o);
+  else if (a.act === 'skip' && same) skip(o);
+  else if (a.act === 'reset' && st.status !== 'idle' && same) resetTimer(o);
+  else if (a.act === 'finish' && st.mode === 'study' && st.status !== 'idle' && same) finishEarly(o);
+}
+
+let dueBusy = false;
 /** El bloque llegó a cero (o ya había llegado mientras la app estaba cerrada). */
 export async function onDue() {
-  const rec = await session.completeDue();
-  if (rec) afterRecord(rec, { auto: true });
-  else renderTimer(); // otra pestaña ya lo registró
+  if (dueBusy) return;
+  dueBusy = true;
+  try {
+    // Antes de guardarlo: lo que tocaste en la notificación de Android con la app cerrada (v4.6) y
+    // lo que hicieron tus otros aparatos (v4.5). Quizás lo pausaste antes de que llegara a cero.
+    await nativeReady();
+    await LIVE.freshen();
+    if (!session.isDue()) {
+      timerChanged();
+      return;
+    }
+    LIVE.hold(); // mientras se guarda, lo que llegue de otro aparato espera
+    try {
+      const rec = await session.completeDue();
+      if (rec) await settle(rec, { auto: true });
+      else renderTimer(); // otra pestaña ya lo registró
+    } finally {
+      LIVE.release();
+    }
+  } finally {
+    dueBusy = false;
+  }
+}
+
+/**
+ * (v4.5) Terminó un bloque aquí. Con cuenta en línea se pregunta primero si otro aparato ya lo
+ * guardó: solo uno se queda con la XP y los minutos. Sin internet se guarda aquí (y se pregunta
+ * después: live.js, settleClaims).
+ */
+async function settle(rec, opts) {
+  LIVE.hold();
+  try {
+    const v = await LIVE.claimBlock(rec);
+    if (v === 'dup') timerChanged(); // ya se había guardado aquí
+    else if (v === false) lostBlock(rec, opts);
+    else afterRecord(rec, opts);
+  } finally {
+    LIVE.release();
+  }
+}
+
+/** Otro aparato ya guardó este bloque: aquí solo se avisa (y se espera lo que haga después). */
+function lostBlock(rec, { auto }) {
+  if (rec.mode === 'study') {
+    onStudyDropped(rec.sessionStartMs, rec.rank);
+    if (rec.completed && auto) {
+      FX.sfx.complete();
+      FX.buzz([60, 40, 60]);
+    }
+    toast(rec.completed ? 'Sesión completa: se guardó desde tu otro aparato.' : 'Esta sesión ya se había guardado desde tu otro aparato.', 'good', { icon: '📲', ms: 5000 });
+  } else {
+    if (auto) FX.sfx.breakDone();
+    toast('Descanso terminado.', 'info', { icon: '📲' });
+  }
+  // Lo siguiente, mientras llega lo que hizo tu otro aparato (esto no se envía)
+  if (session.state.status === 'idle') session.advance(C.nextModeAfter(rec, state.progress.cycle));
+  timerChanged();
+  LIVE.lost();
 }
 
 function celebrate(rec, res) {
@@ -113,6 +211,7 @@ function celebrate(rec, res) {
     FX.buzz([60, 40, 60]);
     const next = state.settings.autoBreak ? 'Ahora toca descansar.' : 'Empieza tu descanso cuando quieras.';
     notify('¡Sesión completa!', res.reward.xp ? `${t('Ganaste {n} XP.', { n: res.reward.xp })} ${tr(next)}` : next);
+    setTimeout(maybeAskExactAlarms, 4000); // (v4.6) Android: aviso puntual del final (se pregunta una vez)
   } else if (!res.reward.tooShort) {
     toast(t('Sesión guardada: {time}.', { time: U.formatMinutes(rec.actualSec / 60) }));
   }
@@ -127,19 +226,24 @@ function afterRecord(rec, { auto }) {
   if (poleAfter - poleBefore > 0.015) {
     setTimeout(() => toast(t('¡Limpiaste tu polo! Ahora está al {n} %.', { n: Math.round(poleAfter * 100) }), 'good', { icon: '🐧' }), 900);
   }
-  session.advance(C.nextModeAfter(rec, state.progress.cycle));
+  // (v4.5) Si mientras tanto empezó otro bloque (aquí o en otro aparato), ese no se toca
+  if (session.state.status === 'idle') {
+    session.advance(C.nextModeAfter(rec, state.progress.cycle));
+    LIVE.local(rec.completed ? 'complete' : 'finish', { at: rec.endMs, done: rec.mode });
+  }
   timerChanged();
   // (v4.3) Un solo ajuste: "Lo siguiente empieza solo" (autoBreak) vale para el estudio y el descanso.
   const autoNext = state.settings.autoBreak;
   if (auto && rec.completed && autoNext && Date.now() - rec.endMs <= LATE_MS) {
     setTimeout(() => {
-      if (session.state.status === 'idle') startOrToggle();
+      if (session.state.status === 'idle') startOrToggle({ auto: true });
     }, 1600);
   }
 }
 
 /** Se llama 4 veces por segundo. */
 export function tick() {
+  LIVE.tick(); // (v4.5) cada 10 s pregunta por tus otros aparatos
   if (!session.running) return;
   if (session.isDue()) onDue();
   else updateClock();
@@ -362,10 +466,13 @@ export function renderTimer() {
   renderXpHint(st);
   renderToday();
   updateClock();
+  syncNativeTimer(); // (v4.6) la notificación en curso y el widget de Android (si cambió algo)
 }
 
 export function bindFocus() {
   buildRingTicks();
+  LIVE.connect({ changed: timerChanged }); // (v4.5) el reloj cambió desde otro aparato
+  connectNative({ apply: applyNative }); // (v4.6) los botones de la notificación y del widget
   $('#mainBtn').addEventListener('click', startOrToggle);
   $('#finishBtn').addEventListener('click', finishEarly);
   $('#skipBtn').addEventListener('click', skip);

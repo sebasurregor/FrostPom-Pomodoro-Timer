@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- La hora del widget. En Android 8 o superior usa Lilita One (values-v26), como la app. -->
+    <style name="FpTime">
+        <item name="android:fontFamily">sans-serif-black</item>
+    </style>
+</resources>

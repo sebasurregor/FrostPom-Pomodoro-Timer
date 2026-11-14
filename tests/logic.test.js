@@ -11,7 +11,7 @@ import * as E from '../js/engine.js';
 import * as S from '../js/storage.js';
 import * as L from '../js/leaderboard.js';
 import { RECORDED } from '../js/ui/effects.js';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { createSession } from '../js/session.js';
 import * as SEA from '../js/season.js';
 import * as W from '../js/weather.js';
@@ -1112,4 +1112,278 @@ test('estilos (v4.4.0): cada CSS de index.html existe, va en orden y queda guard
   // Las variables nuevas viven en tokens.css, el primero
   const tokens = readFileSync(new URL('../css/tokens.css', import.meta.url), 'utf8');
   for (const v of ['--r-pill', '--shadow-chip', '--sp-4', '--card']) assert.ok(tokens.includes(`${v}:`), `tokens.css define ${v}`);
+});
+
+// ---------------------------------------------------------------------
+// v4.5 — Tu cuenta en todos tus aparatos: el reloj en vivo y la mezcla de tres copias
+// ---------------------------------------------------------------------
+import * as TS from '../js/timer-sync.js';
+import { mergeStates } from '../js/merge.js';
+
+const BLK = (n) => `blk-0000-${String(n).padStart(4, '0')}`;
+function sess(id, endIso, { sec = 1500, xp = 30, completed = true } = {}) {
+  const end = Date.parse(endIso);
+  return { id, plannedMin: 25, actualSec: sec, creditedSec: sec, completed, pauses: 0, startedAt: new Date(end - sec * 1000).toISOString(), endedAt: endIso, xp };
+}
+/** Aplica un pomodoro como lo haría la app (engine.js), con su número de bloque. */
+function study(st, block, endIso, sec = 1500) {
+  const endMs = Date.parse(endIso);
+  return E.applyRecord(st, { mode: 'study', completed: true, plannedSec: 1500, actualSec: sec, sessionStartMs: endMs - sec * 1000, startedAt: new Date(endMs - sec * 1000).toISOString(), endMs, endedAt: endIso, pauses: 0, block }, { todayKey: U.dateKey(new Date(endMs)) });
+}
+function baseState() {
+  const st = S.defaultState();
+  st.profile.nick = 'Ana_23'; st.profile.onboarded = true;
+  st.progress.season = '2026-10';
+  st.progress.gems = 100; st.progress.xp = 200;
+  st.createdAt = '2026-10-01T10:00:00.000Z';
+  st.pets.pinguino = { fullness: 50, at: '2026-11-10T10:00:00.000Z' };
+  return S.validateState(st);
+}
+const copy = (v) => JSON.parse(JSON.stringify(v));
+
+test('mezcla (v4.5): los dos aparatos estudian sin internet → se suman los minutos y la XP de los dos', () => {
+  const base = baseState();
+  const mine = copy(base); const theirs = copy(base);
+  study(mine, BLK(1), '2026-11-11T15:00:00.000Z');
+  study(theirs, BLK(2), '2026-11-11T17:00:00.000Z', 1200);
+  const out = S.validateState(mergeStates(base, mine, theirs));
+  const day = '2026-11-11';
+  assert.equal(out.progress.totals.studySec, 1500 + 1200);
+  assert.equal(out.daily[day].studySec, 1500 + 1200);
+  assert.equal(out.daily[day].sessions, 2);
+  assert.equal(out.progress.xp, mine.progress.xp + theirs.progress.xp - base.progress.xp, 'base + lo que sumó cada uno');
+  assert.deepEqual(out.sessions.map((s) => s.id), [BLK(2), BLK(1)], 'el historial une las dos (la más reciente primero)');
+  assert.equal(out.progress.totals.sessions, 2);
+});
+
+test('mezcla (v4.5): uno compra un tema y el otro estudia → no se pierde la compra (ni las gemas que gastó)', () => {
+  const base = baseState();
+  const mine = copy(base); const theirs = copy(base);
+  const r = E.chooseSkin(mine, 'menta', '2026-11-11');
+  assert.ok(r.ok, 'compró el tema');
+  const spent = base.progress.gems - mine.progress.gems;
+  assert.ok(spent > 0);
+  study(theirs, BLK(3), '2026-11-11T18:00:00.000Z');
+  const out = S.validateState(mergeStates(base, mine, theirs));
+  assert.ok(out.progress.owned.includes('menta'), 'el tema comprado sigue siendo tuyo');
+  assert.equal(out.settings.skin, 'menta', 'y sigue puesto (solo ese aparato cambió el tema)');
+  assert.equal(out.progress.gems, theirs.progress.gems - spent, 'las gemas: lo que ganó uno menos lo que gastó el otro');
+  assert.equal(out.progress.totals.studySec, theirs.progress.totals.studySec, 'los minutos del otro aparato también están');
+  // Al revés da lo mismo
+  const back = S.validateState(mergeStates(base, theirs, mine));
+  assert.equal(back.progress.gems, out.progress.gems);
+  assert.ok(back.progress.owned.includes('menta'));
+});
+
+test('mezcla (v4.5): el mismo pomodoro guardado en los dos aparatos se cuenta una sola vez', () => {
+  const base = baseState();
+  const mine = copy(base); const theirs = copy(base);
+  study(mine, BLK(4), '2026-11-11T15:00:00.000Z');
+  study(theirs, BLK(4), '2026-11-11T15:00:00.000Z');
+  const out = S.validateState(mergeStates(base, mine, theirs));
+  assert.equal(out.sessions.filter((s) => s.id === BLK(4)).length, 1);
+  assert.equal(out.progress.totals.studySec, 1500);
+  assert.equal(out.progress.totals.sessions, 1);
+  assert.equal(out.daily['2026-11-11'].studySec, 1500);
+  assert.equal(out.progress.xp, mine.progress.xp, 'la XP de ese pomodoro, una vez');
+});
+
+test('mezcla (v4.5): lo que un aparato quitó (otro ya lo había guardado) queda quitado', () => {
+  const base = baseState();
+  study(base, BLK(5), '2026-11-10T15:00:00.000Z');
+  const mine = copy(base); const theirs = copy(base);
+  E.removeSession(mine, BLK(5));
+  study(theirs, BLK(6), '2026-11-11T15:00:00.000Z');
+  const out = S.validateState(mergeStates(base, mine, theirs));
+  assert.ok(!out.sessions.some((s) => s.id === BLK(5)), 'la sesión quitada no vuelve');
+  assert.equal(out.progress.totals.studySec, 1500, 'solo queda la del otro aparato');
+});
+
+test('mezcla (v4.5): cambio de temporada → gana la más nueva y la XP vieja no se suma a la nueva', () => {
+  const base = baseState();
+  base.progress.season = '2026-07'; base.progress.xp = 500;
+  const mine = copy(base); const theirs = copy(base);
+  const r = E.rolloverSeason(mine, new Date(2026, 9, 2), 3); // octubre: temporada nueva
+  assert.ok(r.ok);
+  const reward = mine.seasons[0].gems;
+  mine.progress.xp += 40;
+  theirs.progress.xp += 60; // el otro siguió en la temporada vieja (sin abrir la app)
+  const out = S.validateState(mergeStates(base, mine, theirs));
+  assert.equal(out.progress.season, '2026-10');
+  assert.equal(out.progress.xp, 40, 'en la temporada nueva solo cuenta lo nuevo');
+  assert.equal(out.seasons[0].id, '2026-07');
+  assert.equal(out.seasons[0].xp, 560, 'lo que el otro sumó en la vieja va a la temporada archivada');
+  assert.equal(out.progress.gems, base.progress.gems + reward);
+  // Si los dos cerraron la temporada, el premio en gemas cuenta una vez
+  const both = copy(base);
+  E.rolloverSeason(both, new Date(2026, 9, 3), 3);
+  const twice = S.validateState(mergeStates(base, mine, both));
+  assert.equal(twice.progress.gems, base.progress.gems + reward);
+  assert.equal(twice.progress.xp, 40, 'los dos empezaron de 0: se suma lo de cada uno');
+});
+
+test('mezcla (v4.5): mascotas, ajustes, logros y Premium', () => {
+  const base = baseState();
+  const mine = copy(base); const theirs = copy(base);
+  mine.pets.pinguino = { fullness: 80, at: '2026-11-11T12:00:00.000Z' }; // le dio de comer
+  theirs.pets.pinguino = { fullness: 50, at: '2026-11-10T10:00:00.000Z', name: 'Copito' }; // le puso nombre
+  mine.settings.theme = 'dark';
+  theirs.settings.theme = 'light';
+  theirs.settings.sound = false;
+  mine.progress.achievements['madrugador'] = '2026-11-11T10:00:00.000Z';
+  theirs.progress.achievements['madrugador'] = '2026-11-10T09:00:00.000Z';
+  theirs.premium = { active: true, demo: true, since: '2026-11-10T00:00:00.000Z', bonusClaimed: false, giftPending: false };
+  const out = S.validateState(mergeStates(base, mine, theirs, { mineAt: Date.parse('2026-11-11T12:00:00Z'), theirsAt: Date.parse('2026-11-10T12:00:00Z') }));
+  assert.equal(out.pets.pinguino.fullness, 80, 'la comida no se pierde');
+  assert.equal(out.pets.pinguino.name, 'Copito', 'el nombre tampoco');
+  assert.equal(out.settings.theme, 'dark', 'si los dos cambiaron lo mismo, gana el más reciente');
+  assert.equal(out.settings.sound, false, 'lo que cambió solo uno se queda');
+  assert.equal(out.progress.achievements['madrugador'], '2026-11-10T09:00:00.000Z', 'un logro guarda su fecha más antigua');
+  assert.equal(out.premium.active, true);
+  assert.equal(out.profile.nick, 'Ana_23');
+});
+
+test('mezcla (v4.5): no cambia las copias que recibe y nunca deja números negativos', () => {
+  const base = baseState();
+  const mine = copy(base); const theirs = copy(base);
+  mine.progress.gems = 10; theirs.progress.gems = 10; // los dos gastaron 90
+  const before = JSON.stringify([base, mine, theirs]);
+  const out = mergeStates(base, mine, theirs);
+  assert.equal(JSON.stringify([base, mine, theirs]), before);
+  assert.equal(out.progress.gems, 0);
+  assert.equal(out.account, undefined, 'la cuenta local no viaja');
+});
+
+test('reloj en vivo (v4.5): el reloj de aquí ↔ el del servidor (con la diferencia de hora)', () => {
+  const off = 5 * 60 * 1000; // este aparato va 5 min atrasado
+  const local = { status: 'running', mode: 'study', durationSec: 1500, accumulatedMs: 2000, runStartMs: 1_000_000, sessionStartMs: 990_000, pauses: 1, block: BLK(7), rank: null };
+  const sh = TS.toShared(local, off, 'resume');
+  assert.equal(sh.runStartAt, 1_000_000 + off);
+  assert.equal(sh.sessionStart, 990_000 + off);
+  assert.equal(sh.act, 'resume');
+  assert.equal(sh.block, BLK(7));
+  // Otro aparato con otra diferencia lo ve igual (en sus horas)
+  const there = TS.fromShared(sh, -60_000);
+  assert.equal(there.runStartMs, 1_000_000 + off + 60_000);
+  assert.ok(TS.same(TS.fromShared(sh, off), local), 'ida y vuelta: lo mismo');
+  assert.equal(TS.fromShared({ ...sh, runStartAt: 'ayer' }, 0), null, 'lo que no sirve se ignora');
+  assert.equal(TS.fromShared({ ...sh, mode: 'fiesta' }, 0), null);
+  // En reposo, la duración es de cada aparato (sus ajustes)
+  assert.ok(TS.same({ status: 'idle', mode: 'break', durationSec: 300 }, { status: 'idle', mode: 'break', durationSec: 600 }));
+  assert.ok(!TS.same({ status: 'idle', mode: 'break', durationSec: 300 }, { status: 'idle', mode: 'study', durationSec: 300 }));
+  // La medición del reloj no es exacta: hasta 1,5 s es "lo mismo"
+  assert.ok(TS.same(local, { ...local, runStartMs: local.runStartMs + 1000 }));
+  assert.ok(!TS.same(local, { ...local, runStartMs: local.runStartMs + 3000 }));
+});
+
+test('reloj en vivo (v4.5): qué hacer con lo que tiene el servidor', () => {
+  const off = 0;
+  const running = { status: 'running', mode: 'study', durationSec: 1500, accumulatedMs: 0, runStartMs: 1_000_000, sessionStartMs: 1_000_000, pauses: 0, block: BLK(8), rank: null };
+  const row = (st, extra = {}) => ({ state: { ...TS.toShared(st, off, 'start'), ...extra }, version: 3 });
+  const idle = { status: 'idle', mode: 'study', durationSec: 1500, accumulatedMs: 0, runStartMs: null, sessionStartMs: null, pauses: 0, block: null, rank: null };
+  assert.equal(TS.decide(row(running), { local: idle, pending: { act: 'pause' } }).do, 'push', 'lo de aquí sin enviar va primero');
+  assert.equal(TS.decide({ state: null, version: 0 }, { local: running }).do, 'sync', 'el servidor no tiene nada: se le envía lo de aquí');
+  assert.equal(TS.decide({ state: null, version: 0 }, { local: idle }).do, 'none');
+  const adopt = TS.decide(row(running), { local: idle, verdict: () => '' });
+  assert.equal(adopt.do, 'adopt', 'otro aparato empezó: se pone igual');
+  assert.equal(adopt.state.block, BLK(8));
+  assert.equal(TS.decide(row(running), { local: running }).do, 'none', 'ya está igual');
+  assert.deepEqual(TS.decide(row({ ...running, rank: BLK(9) }), { local: running }), { do: 'rank', rank: BLK(9) }, 'solo faltaba el número del ranking');
+  assert.equal(TS.decide(row(running), { local: { ...running, rank: BLK(9) } }).do, 'sync', 'aquí está el número del ranking y allá no');
+  // Un bloque que ya terminó aquí (noticia vieja): no se vuelve a poner a correr
+  assert.equal(TS.decide(row(running), { local: idle, verdict: () => 'lost' }).do, 'none', 'lo guardó otro aparato: se espera lo suyo');
+  assert.equal(TS.decide(row(running), { local: idle, verdict: () => 'won' }).do, 'sync', 'lo guardó este: se vuelve a enviar lo de aquí');
+});
+
+test('reloj en vivo (v4.5): acciones sin enviar, bloques terminados y la diferencia de hora', () => {
+  const mem = S.memoryBackend();
+  TS.useStorage(mem);
+  try {
+    const st = { status: 'running', mode: 'study', durationSec: 1500, accumulatedMs: 0, runStartMs: 5, sessionStartMs: 5, pauses: 0, block: BLK(10), rank: null };
+    const s1 = TS.setPending({ at: 100, act: 'start', state: st });
+    const tok1 = TS.pending().tok;
+    const s2 = TS.setPending({ at: 200, act: 'pause', state: { ...st, status: 'paused' } });
+    assert.equal(TS.pending().act, 'pause', 'cada acción reemplaza a la anterior (lleva el reloj completo)');
+    assert.ok(TS.isTok(tok1) && TS.isTok(TS.pending().tok) && TS.pending().tok !== tok1, 'cada acción lleva un número al azar NUEVO (no identifica al aparato)');
+    assert.equal(TS.pending().tok, TS.pending().tok, 'y no cambia mientras se reintenta');
+    TS.sent({ seq: s1, at: 100, act: 'start' }, 'x', true);
+    assert.ok(TS.pending(), 'si llegó una acción más nueva mientras se enviaba, esa sigue pendiente');
+    const tok2 = TS.pending().tok;
+    TS.sent(TS.pending(), '2026-11-11T21:00:00.000Z', true);
+    assert.equal(TS.pending(), null);
+    assert.equal(TS.lastSent().sat, '2026-11-11T21:00:00.000Z', 'se recuerda la hora enviada (para reenviar con el número del ranking)');
+    assert.equal(TS.lastSent().tok, tok2, 'y su número al azar');
+    TS.markDone(BLK(10), 'won');
+    TS.markDone(BLK(11), 'lost');
+    assert.equal(TS.verdict(BLK(10)), 'won');
+    assert.equal(TS.verdict(BLK(11)), 'lost');
+    assert.equal(TS.verdict(BLK(12)), '');
+    TS.addClaim({ block: BLK(12), mode: 'study' });
+    assert.equal(TS.claims().length, 1);
+    TS.removeClaim(BLK(12));
+    assert.equal(TS.claims().length, 0);
+    // La diferencia de hora: se queda con la medición más precisa…
+    TS.sample('2026-11-11T21:00:10.000Z', Date.parse('2026-11-11T21:00:00.000Z'), Date.parse('2026-11-11T21:00:00.200Z'));
+    const first = TS.offset();
+    assert.equal(first, 10_000 - 100);
+    TS.sample('2026-11-11T21:00:20.000Z', Date.parse('2026-11-11T21:00:09.000Z'), Date.parse('2026-11-11T21:00:11.000Z'));
+    assert.equal(TS.offset(), first, 'una respuesta lenta (2 s) no reemplaza a una rápida');
+    // …pero si el reloj de aquí saltó (alguien cambió la hora), se corrige enseguida
+    TS.sample('2026-11-11T21:00:30.000Z', Date.parse('2026-11-11T20:00:20.000Z'), Date.parse('2026-11-11T20:00:20.100Z'));
+    assert.ok(Math.abs(TS.offset() - 3_610_000 + 50) < 5, `el salto de 1 h se corrige (${TS.offset()})`);
+    // Datos raros en el aparato se ignoran
+    mem.setItem('st2_live', JSON.stringify({ pending: { act: 'hackear', at: 1, state: {} }, done: [{ b: 'x', v: 'won', t: 1 }], last: { sat: 'x', act: 'start', at: 1, tok: '<script>' } }));
+    assert.equal(TS.pending(), null);
+    assert.equal(TS.verdict('x'), '');
+    assert.equal(TS.lastSent(), null);
+  } finally {
+    TS.useStorage(null);
+  }
+});
+
+test('reloj en vivo (v4.5): el mismo bloque nunca se guarda dos veces en el mismo aparato', () => {
+  const st = baseState();
+  study(st, BLK(13), '2026-11-11T15:00:00.000Z');
+  const xp = st.progress.xp;
+  const again = study(st, BLK(13), '2026-11-11T15:00:00.000Z');
+  assert.equal(again.reward.duplicate, true);
+  assert.equal(st.progress.xp, xp);
+  assert.equal(st.sessions.filter((s) => s.id === BLK(13)).length, 1);
+  assert.equal(st.progress.totals.studySec, 1500);
+});
+
+test('reloj en vivo (v4.5): la sesión guarda el número del bloque y puede adoptar otro', () => {
+  const mem = S.memoryBackend();
+  const store = S.createStore(mem);
+  let t = Date.parse('2026-11-11T21:00:00.000Z');
+  const session = createSession({ store, durationFor: () => 1500, now: () => t });
+  session.toggle();
+  const block = session.state.block;
+  assert.match(block, /^[A-Za-z0-9-]{8,64}$/, 'cada bloque nace con su número');
+  assert.equal(store.loadTimer().block, block, 'y se guarda');
+  assert.ok(session.setRank('5e550000-0000-4000-8000-000000000001'));
+  // Pausa con la hora en que se tocó (la notificación de Android, fase 5): no regala tiempo
+  t += 60_000;
+  session.toggle({ at: t - 30_000 });
+  assert.equal(session.state.accumulatedMs, 30_000);
+  // Llega el bloque de otro aparato
+  const other = { status: 'running', mode: 'study', durationSec: 1500, accumulatedMs: 0, runStartMs: t - 1000, sessionStartMs: t - 1000, pauses: 0, block: BLK(14), rank: null };
+  assert.ok(session.adopt(other));
+  assert.equal(session.state.block, BLK(14));
+  assert.equal(store.loadTimer().block, BLK(14));
+  assert.equal(session.adopt({ status: 'raro' }), false, 'lo que no sirve se ignora');
+  assert.equal(session.state.block, BLK(14));
+  t += 1500 * 1000;
+  return session.completeDue().then((rec) => {
+    assert.equal(rec.block, BLK(14), 'el registro lleva el número del bloque');
+  });
+});
+
+test('sin conexión (v4.5): cada módulo de la app queda guardado en el service worker', () => {
+  const sw = readFileSync(new URL('../service-worker.js', import.meta.url), 'utf8');
+  const walk = (dir) => readdirSync(new URL(`../${dir}/`, import.meta.url), { withFileTypes: true })
+    .flatMap((e) => (e.isDirectory() ? walk(`${dir}/${e.name}`) : [`${dir}/${e.name}`]));
+  // capacitor-core solo se usa dentro de la app de Android (ahí los archivos ya están en el teléfono)
+  const mods = walk('js').filter((f) => f.endsWith('.js') && f !== 'js/vendor/capacitor-core.js');
+  for (const f of mods) assert.ok(sw.includes(`'./${f}'`), `${f} está en el PRECACHE de service-worker.js`);
 });

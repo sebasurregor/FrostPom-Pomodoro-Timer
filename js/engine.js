@@ -92,6 +92,11 @@ function refreshStreak(state, todayKey) {
  */
 export function applyStudy(state, rec, { todayKey } = {}) {
   const events = [];
+  // (v4.5) El número del bloque es el de la sesión: el mismo pomodoro nunca se guarda dos veces
+  const block = typeof rec.block === 'string' && /^[A-Za-z0-9-]{8,64}$/.test(rec.block) ? rec.block : '';
+  if (block && state.sessions.some((x) => x.id === block)) {
+    return done(events, { reward: { creditedSec: 0, xp: 0, items: [], capped: false, tooShort: false, duplicate: true } });
+  }
   const endKey = U.dateKey(new Date(rec.endMs));
   todayKey = todayKey || endKey;
   const day = ensureDay(state, endKey);
@@ -133,7 +138,7 @@ export function applyStudy(state, rec, { todayKey } = {}) {
   }
 
   state.sessions.unshift({
-    id: U.uid(),
+    id: block || U.uid(),
     plannedMin: Math.round(rec.plannedSec / 60),
     actualSec: rec.actualSec,
     creditedSec: reward.creditedSec,

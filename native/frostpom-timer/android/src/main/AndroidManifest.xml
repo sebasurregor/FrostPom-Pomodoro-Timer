@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  FrostPom (v4.6) — lo que el complemento agrega a la app de Android.
+  Permisos: notificaciones (ya lo pide la app), alarmas exactas (OPCIONAL: la app lo pide una vez,
+  con explicación; sin él el aviso llega unos minutos tarde) y arranque del teléfono (para que la
+  notificación y el aviso vuelvan después de reiniciar). Sin servicios en primer plano y sin
+  USE_EXACT_ALARM (Google Play solo lo permite a despertadores y calendarios).
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <application>
+        <!-- Los botones de la notificación y del widget, el aviso del final y la vuelta cada 15 min -->
+        <receiver
+            android:name="com.startupprometeus.frostpom.timer.TimerActionReceiver"
+            android:exported="false" />
+
+        <!-- Después de reiniciar el teléfono o de actualizar la app (son avisos protegidos del sistema) -->
+        <receiver
+            android:name="com.startupprometeus.frostpom.timer.BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- El widget de 4 × 2 -->
+        <receiver
+            android:name="com.startupprometeus.frostpom.timer.FrostWidgetLarge"
+            android:exported="true"
+            android:label="@string/fp_widget_large">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/fp_widget_large_info" />
+        </receiver>
+
+        <!-- El widget de 2 × 2 -->
+        <receiver
+            android:name="com.startupprometeus.frostpom.timer.FrostWidgetSmall"
+            android:exported="true"
+            android:label="@string/fp_widget_small">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/fp_widget_small_info" />
+        </receiver>
+    </application>
+</manifest>

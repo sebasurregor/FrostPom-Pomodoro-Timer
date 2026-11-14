@@ -2,6 +2,7 @@
 -- FrostPom: servidor del ranking global y de las cuentas en línea (Supabase / PostgreSQL 15+)
 -- v3.9: ranking global · v4.0: guardar el progreso de las cuentas con correo (sin la foto)
 -- v4.1: reportar nombres del ranking (lo piden Google Play y App Store)
+-- v4.5: el reloj en vivo en todos tus aparatos (get_timer, set_timer, claim_block)
 --
 -- Por qué existe: si el ranking se calculara en el teléfono, cualquiera podría
 -- editar sus minutos. Aquí el SERVIDOR mide el tiempo y decide cuánto cuenta.
@@ -27,6 +28,9 @@
 --     anónimas (las del ranking) no pueden guardar progreso.
 -- 10. (v4.1) Quien tiene sesión puede reportar un nombre del ranking (una vez por nombre, máximo
 --     20 al día). Con 3 personas distintas, el nombre se oculta solo hasta que el dueño lo revise.
+-- 11. (v4.5) Las cuentas con correo comparten el pomodoro en curso entre sus aparatos. Gana la
+--     última acción (con la hora del servidor) y cada pomodoro se guarda una sola vez
+--     (claim_block), aunque llegue a cero en dos pantallas a la vez.
 --
 -- Cómo usarlo: Supabase > SQL Editor > pega este archivo > Run. Se puede volver a correr.
 -- Paso a paso completo: docs/RANKING-GLOBAL.md
@@ -196,12 +200,38 @@ create table if not exists private.reports (
 create index if not exists reports_target on private.reports (target_id);
 create index if not exists reports_reporter_created on private.reports (reporter_id, created_at desc);
 
+-- (v4.5) El reloj en vivo: el pomodoro en curso de cada cuenta con correo, compartido entre sus
+-- aparatos. Sin datos personales: el estado del reloj, la hora de la última acción y un número al
+-- azar NUEVO en cada acción (sirve para reconocer un reintento; no identifica al aparato).
+create table if not exists private.timers (
+  user_id      uuid primary key references auth.users (id) on delete cascade,
+  state        jsonb not null,
+  version      int not null default 1,
+  action_at    timestamptz not null,          -- hora (del servidor) de la última acción
+  device       text not null,                 -- número al azar de esa acción (no del aparato)
+  updated_at   timestamptz not null default now(),
+  window_start timestamptz not null default now(),   -- límite de uso: acciones por minuto
+  window_count int not null default 0
+);
+
+-- (v4.5) Cada pomodoro que llegó a cero (o se terminó y guardó) se anota una sola vez: el primer
+-- aparato que lo pide lo guarda; los demás saben que ya está guardado.
+create table if not exists private.timer_claims (
+  user_id    uuid not null references auth.users (id) on delete cascade,
+  block      text not null,
+  device     text,                            -- número al azar de esa pregunta (para los reintentos)
+  claimed_at timestamptz not null default now(),
+  primary key (user_id, block)
+);
+
 alter table private.profiles       enable row level security;
 alter table private.study_sessions enable row level security;
 alter table private.daily_totals   enable row level security;
 alter table private.transfer_codes enable row level security;
 alter table private.saves          enable row level security;
 alter table private.reports        enable row level security;
+alter table private.timers         enable row level security;
+alter table private.timer_claims   enable row level security;
 -- Sin políticas a propósito: el acceso es SOLO a través de las funciones de abajo.
 
 revoke all on all tables in schema private from public;
@@ -499,6 +529,7 @@ begin
     'daily_totals', coalesce((select jsonb_agg(to_jsonb(dt) - 'user_id' order by dt.day) from private.daily_totals dt where dt.user_id = uid), '[]'::jsonb),
     'sessions', coalesce((select jsonb_agg(to_jsonb(s) - 'user_id' order by s.started_at) from private.study_sessions s where s.user_id = uid), '[]'::jsonb),
     'progress', (select sv.data from private.saves sv where sv.user_id = uid),
+    'timer', (select to_jsonb(t) - 'user_id' - 'window_start' - 'window_count' from private.timers t where t.user_id = uid),
     'reports_made', coalesce((select jsonb_agg(jsonb_build_object('username', p.username, 'reason', r.reason, 'created_at', r.created_at) order by r.created_at)
                                 from private.reports r join private.profiles p on p.user_id = r.target_id
                                where r.reporter_id = uid), '[]'::jsonb)
@@ -587,7 +618,119 @@ begin
   delete from private.saves where user_id = uid;
   delete from private.profiles where user_id = uid;
   delete from private.transfer_codes where user_id = uid;
-  delete from auth.users where id = uid;
+  delete from auth.users where id = uid;   -- en cascada: el reloj en vivo y sus pomodoros anotados
+end $$;
+
+-- ---------------------------------------------------------------------
+-- (v4.5) El reloj en vivo: el mismo pomodoro en todos tus aparatos (solo cuentas con correo)
+--  - get_timer: el estado del reloj y la hora del servidor (con ella, cada aparato corrige su
+--    propio reloj y todos muestran la misma cuenta regresiva). También dice la versión del
+--    progreso guardado: si otro aparato guardó algo, este lo trae sin esperar a que lo abras.
+--  - set_timer: guarda un cambio solo si es MÁS NUEVO que el que hay (gana la última acción).
+--  - claim_block: el primer aparato que lo pide guarda el pomodoro; los demás reciben "no".
+-- La app pregunta cada 10 s mientras se ve; máximo 30 cambios por minuto por persona.
+-- ---------------------------------------------------------------------
+-- Revisa lo que manda la app: un objeto pequeño con el modo, el estado y una duración válida.
+create or replace function private.check_timer_state(p jsonb) returns jsonb
+language plpgsql immutable set search_path = '' as $$
+begin
+  if p is null or jsonb_typeof(p) <> 'object' or octet_length(p::text) > 2048
+     or coalesce(p->>'mode', '') not in ('study', 'break', 'long')
+     or coalesce(p->>'status', '') not in ('idle', 'running', 'paused')
+     or coalesce(jsonb_typeof(p->'durationSec'), '') <> 'number'
+     or (p->>'durationSec')::numeric not between 60 and 10800
+     or (p ? 'block' and jsonb_typeof(p->'block') <> 'null'
+         and coalesce(p->>'block', '') !~ '^[A-Za-z0-9-]{8,64}$') then
+    raise exception 'timer_invalid' using errcode = '22023';
+  end if;
+  return p;
+end $$;
+
+create or replace function public.get_timer()
+returns table (state jsonb, version int, action_at timestamptz, device text, server_now timestamptz, progress_version int)
+language plpgsql security definer set search_path = '' as $$
+#variable_conflict use_column
+declare
+  uid uuid := private.require_account();
+  pv  int := coalesce((select s.version from private.saves s where s.user_id = uid), 0);
+begin
+  return query select t.state, t.version, t.action_at, t.device, clock_timestamp(), pv
+                 from private.timers t where t.user_id = uid;
+  if not found then
+    return query select null::jsonb, 0, null::timestamptz, null::text, clock_timestamp(), pv;
+  end if;
+end $$;
+
+-- p_action_at = cuándo tocaste el botón (ya corregida a la hora del servidor). Si otro aparato
+-- hizo algo después, tu cambio no se guarda y te devuelve lo más nuevo (accepted = false).
+-- Una hora en el futuro o de hace más de 1 día se ajusta: nadie puede "congelar" el reloj.
+create or replace function public.set_timer(p_state jsonb, p_action_at timestamptz, p_device text)
+returns table (state jsonb, version int, action_at timestamptz, device text, server_now timestamptz, accepted boolean)
+language plpgsql security definer set search_path = '' as $$
+#variable_conflict use_column
+declare
+  uid uuid := private.require_account();
+  s   jsonb := private.check_timer_state(p_state);
+  dev text := coalesce(p_device, '');
+  at  timestamptz := least(greatest(coalesce(p_action_at, now()), now() - interval '1 day'), now());
+  t   private.timers%rowtype;
+  ok  boolean := false;
+begin
+  if dev !~ '^[A-Za-z0-9-]{4,32}$' then
+    raise exception 'timer_invalid' using errcode = '22023';
+  end if;
+  select * into t from private.timers x where x.user_id = uid for update;
+  if not found then
+    insert into private.timers (user_id, state, version, action_at, device, window_count)
+    values (uid, s, 1, at, dev, 1);
+    ok := true;
+  else
+    if t.window_start > now() - interval '1 minute' then
+      if t.window_count >= 30 then
+        raise exception 'timer_rate' using errcode = '54000';
+      end if;
+      update private.timers x set window_count = x.window_count + 1 where x.user_id = uid;
+    else
+      update private.timers x set window_start = now(), window_count = 1 where x.user_id = uid;
+    end if;
+    -- Gana la última acción. Una acción se puede reenviar con su misma hora y su mismo número al
+    -- azar (por ejemplo, con el número de su sesión del ranking, que llega un momento después).
+    if at > t.action_at or (at = t.action_at and dev = t.device) then
+      update private.timers x
+         set state = s, version = t.version + 1, action_at = at, device = dev, updated_at = now()
+       where x.user_id = uid;
+      ok := true;
+    end if;
+  end if;
+  return query select x.state, x.version, x.action_at, x.device, clock_timestamp(), ok
+                 from private.timers x where x.user_id = uid;
+end $$;
+
+-- true = este aparato guarda el pomodoro (XP, minutos y ranking); false = otro ya lo guardó.
+-- Quien pregunta otra vez con el mismo número al azar (si se cortó la red a mitad) sigue siendo el dueño.
+create or replace function public.claim_block(p_block text, p_device text default null)
+returns boolean
+language plpgsql security definer set search_path = '' as $$
+declare
+  uid uuid := private.require_account();
+  dev text := nullif(left(coalesce(p_device, ''), 32), '');
+  n   int;
+begin
+  if p_block is null or p_block !~ '^[A-Za-z0-9-]{8,64}$' then
+    raise exception 'block_invalid' using errcode = '22023';
+  end if;
+  delete from private.timer_claims c where c.user_id = uid and c.claimed_at < now() - interval '3 days';
+  if (select count(*) from private.timer_claims c where c.user_id = uid) >= 500 then
+    raise exception 'timer_rate' using errcode = '54000';
+  end if;
+  insert into private.timer_claims (user_id, block, device) values (uid, p_block, dev)
+  on conflict do nothing;
+  get diagnostics n = row_count;
+  if n = 1 then
+    return true;
+  end if;
+  return dev is not null and exists (select 1 from private.timer_claims c
+                                       where c.user_id = uid and c.block = p_block and c.device = dev);
 end $$;
 
 -- ---------------------------------------------------------------------
@@ -786,6 +929,8 @@ begin
   delete from private.daily_totals where day < (now() - interval '400 days')::date;
   delete from private.transfer_codes where expires_at < now();
   delete from private.reports where created_at < now() - interval '400 days';
+  delete from private.timer_claims where claimed_at < now() - interval '3 days';
+  delete from private.timers where updated_at < now() - interval '400 days';
   return query select du, ds;
 end $$;
 
@@ -808,6 +953,9 @@ revoke execute on function public.load_progress() from public;
 revoke execute on function public.save_progress(jsonb, int) from public;
 revoke execute on function public.delete_my_cloud_account() from public;
 revoke execute on function public.report_name(text, text) from public;
+revoke execute on function public.get_timer() from public;
+revoke execute on function public.set_timer(jsonb, timestamptz, text) from public;
+revoke execute on function public.claim_block(text, text) from public;
 
 do $$
 begin
@@ -820,5 +968,7 @@ begin
     execute 'grant execute on function public.load_progress(), public.save_progress(jsonb, int), public.delete_my_cloud_account() to authenticated';
     execute 'revoke execute on function public.report_name(text, text) from anon';
     execute 'grant execute on function public.report_name(text, text) to authenticated';
+    execute 'revoke execute on function public.get_timer(), public.set_timer(jsonb, timestamptz, text), public.claim_block(text, text) from anon';
+    execute 'grant execute on function public.get_timer(), public.set_timer(jsonb, timestamptz, text), public.claim_block(text, text) to authenticated';
   end if;
 end $$;

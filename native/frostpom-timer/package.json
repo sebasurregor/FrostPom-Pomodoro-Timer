@@ -1,0 +1,24 @@
+{
+  "name": "@frostpom/timer",
+  "version": "4.6.0",
+  "description": "FrostPom: la notificación en curso, el widget y el aviso exacto del final en Android (complemento local de Capacitor).",
+  "private": true,
+  "license": "UNLICENSED",
+  "files": [
+    "android/src/main/",
+    "android/build.gradle"
+  ],
+  "keywords": [
+    "capacitor",
+    "plugin",
+    "native"
+  ],
+  "capacitor": {
+    "android": {
+      "src": "android"
+    }
+  },
+  "peerDependencies": {
+    "@capacitor/core": ">=8.0.0"
+  }
+}

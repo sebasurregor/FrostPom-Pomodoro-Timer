@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- FrostPom — widget de 2 × 2: el modo, la hora y ▶/⏸. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/fp_card"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/fp_card_dark"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:padding="10dp">
+
+    <TextView
+        android:id="@+id/fp_mode"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:letterSpacing="0.1"
+        android:maxLines="1"
+        android:text="@string/fp_mode_study"
+        android:textColor="#CCDCE6FF"
+        android:textSize="10sp"
+        android:textStyle="bold" />
+
+    <Chronometer
+        android:id="@+id/fp_time"
+        style="@style/FpTime"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:includeFontPadding="false"
+        android:textColor="#FFFFFFFF"
+        android:textSize="32sp" />
+
+    <ImageButton
+        android:id="@+id/fp_toggle"
+        android:layout_width="42dp"
+        android:layout_height="42dp"
+        android:layout_marginTop="6dp"
+        android:background="@drawable/fp_btn_main"
+        android:contentDescription="@string/fp_start"
+        android:padding="10dp"
+        android:scaleType="fitCenter"
+        android:src="@drawable/fp_ic_play" />
+</LinearLayout>

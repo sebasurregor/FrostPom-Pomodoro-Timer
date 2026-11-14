@@ -35,7 +35,7 @@ Google revisa que las direcciones de la ficha (privacidad y borrar cuenta) abran
 5. Espera unos minutos y abre en una ventana InPrivate:
    - https://sebasurregor.github.io/FrostPom-Pomodoro-Timer/eliminar-cuenta.html
    - https://sebasurregor.github.io/FrostPom-Pomodoro-Timer/normas.html
-   - la app: al final de **Ajustes** debe decir **versión 4.4.1** (o la que estés publicando).
+   - la app: al final de **Ajustes** debe decir **versión 4.5.0** (o la que estés publicando).
 
 ✅ **Quedó bien si** las dos páginas abren, y en el ranking tocas **⋯** junto a un nombre y aparecen **Reportar nombre** y **No ver más a esta persona**.
 
@@ -86,7 +86,7 @@ npm run android:abrir
 ```
 
 - `npm install` descarga Capacitor (las versiones exactas que probé: 8.6).
-- `android:crear` copia la app a `www/`, crea la carpeta `android/`, pone los íconos de FrostPom y la versión de `package.json` (hoy 4.4.1, `versionCode 40401`), y conecta todo.
+- `android:crear` copia la app a `www/`, crea la carpeta `android/`, pone los íconos de FrostPom y la versión de `package.json` (hoy 4.5.0, `versionCode 40500`), y conecta todo.
 - `android:abrir` abre el proyecto en Android Studio.
 
 En Android Studio, espera abajo a que termine **Gradle sync** (la primera vez descarga cosas y tarda unos minutos).
@@ -182,7 +182,7 @@ Como tu cuenta personal es nueva, **Google no deja publicar** hasta que **al men
 ## Cada vez que cambies FrostPom
 
 1. Haz el cambio y pruébalo en la web, como siempre.
-2. Sube la versión en los **tres** lugares: `js/config.js` (`version`), `service-worker.js` (`VERSION`) y `package.json` (`version`). Por ejemplo, de 4.4.1 a 4.4.2.
+2. Sube la versión en los **tres** lugares: `js/config.js` (`version`), `service-worker.js` (`VERSION`) y `package.json` (`version`). Por ejemplo, de 4.5.0 a 4.5.1.
 3. Ejecuta:
    ```
    npm run android:actualizar

@@ -308,27 +308,29 @@ export function onStudyStart(st) {
       warnedSession = true;
       toast('Tu sesión en línea se cerró: este pomodoro no sumará en el ranking. Vuelve a entrar en Ajustes → Tu cuenta.', 'warn', { ms: 8000 });
     }
-    return;
+    return Promise.resolve(null);
   }
-  BOARD.startSession(st.sessionStartMs, st.durationSec).then((r) => {
-    if (r.ok || warnedDay === U.dateKey(new Date())) return;
+  // (v4.5) Devuelve el resultado: con { ok, id } el reloj en vivo lleva el número a tus otros aparatos
+  return BOARD.startSession(st.sessionStartMs, st.durationSec).then((r) => {
+    if (r.ok || warnedDay === U.dateKey(new Date())) return r;
     warnedDay = U.dateKey(new Date());
     if (r.kind === 'offline') toast('Sin conexión: este pomodoro no sumará en el ranking global, pero sí en tu progreso.', 'info', { ms: 6000 });
     else if (r.kind === 'rate') toast('Empezaste muchos pomodoros seguidos: este no sumará en el ranking, pero sí en tu progreso.', 'info', { ms: 7000 });
     else toast('No pudimos avisarle al ranking que empezaste: este pomodoro no sumará allí, pero sí en tu progreso.', 'info', { ms: 7000 });
     changed();
-  }).catch(() => {});
+    return r;
+  }).catch(() => null);
 }
 
 /** Se guardó un bloque de estudio. */
 export function onStudyRecorded(rec) {
   if (!BOARD.enabled() || rec.mode !== 'study') return;
-  BOARD.finishSession(rec.sessionStartMs, rec.actualSec, state.progress.xp).then(changed).catch(() => {});
+  BOARD.finishSession(rec.sessionStartMs, rec.actualSec, state.progress.xp, rec.rank || '').then(changed).catch(() => {});
 }
 
-/** Se saltó o reinició el bloque. */
-export function onStudyDropped(startMs) {
-  if (BOARD.enabled()) BOARD.dropSession(startMs);
+/** Se saltó o reinició el bloque. (v4.5) rank = su número del ranking (si lo trajo el reloj en vivo). */
+export function onStudyDropped(startMs, rank = '') {
+  if (BOARD.enabled()) BOARD.dropSession(startMs, rank || '');
 }
 
 // ---------------------------------------------------------------------

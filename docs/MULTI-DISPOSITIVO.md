@@ -1,6 +1,6 @@
 # Fase 4 (v4.5.0): tu cuenta en todos tus aparatos
 
-> **Estado: PLAN para aprobar.** Todavía no hay código de esta fase. Lee las decisiones de la sección 8 y responde antes de que se programe.
+> **Estado: PROGRAMADO en la v4.5.0** (13 de noviembre de 2026), con las 4 decisiones de la sección 8 tal como se recomendaron. Lo que tienes que hacer antes de publicarla está en la sección 9. Las secciones 1 a 8 son el plan original (la sección 1 describe cómo era ANTES de la v4.5).
 
 **La meta (en palabras del autor):** "Si inicio sesión en la versión de App Store o de Google Play, mis datos se sincronizan y puedo manejar mi pomodoro desde el celular, el computador o la tableta".
 
@@ -150,3 +150,28 @@ Ninguna de las dos es necesaria para publicar en Google Play: pueden salir como 
 2. **Si cambiaste el mismo ajuste en dos aparatos, gana el más reciente** (recomendado).
 3. **¿Avisar "Pausado desde otro aparato"?** Recomendado: sí, un aviso corto.
 4. **El reloj en vivo solo existe con cuenta en línea.** Las cuentas solo del aparato (menores de 13) siguen como hoy.
+
+## 9. Cómo quedó (v4.5.0)
+
+**Decisiones aplicadas:** preguntar cada 10 s (sin Realtime); si dos aparatos cambiaron el mismo ajuste, gana el más reciente; aviso corto "Pausado desde otro aparato"; el reloj en vivo solo con cuenta en línea.
+
+**Dónde está el código:**
+- `js/timer-sync.js`: el reloj compartido (horas del servidor), la diferencia de hora de cada aparato, qué hacer con lo que tiene el servidor (`decide`) y quién guarda cada bloque (`claim`).
+- `js/ui/live.js`: cuándo preguntar, los avisos y los bloques guardados sin internet.
+- `js/merge.js`: la mezcla de tres copias. `js/sync.js` la usa al guardar (si otro aparato guardó antes) y al traer el progreso.
+- `js/ui/focus.js`: cada acción de Enfocar se envía; al llegar a cero se pregunta quién lo guarda.
+- `server/supabase/schema.sql`: `private.timers`, `private.timer_claims`, `get_timer`, `set_timer` y `claim_block`.
+
+**Además de lo planeado:**
+- `get_timer` también dice la versión del progreso guardado: si otro aparato guardó algo, este lo trae sin esperar a que vuelvas a abrir la app.
+- Privacidad: en vez de un número fijo por aparato, cada acción lleva un número al azar nuevo (no se puede saber qué aparato es).
+- Si un pomodoro se guardó sin internet en los dos aparatos, la mezcla lo cuenta una vez aunque todavía no se sepa cuál lo guardó primero.
+
+**Lo que tienes que hacer:**
+1. Copia de seguridad de Supabase (`docs/COPIA-DE-SEGURIDAD.md`).
+2. Correr el `server/supabase/schema.sql` de la v4.5 en el editor SQL de Supabase (se puede correr las veces que quieras).
+3. Probar con tu computador y tu celular a la vez: empezar en uno, pausar en el otro, dejar que llegue a cero en los dos (la XP debe subir una sola vez).
+
+**Limitaciones conocidas:**
+- Un aparato que no se está viendo no pregunta: si pausas en el computador con el celular en el bolsillo, el aviso del final del celular puede sonar igual. Al abrirlo, el reloj se corrige.
+- Los premios que se calculan en cada aparato (gemas por subir de rango) pueden sobrar o faltar un poco en una mezcla sin internet.

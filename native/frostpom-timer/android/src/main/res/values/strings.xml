@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- FrostPom (complemento FrostTimer): textos de respaldo en inglés. Los de verdad los manda la app (js/ui/native-ui.js), en el idioma elegido en la app. -->
+<resources>
+    <string name="fp_widget_large">FrostPom timer</string>
+    <string name="fp_widget_small">FrostPom mini</string>
+    <string name="fp_widget_large_desc">Your pomodoro with its buttons, and your buddies by the campfire</string>
+    <string name="fp_widget_small_desc">The time and a button to start or pause</string>
+    <string name="fp_mode_study">Focus session</string>
+    <string name="fp_mode_break">Break</string>
+    <string name="fp_mode_long">Long break</string>
+    <string name="fp_paused">Paused</string>
+    <string name="fp_start">Start</string>
+    <string name="fp_pause">Pause</string>
+    <string name="fp_resume">Resume</string>
+    <string name="fp_skip">Skip</string>
+    <string name="fp_finish">Finish and save</string>
+    <string name="fp_reset">Reset</string>
+    <string name="fp_phrase_study">Time to focus</string>
+    <string name="fp_phrase_study_idle">Ready when you are</string>
+    <string name="fp_phrase_break">Time to rest</string>
+    <string name="fp_phrase_break_idle">Your break is waiting</string>
+    <string name="fp_bubble_study">Studying together!</string>
+    <string name="fp_bubble_break">Break time!</string>
+    <string name="fp_done">Open FrostPom to save your session.</string>
+    <string name="fp_end_study_title">Session complete!</string>
+    <string name="fp_end_study_body">Come back to FrostPom to save your session and earn your XP.</string>
+    <string name="fp_end_break_title">Break over</string>
+    <string name="fp_end_break_body">Start another session whenever you’re ready.</string>
+    <string name="fp_channel_timer">Pomodoro in progress</string>
+    <string name="fp_channel_timer_desc">Your pomodoro countdown, with its buttons.</string>
+    <string name="fp_channel_alert">Pomodoros and reminders</string>
+    <string name="fp_channel_alert_desc">Lets you know when a block ends and at your reminder time.</string>
+</resources>

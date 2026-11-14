@@ -168,6 +168,8 @@ Notas:
 - La **foto de perfil** y la **fecha de nacimiento** no se marcan: nunca salen del teléfono.
 - Las cuentas de **menores de 13** no envían nada; lo de arriba aplica a las cuentas en línea (13+).
 - Los recordatorios y avisos son **notificaciones locales**: no pasan por ningún servidor.
+- (v4.5) El **reloj en vivo** (el estado del pomodoro en curso, compartido entre tus equipos) entra en **Actividad en la app → Interacciones con la app**, que ya está marcado. No se guarda ningún identificador del aparato, así que **no** hay que marcar "ID del dispositivo u otros ID".
+- (v4.6) La notificación en curso y el widget funcionan dentro del teléfono: no envían nada.
 
 ### Eliminación de la cuenta
 

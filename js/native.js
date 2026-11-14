@@ -8,6 +8,9 @@
  *    Si no está, estamos en la web.
  *  - Los complementos (App, LocalNotifications, Haptics, Browser) se cargan con
  *    js/vendor/capacitor-core.js, solo dentro de la app.
+ *  - (v4.6) FrostTimer es el complemento propio de FrostPom (native/frostpom-timer): la
+ *    notificación en curso "como Spotify", el widget y el aviso exacto del final. Si la app
+ *    se compiló sin él, todo sigue como en la v4.5 (aviso del final con LocalNotifications).
  *  - Ningún error de aquí puede romper la app: todo va en try/catch y, si algo falla, la app
  *    sigue como en la web.
  *
@@ -33,11 +36,13 @@ function plugins() {
   if (!isNative()) return Promise.resolve(null);
   if (!loading) {
     loading = import('./vendor/capacitor-core.js')
-      .then(({ registerPlugin }) => ({
+      .then(({ registerPlugin, Capacitor }) => ({
         App: registerPlugin('App'),
         LocalNotifications: registerPlugin('LocalNotifications'),
         Haptics: registerPlugin('Haptics'),
         Browser: registerPlugin('Browser'),
+        // (v4.6) Solo si la app trae el complemento (si no, llamarlo daría "not implemented")
+        FrostTimer: Capacitor && Capacitor.isPluginAvailable && Capacitor.isPluginAvailable('FrostTimer') ? registerPlugin('FrostTimer') : null,
       }))
       .catch(() => null);
   }
@@ -178,6 +183,69 @@ export async function scheduleReminders({ on, time, days, title, body }) {
   }));
   if (!list.length) return false;
   return !!(await quiet(() => p.LocalNotifications.schedule({ notifications: list })));
+}
+
+// ---------------------------------------------------------------------
+// (v4.6) La notificación en curso, el widget y el aviso exacto del final (complemento FrostTimer)
+// ---------------------------------------------------------------------
+// OJO: nunca se devuelve el complemento desde una función async (await lo trataría como una
+// promesa: el "proxy" de Capacitor tiene .then y la espera no termina nunca). Se devuelve el grupo.
+const withTimer = async () => {
+  const p = await plugins();
+  return p && p.FrostTimer ? p : null;
+};
+
+/** ¿La app trae el complemento de la notificación en curso y el widget? */
+export async function hasTimerPlugin() {
+  return !!(await withTimer());
+}
+
+/**
+ * Le cuenta al teléfono cómo está el reloj: la notificación en curso, el widget y el aviso del
+ * final se actualizan solos (aunque después cierres la app). Ver native-ui.js: syncNativeTimer.
+ */
+export async function timerUpdate(info) {
+  const p = await withTimer();
+  if (!p) return false;
+  return !!(await quiet(() => p.FrostTimer.update(info).then(() => true)));
+}
+
+const ACTS = ['start', 'pause', 'resume', 'skip', 'reset', 'finish'];
+/**
+ * Lo que tocaste en la notificación o en el widget (también con la app cerrada), en orden:
+ * [{ act, at, block }]. El teléfono las olvida al entregarlas.
+ */
+export async function takeTimerActions() {
+  const p = await withTimer();
+  if (!p) return [];
+  const r = await quiet(() => p.FrostTimer.getPendingActions());
+  const list = r && Array.isArray(r.actions) ? r.actions : [];
+  return list
+    .filter((a) => a && ACTS.includes(a.act) && Number.isFinite(a.at) && a.at > 0)
+    .map((a) => ({ act: a.act, at: Math.min(a.at, Date.now()), block: typeof a.block === 'string' && /^[A-Za-z0-9-]{8,64}$/.test(a.block) ? a.block : '' }))
+    .sort((a, b) => a.at - b.at)
+    .slice(0, 50);
+}
+
+/** fn() cuando tocas un botón de la notificación o del widget con la app abierta. */
+export async function onTimerActions(fn) {
+  const p = await withTimer();
+  if (!p) return;
+  await quiet(() => p.FrostTimer.addListener('actionsPending', () => fn()));
+}
+
+/** Alarmas exactas ("Alarmas y recordatorios"): 'granted' | 'denied' | 'unavailable'. */
+export async function exactAlarms() {
+  const p = await withTimer();
+  if (!p) return 'unavailable';
+  const r = await quiet(() => p.FrostTimer.canScheduleExactAlarms());
+  return r && typeof r.value === 'boolean' ? (r.value ? 'granted' : 'denied') : 'unavailable';
+}
+
+/** Abre la pantalla de Android donde se da ese permiso a FrostPom. */
+export async function openExactAlarmSettings() {
+  const p = await withTimer();
+  if (p) await quiet(() => p.FrostTimer.openExactAlarmSettings());
 }
 
 /** Solo para las pruebas: olvida los complementos cargados. */
