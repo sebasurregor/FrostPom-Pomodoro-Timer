@@ -5,6 +5,7 @@
 -- v4.5: el reloj en vivo en todos tus aparatos (get_timer, set_timer, claim_block)
 -- v4.5.1: avisos al instante con Realtime, account_status, herramientas para cuentas cruzadas
 --         (account_check, move_name mejorado) y el filtro de nombres más fuerte (review_names)
+-- v4.7.0: Premium pagado en Android (Google Play con RevenueCat): entitlements y get_entitlements
 --
 -- Por qué existe: si el ranking se calculara en el teléfono, cualquiera podría
 -- editar sus minutos. Aquí el SERVIDOR mide el tiempo y decide cuánto cuenta.
@@ -611,6 +612,7 @@ begin
     'sessions', coalesce((select jsonb_agg(to_jsonb(s) - 'user_id' order by s.started_at) from private.study_sessions s where s.user_id = uid), '[]'::jsonb),
     'progress', (select sv.data from private.saves sv where sv.user_id = uid),
     'timer', (select to_jsonb(t) - 'user_id' - 'window_start' - 'window_count' from private.timers t where t.user_id = uid),
+    'premium', (select to_jsonb(e) - 'user_id' - 'synced_at' from private.entitlements e where e.user_id = uid),
     'reports_made', coalesce((select jsonb_agg(jsonb_build_object('username', p.username, 'reason', r.reason, 'created_at', r.created_at) order by r.created_at)
                                 from private.reports r join private.profiles p on p.user_id = r.target_id
                                where r.reporter_id = uid), '[]'::jsonb)
@@ -719,7 +721,8 @@ begin
   delete from private.saves where user_id = uid;
   delete from private.profiles where user_id = uid;
   delete from private.transfer_codes where user_id = uid;
-  delete from auth.users where id = uid;   -- en cascada: el reloj en vivo y sus pomodoros anotados
+  delete from private.billing_events where app_user_id = uid::text;  -- (v4.7.0)
+  delete from auth.users where id = uid;   -- en cascada: el reloj en vivo, sus pomodoros anotados y Premium
 end $$;
 
 -- (v4.5.1) Lo que el servidor sabe de TU cuenta, para que la app explique bien qué pasa cuando
@@ -1088,6 +1091,18 @@ begin
     return query select 'Nombre en el ranking', 'No tiene (su lugar puede estar en una sesión anónima: busca su nombre con private.who_has_name)';
   end if;
   return query select 'Reloj en vivo', coalesce((select 'Último cambio ' || to_char(t.action_at, 'YYYY-MM-DD HH24:MI') from private.timers t where t.user_id = u.id), 'nunca usado');
+  -- (v4.7.0) Premium pagado (si la tabla ya existe)
+  if to_regclass('private.entitlements') is not null then
+    return query select 'Premium (Google Play)', coalesce((select
+        case when e.premium and (e.expires_at is null or e.expires_at > now()) then 'SÍ' else 'no' end
+        || ' · estado ' || e.status || coalesce(' · ' || e.product, '')
+        || coalesce(' · vence ' || to_char(e.expires_at, 'YYYY-MM-DD HH24:MI'), '')
+        || case when e.sandbox then ' · compra de PRUEBA' else '' end
+        || ' · actualizado ' || to_char(e.updated_at, 'YYYY-MM-DD HH24:MI')
+      from private.entitlements e where e.user_id = u.id), 'nunca se suscribió');
+    return query select 'Avisos de RevenueCat', coalesce((select count(*) || ', el último ' || to_char(max(b.received_at), 'YYYY-MM-DD HH24:MI')
+      from private.billing_events b where b.app_user_id = u.id::text having count(*) > 0), 'ninguno');
+  end if;
 end $$;
 
 -- Limpieza: borra cuentas anónimas sin actividad en p_days días (y las que nunca se unieron
@@ -1113,7 +1128,141 @@ begin
   delete from private.reports where created_at < now() - interval '400 days';
   delete from private.timer_claims where claimed_at < now() - interval '3 days';
   delete from private.timers where updated_at < now() - interval '400 days';
+  if to_regclass('private.billing_events') is not null then
+    delete from private.billing_events where received_at < now() - interval '400 days';
+  end if;
   return query select du, ds;
+end $$;
+
+-- ---------------------------------------------------------------------
+-- (v4.7.0) Premium pagado (Google Play, con RevenueCat). Paso a paso: docs/GOOGLE-PLAY-BILLING.md
+--  - El SERVIDOR decide si eres Premium: la app de Android pregunta con get_entitlements(), en vez
+--    de creerle a un dato guardado en el teléfono (que cualquiera podría cambiar).
+--  - Quién escribe aquí: SOLO las Edge Functions (rc-webhook y premium-sync), con la clave secreta
+--    de Supabase (rol service_role). Ellas le preguntan a RevenueCat, que verifica cada compra con
+--    Google. Nadie con sesión (ni anónima ni con correo) puede escribir aquí.
+--  - Datos: solo el estado de la suscripción (activa, prueba gratis, cancelada…), el producto y las
+--    fechas. Nunca la tarjeta, el correo de Google ni el número de pedido.
+--  - Borrar la cuenta en línea borra esta fila (en cascada). La suscripción de Google Play NO se
+--    cancela sola: se cancela en Google Play (la app lo avisa antes de borrar).
+-- ---------------------------------------------------------------------
+create table if not exists private.entitlements (
+  user_id       uuid primary key references auth.users (id) on delete cascade,
+  premium       boolean not null default false,
+  status        text not null default 'none'
+                check (status in ('none', 'trial', 'active', 'cancelled', 'grace', 'on_hold', 'expired', 'refunded')),
+  store         text,                          -- play_store, app_store, promotional…
+  product       text,                          -- frostpom_premium:mensual / frostpom_premium:anual
+  period_type   text,                          -- trial, intro, normal, prepaid
+  expires_at    timestamptz,                   -- null con premium = sin vencimiento (regalo de por vida)
+  will_renew    boolean not null default false,
+  billing_issue boolean not null default false,
+  sandbox       boolean not null default false,  -- compra de prueba (probadores de licencias)
+  updated_at    timestamptz not null default now(),
+  synced_at     timestamptz                    -- última vez que la app pidió revisar (límite de uso)
+);
+
+-- Los avisos de RevenueCat que llegaron (para revisar si algo no llegó). Sin datos personales.
+create table if not exists private.billing_events (
+  event_id    text primary key,
+  app_user_id text not null,
+  type        text not null,
+  environment text,
+  received_at timestamptz not null default now()
+);
+create index if not exists billing_events_user on private.billing_events (app_user_id, received_at desc);
+
+alter table private.entitlements   enable row level security;
+alter table private.billing_events enable row level security;
+revoke all on private.entitlements, private.billing_events from public;
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'anon') then
+    execute 'revoke all on private.entitlements, private.billing_events from anon, authenticated';
+  end if;
+end $$;
+
+-- Tu Premium según el servidor (ninguna fila si nunca te suscribiste). Solo cuentas con correo.
+create or replace function public.get_entitlements()
+returns table (premium boolean, status text, store text, product text, period_type text,
+               expires_at timestamptz, will_renew boolean, billing_issue boolean, sandbox boolean, updated_at timestamptz)
+language plpgsql stable security definer set search_path = '' as $$
+#variable_conflict use_column
+declare
+  uid uuid := private.require_account();
+begin
+  -- Si la fecha ya pasó (y no llegó el aviso), el servidor ya no dice "Premium"
+  return query select
+    e.premium and (e.expires_at is null or e.expires_at > now()),
+    case when e.premium and e.expires_at is not null and e.expires_at <= now() then 'expired' else e.status end,
+    e.store, e.product, e.period_type, e.expires_at, e.will_renew, e.billing_issue, e.sandbox, e.updated_at
+  from private.entitlements e where e.user_id = uid;
+end $$;
+
+-- SOLO para las Edge Functions (service_role): guarda lo que RevenueCat dice de una cuenta.
+-- p_user llega como texto (el "App User ID" de RevenueCat): si no es una cuenta con correo de
+-- FrostPom (por ejemplo, un id anónimo de RevenueCat o un aviso de prueba), no se guarda nada y
+-- devuelve false. p_event = { id, type, environment } del aviso (opcional), para el registro.
+create or replace function public.billing_apply(p_user text, p_state jsonb, p_event jsonb default null)
+returns boolean
+language plpgsql security definer set search_path = '' as $$
+declare
+  uid  uuid;
+  st   text := coalesce(p_state->>'status', 'none');
+  exp  timestamptz;
+begin
+  if p_event is not null and coalesce(p_event->>'id', '') <> '' then
+    insert into private.billing_events (event_id, app_user_id, type, environment)
+    values (left(p_event->>'id', 100), left(coalesce(p_user, ''), 100), left(coalesce(p_event->>'type', '?'), 60), left(p_event->>'environment', 20))
+    on conflict (event_id) do nothing;
+  end if;
+  if coalesce(p_user, '') !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then
+    return false;
+  end if;
+  uid := p_user::uuid;
+  if not exists (select 1 from auth.users u where u.id = uid and not coalesce(u.is_anonymous, false)) then
+    return false;
+  end if;
+  if p_state is null or jsonb_typeof(p_state) <> 'object'
+     or st not in ('none', 'trial', 'active', 'cancelled', 'grace', 'on_hold', 'expired', 'refunded') then
+    raise exception 'billing_invalid' using errcode = '22023';
+  end if;
+  begin
+    exp := nullif(p_state->>'expires_at', '')::timestamptz;
+  exception when others then
+    raise exception 'billing_invalid' using errcode = '22023';
+  end;
+  insert into private.entitlements as e (user_id, premium, status, store, product, period_type, expires_at,
+                                         will_renew, billing_issue, sandbox, updated_at)
+  values (uid, coalesce((p_state->>'premium')::boolean, false), st, left(p_state->>'store', 40),
+          left(p_state->>'product', 100), left(p_state->>'period_type', 20), exp,
+          coalesce((p_state->>'will_renew')::boolean, false), coalesce((p_state->>'billing_issue')::boolean, false),
+          coalesce((p_state->>'sandbox')::boolean, false), now())
+  on conflict (user_id) do update set
+    premium = excluded.premium, status = excluded.status, store = excluded.store, product = excluded.product,
+    period_type = excluded.period_type, expires_at = excluded.expires_at, will_renew = excluded.will_renew,
+    billing_issue = excluded.billing_issue, sandbox = excluded.sandbox, updated_at = now();
+  -- Tus otros aparatos se enteran al instante (Realtime): "revisa tu Premium". Sin datos personales.
+  perform private.notify(uid, jsonb_build_object('k', 'e'));
+  return true;
+end $$;
+
+-- SOLO para premium-sync (service_role): ¿puede esta cuenta pedir revisar su Premium ahora?
+-- Máximo una vez cada 10 segundos por cuenta (así nadie usa la función para molestar a RevenueCat).
+create or replace function public.billing_sync_gate(p_user uuid)
+returns boolean
+language plpgsql security definer set search_path = '' as $$
+declare
+  ok boolean;
+begin
+  if not exists (select 1 from auth.users u where u.id = p_user and not coalesce(u.is_anonymous, false)) then
+    return false;
+  end if;
+  insert into private.entitlements as e (user_id, synced_at) values (p_user, now())
+  on conflict (user_id) do update set synced_at = now()
+   where e.synced_at is null or e.synced_at < now() - interval '10 seconds'
+  returning true into ok;
+  return coalesce(ok, false);
 end $$;
 
 -- ---------------------------------------------------------------------
@@ -1139,6 +1288,9 @@ revoke execute on function public.get_timer() from public;
 revoke execute on function public.set_timer(jsonb, timestamptz, text) from public;
 revoke execute on function public.claim_block(text, text) from public;
 revoke execute on function public.account_status() from public;
+revoke execute on function public.get_entitlements() from public;
+revoke execute on function public.billing_apply(text, jsonb, jsonb) from public;
+revoke execute on function public.billing_sync_gate(uuid) from public;
 
 do $$
 begin
@@ -1155,6 +1307,13 @@ begin
     execute 'grant execute on function public.get_timer(), public.set_timer(jsonb, timestamptz, text), public.claim_block(text, text) to authenticated';
     execute 'revoke execute on function public.account_status() from anon';
     execute 'grant execute on function public.account_status() to authenticated';
+    -- (v4.7.0) Premium: leerlo, cualquiera con sesión; escribirlo, SOLO las Edge Functions
+    execute 'revoke execute on function public.get_entitlements() from anon';
+    execute 'grant execute on function public.get_entitlements() to authenticated';
+    execute 'revoke execute on function public.billing_apply(text, jsonb, jsonb), public.billing_sync_gate(uuid) from anon, authenticated';
+  end if;
+  if exists (select 1 from pg_roles where rolname = 'service_role') then
+    execute 'grant execute on function public.billing_apply(text, jsonb, jsonb), public.billing_sync_gate(uuid) to service_role';
   end if;
 end $$;
 

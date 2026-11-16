@@ -14,7 +14,7 @@ import { penguin } from './companions.js';
 import { countryPicker } from './widgets.js';
 import { chooseAndLoad, photoCropper } from './photo.js';
 import { pic } from './pics.js';
-import { skipPaywallToday } from './premium.js';
+import { skipPaywallToday, hasPlaySubscription } from './premium.js';
 import * as BOARD from '../board.js';
 import { birthField, applyRename, adoptEmailSession, deleteBoardOnAccountDelete, errorText as boardErrorText } from './board-ui.js';
 import * as SYNC from '../sync.js';
@@ -161,6 +161,12 @@ function accountFields({ withPassword = true, withEmail = false, withBirth = fal
     return r;
   }
   name.addEventListener('input', check);
+  // (v4.5.2) Al escribir el correo de una cuenta en línea (13 años o más), se prepara la creación de la
+  // cuenta (la conexión y el token de Cloudflare): "Creando tu cuenta…" ya no espera a Cloudflare.
+  // Para menores de 13 no se prepara nada: sus cuentas nunca salen del equipo.
+  if (showEmail && SYNC.enabled() && birth) {
+    CLOUD.warmOnInput([email], 1, () => { const born = birth.value(); return !!born && BOARD.oldEnough(born) && email.value.includes('@'); });
+  }
   const nodes = [
     h('label', { class: 'pin-label', for: 'accUser', text: 'Nombre de usuario' }),
     h('p', { class: 'acc-hint acc-hint--privacy', id: 'accPrivacy', text: 'Usa un nombre que no revele quién eres.' }),
@@ -253,6 +259,7 @@ export async function loginGate() {
       {
         label: 'Entrar', value: 'ok', variant: 'btn--gold', primary: true,
         validate: async () => {
+          err.textContent = tr('Comprobando…'); // (v4.5.2) en el celular, revisar la contraseña tarda un momento
           const v = await verifyWithGuard(pass.value, { username: user.value, wrong: 'Nombre o contraseña incorrectos.' });
           if (v.ok) return true;
           pass.value = '';
@@ -418,6 +425,8 @@ export async function deleteAccountFlow() {
     title: hasAccount ? '¿Eliminar tu cuenta?' : '¿Borrar los datos de este dispositivo?',
     body: [
       h('p', { class: 'dlg__text', text: 'Se borran para siempre tu cuenta, tu rango, tus temporadas, tu calendario, tus logros y tus ajustes. No se puede deshacer.' }),
+      // (v4.7.0) Borrar la cuenta no cancela la suscripción de Google Play (eso solo lo puede hacer Google Play)
+      hasPlaySubscription() ? h('p', { class: 'dlg__text premium__warn', id: 'delPlayWarn', text: 'Tienes una suscripción de Google Play: eliminar tu cuenta NO la cancela. Cancélala primero en Google Play → Suscripciones.' }) : null,
       hasAccount ? [h('label', { class: 'pin-label', for: 'delPass', text: 'Escribe tu contraseña para confirmar' }), pass] : null,
       err,
     ],
@@ -672,7 +681,7 @@ async function forgotPasswordFlow() {
         },
       },
     ],
-    onOpen: () => mail.focus(),
+    onOpen: () => { mail.focus(); CLOUD.warmOnInput([mail], acc.emailLinked ? 1 : 2); }, // (v4.5.2)
   });
   if (step1 !== 'ok') return false;
   if (!acc.emailLinked) mutate((s) => { s.account.emailLinked = true; });

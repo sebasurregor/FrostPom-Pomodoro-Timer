@@ -1,5 +1,149 @@
 # Cambios de la v2 a la v3
 
+## v4.7.0: Premium con Google Play (RevenueCat), con tus decisiones
+
+**Antes de publicar:**
+
+- Vuelve a pegar tu clave del sitio de Turnstile en `js/config.js`.
+- Haz `npm install`: llega el complemento `@revenuecat/purchases-capacitor` 14.1.0.
+- **Hay cambios de servidor:** copia de seguridad y después corre el `schema.sql` nuevo (solo agrega tablas y funciones). Las Edge Functions se despliegan cuando configures el cobro.
+- El cobro viene **apagado** (`config.premium.play.enabled = false`). Para encenderlo sigue `docs/GOOGLE-PLAY-BILLING.md`, sección 5 (son dos subidas a Google Play: la 4.7.0 con el cobro apagado y la 4.7.1 con el cobro encendido).
+
+**Tus decisiones (16 nov 2026):** RevenueCat; US$ 2,99 al mes y US$ 19,99 al año; 7 días gratis; primero solo Android.
+
+### Qué hay
+
+- **La ventana de Premium en Android** (con el cobro encendido):
+  - los dos planes con el precio de Google y "Ahorra 44 %" en el anual;
+  - "Empezar 7 días gratis" (o "Suscribirme, …" si ya tuvo la prueba);
+  - las condiciones claras (renovación automática, cómo cancelar, que cancelando en la prueba no se cobra);
+  - "Restaurar compras".
+- **Ya eres Premium:** el estado de tu suscripción (prueba gratis, se renueva, cancelada, problema de pago) y "Administrar suscripción", que abre Google Play.
+- **Avisos:** período de gracia (Premium sigue, revisa el pago), en espera (sin Premium hasta arreglar el pago), "Tu Premium terminó" (lo ganado sigue siendo tuyo).
+- **Solo cuentas en línea (13+)** pueden suscribirse. Sin cuenta en línea, la ventana pide conectarla; los menores de 13 no ven la oferta.
+- **Quien usaba la prueba gratis** en Android ve una vez "La prueba gratis de Premium terminó". Con eso se cierra el hueco de la v4.5.3 (quitar el anuncio del descanso gratis).
+- **Eliminar la cuenta** avisa que la suscripción de Google Play no se cancela sola.
+
+### Servidor
+
+- `private.entitlements` (el estado de la suscripción, sin datos de pago) y `private.billing_events` (los avisos de RevenueCat que llegaron).
+- `get_entitlements()` para la app. `billing_apply()` y `billing_sync_gate()` solo para las Edge Functions (`service_role`).
+- `export_my_data()` incluye Premium; `delete_my_cloud_account()` lo borra; `account_check()` lo muestra; `cleanup()` borra los avisos viejos.
+- **Edge Functions:** `rc-webhook` (aviso de RevenueCat, con clave; nunca le cree al aviso, le pregunta a RevenueCat) y `premium-sync` (la app pide revisar su propia cuenta). Listas para pegar en el panel: `server/supabase/functions/pegar-en-supabase/` (las arma `npm run edge:pegar`).
+
+### Para quien programa
+
+- `js/play-billing.js`: el complemento de RevenueCat (`NATIVE.purchases()` devuelve `{ api }`, como AdMob) y la lógica pura (estados, precios, prueba gratis, errores), con pruebas.
+- `C.setPremiumGate(fn)`: en Android con cobro, `isPremium` lo decide la copia de lo que dijo el servidor (`st2_play`, de este aparato) y no `premium.active` (el de la prueba gratis, que viaja con el progreso).
+- `E.premiumGift(state)`: el regalo de bienvenida sin tocar `premium.active`.
+- `CLOUD.callFunction(name, token)`: llamar una Edge Function con la sesión.
+- Realtime: el aviso `{ k: 'e' }` hace que tus otros aparatos pregunten por Premium.
+- `tools/app-android.mjs` se detiene si `revenueCatKey` es una clave secreta (`sk_…`).
+- Pruebas nuevas: `tests/billing-server.test.js` (7), `tests/billing-app.test.js` (8), `tests/e2e_play.py` (42) y 9 bloques SQL en `tests.sql`.
+
+## v4.5.3: anuncios de AdMob (con tus decisiones)
+
+**Antes de publicar:**
+
+- Vuelve a pegar tu clave del sitio de Turnstile en `js/config.js`.
+- Haz `npm install`: llega el complemento de anuncios.
+- No hay cambios de servidor.
+- Los anuncios vienen **apagados** (`config.ads.enabled = false`). Para encenderlos sigue `docs/ANUNCIOS.md`, sección 5 (cuenta de AdMob, ID, mensaje de consentimiento, app-ads.txt y Play Console).
+
+**Tus decisiones (16 nov 2026):**
+
+- 3 anuncios para revivir la mascota.
+- +10 gemas por anuncio, hasta 5 al día.
+- Pantalla completa cada 4 pomodoros o 90 minutos de estudio, lo que llegue primero (los minutos cuentan el estudio, no el reloj; los contadores empiezan de cero cada día).
+- Premium puede ganar gemas con anuncios, pero nunca ve el de pantalla completa.
+- La mascota **no** se muere más rápido.
+
+### Qué hay
+
+- **Tienda:** "Ver un anuncio: +10 gemas", con "Quedan N hoy". El premio llega solo si el anuncio se ve completo.
+- **Mascota muerta:** "Revivir con anuncios (0 de 3)", además de "Revivir por 30 gemas". El avance se guarda.
+- **Racha apagada:** "Ver anuncios y revivirla (0 de 2)": 1 anuncio por cada día que faltó.
+- **Descanso:** el anuncio de pantalla completa. Se carga al empezar el pomodoro que lo va a tener. El descanso empieza **cuando lo cierras**.
+  - **Nunca sale:** durante el estudio, al abrir la app, con la app en segundo plano ni con Premium.
+- **Ajustes → Acerca de → "Opciones de privacidad de los anuncios"**: solo donde Google lo pide (por ejemplo, en Europa).
+
+### Quién los ve
+
+- **Solo en la app de Android y solo desde los 13 años.** Menores de 13 y edad desconocida: la app **nunca** inicia AdMob.
+- **Menores de 18**, o una cuenta en línea sin la fecha en ese teléfono: anuncios no personalizados y con contenido "con guía de los padres".
+- **La web y Microsoft Store** no tienen anuncios.
+
+### Para quien programa
+
+- `js/ad-rules.js` (las reglas, con 5 pruebas de lógica), `js/ads.js` (el complemento `@capacitor-community/admob` 8.4.0) y `js/ui/ads-ui.js`.
+- `E.adGems`; `E.revivePet(s, now, { via: 'ad' })`.
+- `NATIVE.adMob()` devuelve `{ api }`. El complemento de Capacitor responde también a `then`, así que devolverlo solo desde una función async dejaba la app esperando para siempre.
+- `tools/app-android.mjs` pone el ID de la app de AdMob en `AndroidManifest.xml` (el de prueba si está vacío).
+- `openDialog`: `validate(btn)` recibe el botón (para "1 de 2").
+- **Privacidad:** `privacidad.html` (ES/EN) explica los anuncios. `docs/google-play/FICHA.md` tiene lo nuevo de "Seguridad de los datos" y del ID de publicidad.
+- **Pruebas nuevas:** `tests/e2e_anuncios.py`, con Capacitor, AdMob y Supabase simulados.
+
+## v4.5.2: entrar más rápido, la racha se ve y el plan de anuncios
+
+**Antes de publicar:** vuelve a pegar tu clave del sitio de Turnstile en `js/config.js`. Esta versión **no** cambia el servidor: no hay que correr `schema.sql`.
+
+### Entrar es más rápido
+
+- **"Conectando…" ya no espera a Cloudflare.** Antes, al tocar "Entrar", la app recién ahí cargaba Turnstile y esperaba su token, que en Android puede tardar varios segundos. Ahora lo pide **mientras escribes** el correo o la contraseña (`js/captcha.js`). Al tocar "Entrar" ya está listo, y solo se espera a Supabase.
+  - Pasa en: Inicia sesión, Crear cuenta (al escribir el correo), Conectar, Volver a entrar y ¿Olvidaste la contraseña?.
+  - **Menores de 13: nunca.** Escribir un correo en su registro no carga nada de Cloudflare.
+  - Cada token sigue sirviendo una sola vez. Si pasan más de 4,5 minutos, se pide otro solo.
+- **También se abre de antemano la conexión con Supabase** (sin enviar nada).
+- **Si Cloudflare no responde**, la app sigue a los 30 s (antes, 90 s). Si muestra la casilla, espera a que la toques.
+- **Cuánto tardó cada parte** sale en la consola: `[FrostPom] /token: CAPTCHA 3 ms, servidor 640 ms`. En el celular se ve con `chrome://inspect`.
+- **Después de entrar dice "Trayendo tu progreso…"**, para que se note que avanza.
+
+### Los avisos de las ventanas: verde mientras avanza, rojo si falla
+
+- **"Conectando…", "Creando tu cuenta…", "Enviando…", "Comprobando…" y "Guardando…"** se ven en **verde y con una ruedita**. Los errores siguen en rojo.
+- **Los lectores de pantalla** leen el avance sin interrumpir. Los errores siguen siendo alertas.
+- **"¡Hola de nuevo!"** dice "Comprobando…" mientras revisa la contraseña.
+
+### La racha se ve
+
+- **El primer día de una racha** sale una vista con el **fuego encendiéndose** y **"+1 día de racha"**.
+- **A los 5, 10, 20, 50, 100, 200 y 365 días**, la vista sale con el fuego **cada vez más grande**: más llamas, más chispas y, desde los 100 días, dorado.
+- **Los demás días** sale un aviso corto.
+- **La llama** es el dibujo de la fogata de la entrada: es vectorial y se ve nítida aunque crezca.
+- **Si la racha se apagó ayer** (faltaron 1 o 2 días y era de 2 días o más), al abrir la app sale **tu compañero llorando junto al fuego congelado**. Se puede **revivir por 100 gemas por cada día que faltó**. Los días que faltaron quedan "congelados":
+  - cuentan para la racha;
+  - no cuentan como días estudiados;
+  - en el calendario llevan el fuego congelado.
+- **La vista sale una sola vez.** Después, la opción sigue en Progreso, en la tarjeta de la racha.
+- **El botón "Ver un anuncio y revivirla"** ya está programado y aparece cuando se enciendan los anuncios.
+- **Sin estudiar hoy**, el fuego del HUD y de la tarjeta de la racha se ve **congelado** (el dibujo que enviaste). Antes se veía en gris.
+
+### Otros arreglos
+
+- **Crear cuenta en el celular:** el 🌐 ya no queda pegado a "Busca tu país…". Una regla del celular le quitaba el espacio.
+- **Calendario:** el día que cumpliste la meta del polo usa **"congelada"** (el dibujo que enviaste) en vez del copo.
+- **Calendario, tema oscuro:** el número de hoy (sin estudio) ya no se pierde sobre el círculo claro.
+
+### Anuncios: plan para aprobar
+
+- **`docs/ANUNCIOS.md`** tiene el plan completo:
+  - quién los ve: nunca los menores de 13;
+  - qué formato va en cada lugar;
+  - las reglas de Google Play para apps con niños;
+  - AdMob y lo que cambia en Play Console;
+  - las 5 decisiones que te tocan.
+- **`js/ads.js`** existe, pero está apagado. No carga nada.
+
+### Para quien programa
+
+- `G.isStreakDay` (estudiado o congelado), `G.lostStreak`, `G.streakTier`, `G.STREAK_MILESTONES`, `E.reviveStreak` y el evento `streak` en `applyStudy`. `emptyDay()` tiene `frozen`.
+- **Cuidado al mezclar versiones:** una versión vieja descarta `frozen`. Si una racha se revive en la v4.5.2 y otro aparato con la v4.5.1 guarda encima, ese día puede perder lo de congelado.
+- `CAPTCHA.warm(n)`, `CLOUD.warmAuth(n)`, `CLOUD.warmOnInput(campos, n, permitido)` y `CLOUD.preconnect()`.
+- Pruebas nuevas:
+  - `tests/e2e_racha.py`;
+  - sección F de `tests/e2e_captcha.py` (el token listo de antemano y el verde);
+  - 5 pruebas de lógica.
+
 ## v4.5.1: arreglos de la prueba cerrada (cuentas, ranking, reloj en vivo y nombres)
 
 Arreglos de lo que reportaron los usuarios de la prueba cerrada de Google Play. El diagnóstico completo y las consultas para revisar casos están en `docs/DIAGNOSTICO-CUENTAS.md`.

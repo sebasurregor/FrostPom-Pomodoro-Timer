@@ -15,12 +15,14 @@ import { config } from '../config.js';
 import { seasonFor, daysLeft } from '../season.js';
 import { renderActivity } from './activity.js';
 import { pic } from './pics.js';
+import { lostNow, lostStreakDialog } from './streak.js';
 import { t, tr } from '../i18n.js';
 
 function renderShowcase() {
   const r = G.rankForXp(state.progress.xp);
   const streak = G.computeStreak(state.daily, today());
   const best = Math.max(state.progress.bestStreak, streak.current);
+  const lost = lostNow();
   const pct = Math.round(r.progress * 100);
   const season = seasonFor(new Date(), config.season.months);
   const left = daysLeft(season, today());
@@ -38,11 +40,16 @@ function renderShowcase() {
       h('div', { class: 'hero__emblem' }, emblem(r, { size: 132, snow: true }))),
     // Tarjeta blanca de la racha
     h('div', { class: `streak-card${streak.activeToday ? ' is-hot' : ''}` },
-      h('span', { class: 'streak-card__icon' }, pic('fuego', 44)),
+      // (v4.5.2) Sin estudiar hoy, el fuego se ve congelado (antes, en gris)
+      h('span', { class: 'streak-card__icon' }, pic(streak.activeToday ? 'fuego' : 'fuego-congelado', 44)),
       h('div', { class: 'streak-card__body' },
         h('p', { class: 'streak-card__n', text: U.plural(streak.current, 'día seguido', 'días seguidos') }),
-        h('p', { class: 'streak-card__sub', text: streak.activeToday ? t('Hoy ya cuenta. Mejor racha: {n}.', { n: best }) : 'Estudia 10 minutos hoy para mantenerla.' }),
-        streak.activeToday ? null : h('button', { type: 'button', class: 'link-btn streak-card__go', onclick: goStudy }, 'Estudiar ahora'))),
+        // (v4.5.2) Si se apagó ayer, todavía se puede revivir (js/ui/streak.js)
+        lost
+          ? h('p', { class: 'streak-card__sub', text: t('Tu racha de {n} días se apagó. Todavía puedes revivirla.', { n: lost.length }) })
+          : h('p', { class: 'streak-card__sub', text: streak.activeToday ? t('Hoy ya cuenta. Mejor racha: {n}.', { n: best }) : 'Estudia 10 minutos hoy para mantenerla.' }),
+        lost ? h('button', { type: 'button', class: 'link-btn streak-card__go', id: 'streakRevive', onclick: () => lostStreakDialog() }, 'Revivir mi racha')
+          : streak.activeToday ? null : h('button', { type: 'button', class: 'link-btn streak-card__go', onclick: goStudy }, 'Estudiar ahora'))),
     h('details', { class: 'ladder' },
       h('summary', { text: 'Ver todos los rangos' }),
       h('ol', { class: 'ladder__list' }, G.rankLadder().map((step) => {

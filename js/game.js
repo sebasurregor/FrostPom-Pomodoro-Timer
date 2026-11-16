@@ -138,31 +138,84 @@ export function previewStudyReward(state, durationSec, todayKey) {
 // =========================================================
 // Rachas
 // =========================================================
+/** ¿Ese día estudiaste lo suficiente (10 min)? */
 export function isActiveDay(daily, key) {
   const d = daily && daily[key];
   return !!d && d.studySec >= RULES.activeDaySec;
 }
+/**
+ * (v4.5.2) ¿Ese día cuenta para la racha? Si estudiaste, o si revivías la racha y ese día quedó
+ * "congelado" (daily[día].frozen). Los logros de días estudiados siguen usando isActiveDay.
+ */
+export function isStreakDay(daily, key) {
+  const d = daily && daily[key];
+  return !!d && (d.studySec >= RULES.activeDaySec || d.frozen > 0);
+}
+/** Días seguidos que cuentan, hacia atrás desde `key` (incluido). */
+function runBack(daily, key) {
+  let n = 0;
+  while (n < 4000 && isStreakDay(daily, key)) {
+    n++;
+    key = U.shiftKey(key, -1);
+  }
+  return n;
+}
 export function computeStreak(daily, todayKey) {
   const activeToday = isActiveDay(daily, todayKey);
-  let cursor = activeToday ? todayKey : U.shiftKey(todayKey, -1);
-  let current = 0;
-  while (current < 4000 && isActiveDay(daily, cursor)) {
-    current++;
-    cursor = U.shiftKey(cursor, -1);
-  }
-  return { current, activeToday };
+  return { current: runBack(daily, activeToday ? todayKey : U.shiftKey(todayKey, -1)), activeToday };
 }
 /** Racha que venía hasta ayer (0 si ayer no estudiaste). */
 export function streakBefore(daily, dayKey) {
-  const yesterday = U.shiftKey(dayKey, -1);
-  return isActiveDay(daily, yesterday) ? computeStreak(daily, yesterday).current : 0;
+  return runBack(daily, U.shiftKey(dayKey, -1));
+}
+
+/** (v4.5.2) Rachas que se celebran en grande: el fuego crece en cada una. */
+export const STREAK_MILESTONES = Object.freeze([5, 10, 20, 50, 100, 200, 365]);
+/** Qué tan grande es el fuego (0 = recién encendido … 7 = 365 días o más). */
+export function streakTier(days) {
+  let tier = 0;
+  for (const m of STREAK_MILESTONES) if (days >= m) tier++;
+  return tier;
+}
+
+/**
+ * (v4.5.2) Revivir la racha: si se apagó AYER (faltaron 1 o 2 días) y era de 2 días o más, se puede
+ * volver a encender pagando gemas (o, cuando haya anuncios, viendo uno: docs/ANUNCIOS.md). Los días
+ * que faltaron quedan "congelados": cuentan para la racha, pero no como días estudiados.
+ */
+export const STREAK_REVIVE = Object.freeze({ maxMissed: 2, gemsPerDay: 100, minLength: 2 });
+/**
+ * La racha que se apagó y todavía se puede revivir, o null. Devuelve { length (los días que tenía),
+ * missed (días que faltaron, del más viejo al más nuevo), gems (lo que cuesta), restored (la racha
+ * que quedaría) }.
+ */
+export function lostStreak(daily, todayKey) {
+  const now = computeStreak(daily, todayKey);
+  // Sigue viva (aunque falte estudiar hoy), o ya volvió a empezar hace más de un día
+  if (now.current > (now.activeToday ? 1 : 0)) return null;
+  const missed = [];
+  let k = U.shiftKey(todayKey, -1);
+  while (missed.length <= STREAK_REVIVE.maxMissed && !isStreakDay(daily, k)) {
+    missed.push(k);
+    k = U.shiftKey(k, -1);
+  }
+  if (!missed.length || missed.length > STREAK_REVIVE.maxMissed) return null;
+  const length = runBack(daily, k);
+  if (length < STREAK_REVIVE.minLength) return null;
+  return {
+    length,
+    missed: missed.reverse(),
+    gems: missed.length * STREAK_REVIVE.gemsPerDay,
+    restored: length + missed.length + (now.activeToday ? 1 : 0),
+  };
 }
 
 // =========================================================
 // Día vacío (estructura de estadísticas diarias)
 // =========================================================
 export function emptyDay() {
-  return { studySec: 0, creditedSec: 0, sessions: 0, partials: 0, breaks: 0, xp: 0, noPauseSessions: 0 };
+  // frozen (v4.5.2): 1 si ese día no estudiaste pero reviviste la racha (cuenta para la racha)
+  return { studySec: 0, creditedSec: 0, sessions: 0, partials: 0, breaks: 0, xp: 0, noPauseSessions: 0, frozen: 0 };
 }
 
 // =========================================================

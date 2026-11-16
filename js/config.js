@@ -4,7 +4,7 @@
  * teléfono o al navegador lo puede leer cualquiera. Ver docs/SEGURIDAD.md.
  */
 export const config = Object.freeze({
-  version: '4.5.1',
+  version: '4.7.0',
   // Dirección pública de la app. La app de Android abre aquí las normas, la privacidad y la
   // página para eliminar la cuenta (en el navegador del teléfono). Ver js/native.js.
   publicUrl: 'https://sebasurregor.github.io/FrostPom-Pomodoro-Timer/',
@@ -29,6 +29,25 @@ export const config = Object.freeze({
     // La clave SECRETA va solo en Supabase. Orden: primero esta clave y publicar; después
     // encenderlo en Supabase. Paso a paso: docs/CAPTCHA.md
     siteKey: '0x4AAAAAAF6Reo5ZUf_d9-AG',
+  }),
+  ads: Object.freeze({
+    // (v4.5.3) Anuncios de Google AdMob: SOLO en la app de Android y SOLO para mayores de 13
+    // (nunca para menores de 13 ni para edad desconocida). Decisiones y paso a paso: docs/ANUNCIOS.md
+    // false = apagado: la app no inicia AdMob ni muestra nada. Enciéndelo cuando tu cuenta de AdMob
+    // esté lista y hayas puesto los ID de abajo.
+    enabled: false,
+    // true = anuncios de PRUEBA de Google (para probar en tu celular sin riesgo; nunca toques los
+    // de verdad). Ponlo en false solo para publicar, con los ID de verdad.
+    testing: true,
+    // Los ID de AdMob (son públicos, no secretos). El de la app lleva "~"; las unidades, "/".
+    appId: '', // ca-app-pub-XXXXXXXXXXXXXXXX~YYYYYYYYYY (tools/app-android.mjs lo pone en Android)
+    rewardedId: '', // unidad de tipo "Recompensa" (ganar gemas, revivir la mascota o la racha)
+    interstitialId: '', // unidad de tipo "Intersticial" (al empezar el descanso)
+    gemsPerAd: 10, // gemas por anuncio
+    gemAdsPerDay: 5, // anuncios para ganar gemas, por día
+    petReviveAds: 3, // anuncios para revivir a la mascota
+    everyPomodoros: 4, // pantalla completa cada 4 pomodoros…
+    everyStudyMin: 90, // …o cada 90 minutos de estudio (lo que llegue primero)
   }),
   leaderboard: Object.freeze({
     // 'local'  = solo tu marca en este dispositivo y el aviso "llega pronto".
@@ -60,5 +79,15 @@ export const config = Object.freeze({
     // Enlace de FrostPom en Microsoft Store (Partner Center → Product identity → URL de la Store).
     // Se ofrece a quien abre la app en el navegador, donde no se puede comprar.
     storeUrl: '',
+    // (v4.7.0) Cobro en la app de ANDROID con Google Play (con RevenueCat). Decisiones y paso a paso:
+    // docs/GOOGLE-PLAY-BILLING.md. Mientras enabled sea false, en Android Premium sigue en modo prueba.
+    play: Object.freeze({
+      enabled: false,
+      // La clave PÚBLICA de RevenueCat para Android (empieza por goog_…). Puede ir en GitHub.
+      // La clave SECRETA de RevenueCat (sk_…) NUNCA va aquí: va solo en los secretos de Supabase.
+      revenueCatKey: '',
+      entitlement: 'premium', // el "entitlement" de RevenueCat
+      offering: '', // '' = la oferta marcada como "current" en RevenueCat (la "default")
+    }),
   }),
 });

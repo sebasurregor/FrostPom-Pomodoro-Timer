@@ -125,6 +125,7 @@ Preguntar cada 10 s es simple, funciona igual en la web, en Windows y en Android
   - **Google Play y App Store:** el servidor, al verificar cada compra (fase 6).
   - **Microsoft Store:** hoy la compra se revisa solo en el equipo (Digital Goods API). Para que valga en Android o iPhone hay que verificarla en el servidor con la API de colecciones de Microsoft Store, que pide una aplicación en Azure AD. Queda como fase 6b.
 - **Modo prueba:** mientras no haya cobro, sigue igual que hoy (local y gratis).
+- **(v4.7.0) Hecho para Google Play:** `private.entitlements` y `get_entitlements()` ya existen, y las llenan las Edge Functions `rc-webhook` y `premium-sync` con RevenueCat. Ver `docs/GOOGLE-PLAY-BILLING.md`.
 
 ## 6. Lo que tienes que hacer tú
 

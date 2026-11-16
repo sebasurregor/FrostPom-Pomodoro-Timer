@@ -17,6 +17,7 @@ import { state, mutate } from './context.js';
 import { setEating, EATING_MS, buddySays } from './focus.js';
 import { pic } from './pics.js';
 import { t, tr } from '../i18n.js';
+import { renderTrayAds } from './ads-ui.js';
 
 const tray = () => $('#foodTray');
 export const trayOpen = () => !tray().hidden;
@@ -132,6 +133,7 @@ export function renderTray() {
   // Se murió: la tumba y el botón para revivirlo (la comida no se muestra)
   $('#trayRevive').hidden = !st.dead;
   $('#trayFoods').hidden = st.dead;
+  renderTrayAds(st); // (v4.5.3) "+10 gemas" y "revivir con anuncios" (solo en Android, 13+)
   if (st.dead) {
     const missing = P.REVIVE_COST - state.progress.gems;
     $('#trayHint').textContent = `${m.emoji} ${t('{pet} se murió porque pasó 3 días sin comer.', { pet: capital(label) })}`;

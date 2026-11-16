@@ -53,7 +53,8 @@ FAKE_TS = r"""
         b.addEventListener('click', () => o.callback('tok-' + id + '-' + Date.now()));
         el.appendChild(b); return id;
       }
-      setTimeout(() => o.callback('tok-' + id + '-' + Math.random().toString(36).slice(2)), 30);
+      // (v4.5.2) __tsDelay: Cloudflare lento (en Android tarda varios segundos)
+      setTimeout(() => o.callback('tok-' + id + '-' + Math.random().toString(36).slice(2)), Number(localStorage.getItem('__tsDelay')) || 30);
       return id;
     },
     remove(id) { window.__ts.removed++; window.__ts.gone.push(id); }, reset() {}, execute() {},
@@ -222,6 +223,54 @@ with sync_playwright() as p:
             check(any('110200' in w for w in warns), 'la consola dice el código de Cloudflare (aquí 110200) para saber qué pasó')
             check(pg.evaluate('window.__ts.last.retry') == 'never', 'la app le pide a Turnstile no reintentar solo (ella maneja el error)')
         ctx.close()
+    # ---------- F. (v4.5.2) El token se pide MIENTRAS escribes ----------
+    import time
+    fake = FakeSupabase()
+    fake.require_captcha = True
+    ctx, pg, errs, loads = device(browser, fake)
+    pg.goto(URL); pg.wait_for_timeout(900)
+    # Menor de 13 que escribe un correo: no se prepara nada (nada de Cloudflare)
+    pg.fill('#accUser', 'peque_correo'); pg.fill('#accPass1', 'Pingu2026'); pg.fill('#accPass2', 'Pingu2026')
+    pg.select_option('#accBirthM', '03'); pg.select_option('#accBirthY', '2017')
+    pg.fill('#accEmail', 'peque@example.com'); pg.wait_for_timeout(600)
+    check(not loads, 'menor de 13: escribir un correo NO carga Cloudflare (solo se prepara para cuentas en línea)')
+    # Con 13 o más: al escribir el correo ya se pide el token (Cloudflare lento: 1,5 s)
+    pg.evaluate("localStorage.setItem('__tsDelay', '1500')")
+    pg.select_option('#accBirthY', '2000'); pg.fill('#accEmail', 'rapido@example.com')
+    pg.wait_for_timeout(2000)
+    check(loads and pg.evaluate("import('./js/captcha.js').then(m => m.ready())") == 1, 'con 13 o más, al escribir el correo el token queda listo antes de tocar «Crear cuenta»')
+    t0 = time.time(); n = len(fake.guarded_at)
+    pg.click("#dlg button:has-text('Crear cuenta')"); pg.wait_for_timeout(1500)
+    skip_photo(pg)
+    check(fake.uid_of('rapido@example.com') and len(fake.guarded_at) > n and fake.guarded_at[n] - t0 < 0.9,
+          f'crear la cuenta ya no espera a Cloudflare (llegó al servidor en {round((fake.guarded_at[n] - t0) * 1000) if len(fake.guarded_at) > n else "?"} ms, Cloudflare tarda 1500)')
+    close_dialogs(pg)
+    # Cerrar sesión: en "Inicia sesión", la contraseña mal escrita y tocar enseguida → "Conectando…" en verde
+    pg.goto(URL + '#/ajustes'); pg.wait_for_timeout(600)
+    pg.click('#accLogoutBtn'); pg.wait_for_timeout(300)
+    pg.click("#dlg .dlg__actions button:has-text('Cerrar sesión')"); pg.wait_for_timeout(2000)
+    pg.fill('#signPass', 'Equivocada1'); pg.click("#dlg button:has-text('Entrar')"); pg.wait_for_timeout(400)
+    st1 = pg.evaluate("(() => { const e = document.querySelector('#dlg .form-error'); return { text: e.textContent, cls: e.className, color: getComputedStyle(e).color, role: e.getAttribute('role') }; })()")
+    check('Conectando' in st1['text'] and 'is-progress' in st1['cls'] and st1['color'] == 'rgb(17, 112, 63)' and st1['role'] == 'status',
+          f'«Conectando…» se ve en verde, con ruedita y sin interrumpir al lector de pantalla ({st1["color"]})')
+    pg.screenshot(path='/tmp/claude-0/gs/vis/conectando-verde.png')
+    pg.wait_for_timeout(2000)
+    st2 = pg.evaluate("(() => { const e = document.querySelector('#dlg .form-error'); return { text: e.textContent, cls: e.className, color: getComputedStyle(e).color, role: e.getAttribute('role') }; })()")
+    check('no coinciden' in st2['text'] and 'is-progress' not in st2['cls'] and st2['color'] == 'rgb(196, 23, 63)' and st2['role'] == 'alert',
+          f'el error sigue en rojo (y como alerta): "{st2["text"][:40]}"')
+    # Ahora bien escrita: mientras escribe se pide el token; al tocar "Entrar" ya está
+    pg.fill('#signPass', 'Pingu2026'); pg.wait_for_timeout(2200)
+    check(pg.evaluate("import('./js/captcha.js').then(m => m.ready())") == 1, 'en «Inicia sesión», el token queda listo mientras escribes la contraseña')
+    t0 = time.time(); n = len(fake.guarded_at)
+    pg.click("#dlg button:has-text('Entrar')"); pg.wait_for_timeout(1800)
+    st = pg.evaluate("JSON.parse(localStorage.getItem('st2_state'))")
+    check(st and st['account'] and st['account'].get('online') and len(fake.guarded_at) > n and fake.guarded_at[n] - t0 < 0.9,
+          f'entrar ya no espera a Cloudflare (llegó al servidor en {round((fake.guarded_at[n] - t0) * 1000) if len(fake.guarded_at) > n else "?"} ms)')
+    toks = [t for _, t in fake.captcha_tokens if t]
+    check(len(set(toks)) == len(toks), 'los tokens preparados de antemano también se usan una sola vez')
+    check(pg.evaluate('window.__ts.renders === window.__ts.removed') and not pg.query_selector('.captcha-box'), 'no queda ninguna casilla de Cloudflare suelta')
+    check(not errs, 'sin errores en la consola' + (': ' + ' | '.join(errs) if errs else ''))
+    ctx.close()
     browser.close()
 
 bad = [m for ok, m in results if not ok]

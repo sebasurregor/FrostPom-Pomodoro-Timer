@@ -7,7 +7,7 @@
  *  - Solo se guarda en caché lo de este mismo sitio y respuestas correctas. Nunca respuestas de APIs
  *    ni de otros dominios (podrían contener datos personales).
  */
-const VERSION = '4.5.1';
+const VERSION = '4.7.0';
 const CACHE = `frostpom-${VERSION}`;
 const PRECACHE = [
   './',
@@ -50,6 +50,11 @@ const PRECACHE = [
   './js/timer.js',
   './js/timer-sync.js',
   './js/realtime.js',
+  './js/ads.js', // (v4.5.3) los anuncios de AdMob (solo en la app de Android): docs/ANUNCIOS.md
+  './js/ad-rules.js',
+  './js/play-billing.js', // (v4.7.0) Premium con Google Play (solo en la app de Android): docs/GOOGLE-PLAY-BILLING.md
+  './js/ui/ads-ui.js',
+  './js/ui/streak.js', // (v4.5.2) la racha: el fuego que se enciende, crece y se congela
   './js/session.js',
   './js/engine.js',
   './js/storage.js',
@@ -66,6 +71,9 @@ const PRECACHE = [
   './js/ui/pics.js',
   './assets/icons/fuego.png',
   './assets/icons/copo.png',
+  './assets/icons/congelada.png', // (v4.5.2) el día congelado del calendario
+  './assets/icons/fuego-congelado.png', // (v4.5.2) la racha apagada
+  './assets/icons/fuego-congelado-lg.webp',
   './assets/icons/corona.png',
   './assets/icons/cofre.png',
   './assets/icons/candado.png',

@@ -81,11 +81,12 @@ export function openDialog({ title, body = [], actions = [], className = '', dis
             if (busy) return;
             if (a.validate) {
               busy = true;
-              const box = ev.currentTarget.closest('.dlg__actions');
+              const btn = ev.currentTarget; // (v4.5.3) validate(btn) puede cambiar su texto (por ejemplo, "1 de 2")
+              const box = btn.closest('.dlg__actions');
               box.classList.add('is-busy');
               box.setAttribute('aria-busy', 'true');
               let ok = false;
-              try { ok = await a.validate(); } finally {
+              try { ok = await a.validate(btn); } finally {
                 busy = false;
                 box.classList.remove('is-busy');
                 box.removeAttribute('aria-busy');
@@ -112,6 +113,27 @@ export function openDialog({ title, body = [], actions = [], className = '', dis
   const p = dialogChain.then(run, run);
   dialogChain = p.catch(() => {});
   return p;
+}
+
+/**
+ * (v4.5.2) Los avisos de las ventanas (.form-error) que dicen que algo AVANZA ("Conectando…",
+ * "Creando tu cuenta…", "Enviando…", "Comprobando…", "Guardando…") se ven en verde y con una
+ * ruedita; los errores siguen en rojo. Se reconocen porque terminan en "…" (también en inglés).
+ */
+export const isProgressText = (text) => /(…|\.\.\.)\s*$/.test(String(text || ''));
+function paintProgress() {
+  for (const el of dlg.querySelectorAll('.form-error')) {
+    const on = isProgressText(el.textContent);
+    if (el.classList.contains('is-progress') !== on) el.classList.toggle('is-progress', on);
+    // Mientras avanza no es una alerta (el lector de pantalla lo lee sin interrumpir)
+    if (el.getAttribute('role') === 'alert' || el.dataset.role) {
+      if (on && el.getAttribute('role') === 'alert') { el.dataset.role = 'alert'; el.setAttribute('role', 'status'); }
+      else if (!on && el.dataset.role) { el.setAttribute('role', el.dataset.role); delete el.dataset.role; }
+    }
+  }
+}
+if (dlg && typeof MutationObserver === 'function') {
+  new MutationObserver(paintProgress).observe(dlg, { subtree: true, childList: true, characterData: true });
 }
 
 export function confirmDialog(title, text, okLabel, variant = 'btn--coral') {

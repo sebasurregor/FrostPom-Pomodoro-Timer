@@ -165,6 +165,18 @@ html[data-theme="dark"] .link-btn--danger { color: #FF8BA2; }
 /* Crear cuenta: sin error, el aviso no ocupa espacio (el correo queda cerca de la nacionalidad) */
 .onb__acc .form-error:empty { min-height: 0; }
 html[data-theme="dark"] .form-error { color: #FF8BA2; }
+/* (v4.5.2) Mientras algo avanza ("Conectando…", "Creando tu cuenta…", "Enviando…"): en verde y con
+   una ruedita, para que se note que funciona. En rojo quedan solo los errores. (feedback.js pone is-progress) */
+.form-error.is-progress { display: flex; align-items: center; gap: 8px; color: #11703F; }
+.form-error.is-progress::before {
+  content: ''; flex: none; width: 14px; height: 14px; box-sizing: border-box;
+  border: 2.5px solid currentColor; border-right-color: transparent; border-radius: 50%;
+  animation: fe-spin 0.8s linear infinite;
+}
+@keyframes fe-spin { to { transform: rotate(360deg); } }
+.reduce-motion .form-error.is-progress::before { animation: none; border-right-color: currentColor; opacity: 0.55; }
+@media (prefers-reduced-motion: reduce) { .form-error.is-progress::before { animation-duration: 2.4s; } }
+html[data-theme="dark"] .form-error.is-progress { color: #6EE7A0; }
 
 /* Interruptores */
 .switch {
@@ -329,7 +341,7 @@ input::-ms-reveal, input::-ms-clear { display: none; }
 .panel, .dlg, .profile-card, .showcase, .toast { color-scheme: light; }
 .panel__meta, .panel__text, .empty, .acc-hint, .custom__limits, .dlg__text, .dlg__note { color: var(--card-muted); }
 /* Recuadros de adentro: borde gris y un escalón suave (siguen pareciendo botones) */
-.preset, .sound-chip, .stat, .row, .companion-card, .skin, .badge, .choice__opt, .tray-food, .gift-pet, .day-chip,
+.preset, .sound-chip, .stat, .row, .companion-card, .skin, .badge, .choice__opt, .tray-food, .gift-pet, .plan, .day-chip,
 .stepper__btn, .cal__arrow, .mission {
   border: 2px solid var(--card-line-2);
   box-shadow: var(--shadow-chip);
@@ -339,7 +351,7 @@ input::-ms-reveal, input::-ms-clear { display: none; }
 .companion-card, .sound-chip.is-locked { background: var(--card-soft); }
 .preset:active, .stepper__btn:active { box-shadow: 0 1px 0 var(--card-line-2); }
 /* Lo elegido: dorado con borde dorado oscuro */
-.preset[aria-checked="true"], .sound-chip.is-on, .choice__opt:has(input:checked), .gift-pet[aria-checked="true"] {
+.preset[aria-checked="true"], .sound-chip.is-on, .choice__opt:has(input:checked), .gift-pet[aria-checked="true"], .plan[aria-checked="true"] {
   background: var(--gold); border-color: var(--gold-deep); box-shadow: 0 3px 0 var(--gold-edge);
 }
 
@@ -940,6 +952,12 @@ html.is-feeding, html.is-feeding * { cursor: grabbing !important; }
 .tray-revive { display: flex; align-items: center; gap: var(--sp-6); padding: 6px 4px 2px; }
 .tray-revive__art { width: 88px; height: 88px; flex: none; object-fit: contain; }
 .tray-revive__body { display: grid; gap: var(--sp-3); justify-items: start; }
+/* (v4.5.3) Anuncios en la tienda (solo en la app de Android, 13+): ganar gemas y revivir con anuncios */
+.tray-adgems { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 2px 0 8px; }
+.tray-adgems__left { font-size: 0.8rem; font-weight: 800; color: var(--on-paper-muted); }
+.ad-play { width: 16px; height: 16px; flex: none; fill: currentColor; margin-right: 6px; vertical-align: -2px; }
+#adGemsBtn, #reviveAdBtn { display: inline-flex; align-items: center; }
+#adGemsBtn[aria-busy="true"], #reviveAdBtn[aria-busy="true"] { opacity: 0.7; cursor: progress; }
 .tray-revive__note { margin: 0; font-size: 0.85rem; font-weight: 700; color: var(--on-paper-muted); }
 
 /* Elegir compañero desde la tienda */
@@ -1024,7 +1042,9 @@ html[data-theme="dark"] .prog__meta { background: rgba(20, 32, 55, 0.92); }
 /* Tarjeta de la racha */
 .streak-card { display: flex; align-items: center; gap: var(--sp-7); padding: 16px; border-radius: 18px; background: var(--surface); border: 2px solid var(--pp-line); }
 .streak-card__icon { flex: 0 0 auto; display: grid; place-items: center; width: 56px; height: 56px; border-radius: 16px; background: #FFF1DF; }
-.streak-card:not(.is-hot) .streak-card__icon img { filter: grayscale(1) opacity(0.55); }
+/* (v4.5.2) Sin estudiar hoy: el fuego congelado sobre hielo (antes, el fuego en gris) */
+.streak-card:not(.is-hot) .streak-card__icon { background: #E3F4FD; }
+html[data-theme="dark"] .streak-card:not(.is-hot) .streak-card__icon { background: #17324D; }
 .streak-card__n { font-family: var(--font-display); font-size: 1.35rem; line-height: 1.1; color: var(--text); }
 .streak-card.is-hot .streak-card__n { color: #D96F00; }
 .streak-card__sub { font-size: 0.92rem; font-weight: 700; color: var(--pp-muted); }
@@ -1193,6 +1213,8 @@ html[data-theme="dark"] .view--paper .cal__day.lv-2 .cal__num {
   color: #FFC98A;
 }
 html[data-theme="dark"] .view--paper .cal__day.is-today .cal__num { color: var(--text); }
+/* (v4.5.2) Hoy sin estudio, en el tema oscuro: el número se veía blanco sobre el círculo claro */
+html[data-theme="dark"] .view--paper .cal__day.is-today.lv-0 .cal__num { background: #2A3A5C; color: var(--text); }
 
 .act-meta { margin: -4px 0 6px; text-align: right; }
 
@@ -1429,7 +1451,9 @@ html[data-theme="dark"] .report-reason { border-color: var(--card-line, #3B5175)
 .country-picker { gap: var(--sp-3); position: relative; display: block; margin-bottom: 6px; }
 
 .country-search { min-height: 42px; }
-.country-field .country-search { width: 100%; padding-left: 44px; padding-right: 40px; }
+/* (v4.5.2) Con .acc-input en el selector: así gana también en "Crear cuenta" del celular, donde
+   .dlg--gate .acc-input le quitaba el espacio y el 🌐 quedaba pegado a "Busca tu país…" */
+.country-field .acc-input.country-search { width: 100%; padding-left: 44px; padding-right: 40px; }
 
 .country-list { list-style: none; margin: 0; padding: 4px; max-height: 200px; overflow: auto; border-radius: var(--r-sm); background: var(--surface); }
 .country-picker .country-list {
@@ -1767,6 +1791,98 @@ html[data-theme="dark"] .dlg--premium .dlg__box { background: linear-gradient(18
 .rankup__stage { position: relative; display: grid; place-items: center; width: 210px; height: 210px; }
 .rankup__stage > img, .rankup__stage > svg, .rankup__stage > .gift-art { display: block; margin: auto; }
 
+/* =====================================================================
+   (v4.5.2) La racha: el fuego que se enciende, crece y se congela (js/ui/streak.js)
+   La llama es el dibujo de la fogata de la entrada (vectorial: crece sin verse borrosa).
+   ===================================================================== */
+.sfire {
+  --s: min(calc(108px + var(--tier, 0) * 15px), 52vw, 27vh); /* alto de la llama principal */
+  position: relative; width: calc(var(--s) * 1.7); height: calc(var(--s) * 1.12);
+}
+.sfire__main, .sfire__side { position: absolute; bottom: 0; transform-origin: 50% 100%; }
+.sfire__main { left: 50%; width: calc(var(--s) * 0.806); height: var(--s); margin-left: calc(var(--s) * -0.403); z-index: 2; }
+.sfire__side { width: calc(var(--s) * 0.42); height: calc(var(--s) * 0.52); z-index: 1; }
+.sfire__side--l { left: calc(50% - var(--s) * 0.56); transform: rotate(-16deg); }
+.sfire__side--r { left: calc(50% + var(--s) * 0.14); transform: rotate(16deg); }
+.sfire__side--l2 { left: calc(50% - var(--s) * 0.8); width: calc(var(--s) * 0.3); height: calc(var(--s) * 0.36); transform: rotate(-30deg); }
+.sfire__side--r2 { left: calc(50% + var(--s) * 0.5); width: calc(var(--s) * 0.3); height: calc(var(--s) * 0.36); transform: rotate(30deg); }
+.sfire__svg { display: block; width: 100%; height: 100%; overflow: visible; transform-origin: 50% 100%; animation: sfire-flicker 1.6s ease-in-out infinite; }
+.sfire__side .sfire__svg { animation-duration: 1.25s; animation-delay: -0.5s; }
+.sfire__side--r .sfire__svg, .sfire__side--r2 .sfire__svg { animation-delay: -0.9s; }
+.sfire__body { fill: #F88F2E; stroke: #E46C1E; stroke-width: 4; stroke-linejoin: round; }
+.sfire__core { fill: #FBCC56; }
+@keyframes sfire-flicker {
+  0%, 100% { transform: scale(1, 1); }
+  30% { transform: scale(1.03, 0.96) skewX(-2deg); }
+  65% { transform: scale(0.97, 1.05) skewX(2deg); }
+}
+.sfire__glow {
+  position: absolute; left: 50%; bottom: -8%; z-index: 0;
+  width: calc(var(--s) * 1.6); height: calc(var(--s) * 1.15); margin-left: calc(var(--s) * -0.8);
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(255, 170, 60, 0.6), rgba(255, 120, 40, 0.2) 62%, transparent);
+  animation: sfire-glow 2.4s ease-in-out infinite;
+}
+@keyframes sfire-glow { 50% { transform: scale(1.08); opacity: 0.85; } }
+.sfire__spark {
+  position: absolute; z-index: 3; left: calc(50% + var(--x) * 0.55); bottom: 22%;
+  width: 6px; height: 6px; border-radius: 50%; background: #FFC531; box-shadow: 0 0 6px #FF8A3D;
+  opacity: 0; animation: sfire-spark var(--d, 1.6s) ease-out infinite; animation-delay: calc(var(--i) * -0.37s);
+}
+@keyframes sfire-spark {
+  0% { opacity: 0; transform: translateY(0) scale(1); }
+  15% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(calc(var(--s) * -0.95)) scale(0.4); }
+}
+/* 100 días o más: el centro se pone dorado; 365: casi blanco */
+.sfire:is(.sfire--t5, .sfire--t6, .sfire--t7) .sfire__glow { background: radial-gradient(closest-side, rgba(255, 215, 90, 0.75), rgba(255, 140, 40, 0.25) 62%, transparent); }
+.sfire:is(.sfire--t6, .sfire--t7) .sfire__core { fill: #FFE68A; }
+.sfire--t7 .sfire__core { fill: #FFF6CF; }
+/* Encendiéndose: primero una chispa, después la llama (y las de los lados) */
+.sfire.is-lighting .sfire__main { animation: sfire-light 1.1s 0.15s cubic-bezier(0.2, 1.4, 0.4, 1) both; }
+.sfire.is-lighting .sfire__side { animation: sfire-light-side 0.8s 0.75s cubic-bezier(0.2, 1.4, 0.4, 1) both; }
+.sfire.is-lighting .sfire__glow { animation: sfire-glow-in 1.2s 0.2s ease-out both, sfire-glow 2.4s 1.4s ease-in-out infinite; }
+@keyframes sfire-light {
+  0% { opacity: 0; transform: scale(0.05, 0.05); }
+  35% { opacity: 1; transform: scale(0.35, 0.3); }
+  70% { transform: scale(1.1, 1.14); }
+  100% { opacity: 1; transform: scale(1, 1); }
+}
+@keyframes sfire-light-side { from { opacity: 0; scale: 0.1; } to { opacity: 1; scale: 1; } }
+@keyframes sfire-glow-in { from { opacity: 0; transform: scale(0.3); } }
+
+.dlg--streak .rankup { gap: var(--sp-2); }
+.streak-lit__stage { position: relative; display: grid; place-items: end center; min-height: 150px; }
+.streak-lit__plus {
+  position: relative; padding: 4px 16px; border-radius: 999px;
+  background: linear-gradient(180deg, #FFB347, #E4572E); color: #fff;
+  font-weight: 900; font-size: 1.05rem; text-shadow: 0 1px 0 rgba(0, 0, 0, 0.25); box-shadow: 0 3px 0 #9A3412;
+  animation: rise 0.5s 0.9s both;
+}
+.streak-track { position: relative; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin: 6px 0 0; padding: 0; list-style: none; animation: rise 0.5s 1s both; }
+.streak-track__step {
+  display: grid; justify-items: center; gap: 2px; min-width: 42px; padding: 6px 4px 4px;
+  border-radius: 12px; background: rgba(255, 255, 255, 0.08); color: #C9D6EA; font-weight: 900; font-size: 0.8rem;
+}
+.streak-track__step .pic { width: 26px; height: 26px; }
+.streak-track__step.is-on { color: #FFD45C; background: rgba(255, 160, 60, 0.18); }
+.streak-track__step.is-now { outline: 2px solid #FFD45C; outline-offset: 1px; }
+.toast.streak-toast { border-color: #FFC58F; }
+
+/* La racha se apagó: tu compañero triste junto al fuego congelado */
+.dlg--streaklost { width: min(94vw, 440px); }
+.streak-lost__art {
+  display: flex; align-items: flex-end; justify-content: center; gap: 6px; margin: 0 0 10px; padding: 12px 0 8px;
+  border-radius: 18px; background: linear-gradient(180deg, #DDF1FC, #F5FBFF);
+}
+html[data-theme="dark"] .streak-lost__art { background: linear-gradient(180deg, #17324D, #142037); }
+.streak-lost__pet { display: grid; place-items: end center; }
+.streak-lost__fire { width: 84px; height: 84px; animation: lost-shiver 3s ease-in-out infinite; }
+@keyframes lost-shiver { 0%, 88%, 100% { transform: none; } 91% { transform: translateX(-2px) rotate(-3deg); } 94% { transform: translateX(2px) rotate(3deg); } 97% { transform: translateX(-1px); } }
+.dlg--streaklost .dlg__actions .btn--gold { min-width: 52%; }
+/* El calendario: el día que reviviste la racha */
+.cal__goal--frozen .pic { opacity: 0.95; }
+
 .premium__hero { display: flex; align-items: flex-end; justify-content: center; gap: var(--sp-2); margin: -4px 0 6px; }
 .premium__crown svg { width: 76px; height: 76px; filter: drop-shadow(0 4px 0 rgba(13, 35, 70, 0.25)); animation: crown-bob 2.4s ease-in-out infinite; }
 .premium__list { list-style: none; margin: 0 0 10px; padding: 0; display: grid; gap: var(--sp-4); }
@@ -1775,6 +1891,25 @@ html[data-theme="dark"] .dlg--premium .dlg__box { background: linear-gradient(18
 .premium__list small { color: var(--on-paper-muted); font-weight: 700; }
 .premium__icon { font-size: 1.4rem; text-align: center; }
 .premium__price { font-family: var(--font-display); font-size: 1.15rem; text-align: center; }
+/* (v4.7.0) Google Play: elegir el plan (anual o mensual), las condiciones y los avisos de pago */
+.plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: var(--sp-4); margin: 2px 0 8px; }
+.plan {
+  position: relative; display: grid; justify-items: center; align-content: start; gap: 2px; padding: 12px 8px 10px;
+  border-radius: var(--r-md); background: var(--paper-2); color: var(--text); cursor: pointer; font: inherit; text-align: center;
+  transition: transform 0.12s ease, background-color 0.12s ease;
+}
+.plan:hover, .plan[aria-checked="true"] { transform: translateY(-2px); }
+.plan__name { font-weight: 800; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.04em; }
+.plan__price { font-family: var(--font-display); font-size: 1.12rem; line-height: 1.2; }
+.plan__sub { font-weight: 700; font-size: 0.78rem; color: var(--on-paper-muted); }
+.plan__badge {
+  position: absolute; top: -10px; right: 8px; padding: 1px 8px; border-radius: var(--r-round);
+  background: var(--mint, #2EE6B6); color: var(--ink); border: 2px solid var(--ink); font-weight: 800; font-size: 0.72rem;
+}
+.premium__terms { font-size: 0.82rem; line-height: 1.4; margin: 2px 0 4px; }
+.premium__links { margin: 2px 0 0; text-align: center; }
+.premium__warn, #premiumStatus.is-warn { background: #FFF6E0; border: 2px solid #F2C76B; color: #7A4B00; border-radius: var(--r-md); padding: 8px 10px; }
+html[data-theme="dark"] :is(.premium__warn, #premiumStatus.is-warn) { background: #3A2E12; border-color: #8C6A22; color: #FFE3A6; }
 
 /* =====================================================================
    Gate: entrar y crear cuenta
@@ -1790,7 +1925,7 @@ html[data-theme="dark"] .dlg--premium .dlg__box { background: linear-gradient(18
 /* Reglas html[data-theme="dark"] :is(…) que cambian lo mismo en varios componentes a la vez.
    No se reparten por componente: :is() pesa lo que su selector más fuerte, y separarlas cambiaría quién gana. */
 /* Lo que va sobre dorado, menta o la banda del rango sigue con letra oscura */
-html[data-theme="dark"] :is(.preset[aria-checked="true"], .sound-chip.is-on, .row.is-you, .choice__opt:has(input:checked), .gift-pet[aria-checked="true"], .day-chip.is-on, .seg__btn[aria-selected="true"], .tab[aria-current="page"], .chip-stat--crown.is-active, .hero) {
+html[data-theme="dark"] :is(.preset[aria-checked="true"], .sound-chip.is-on, .row.is-you, .choice__opt:has(input:checked), .gift-pet[aria-checked="true"], .plan[aria-checked="true"], .day-chip.is-on, .seg__btn[aria-selected="true"], .tab[aria-current="page"], .chip-stat--crown.is-active, .hero) {
   --text: var(--ink); --on-paper-muted: #4D6384; --card-muted: #4D6384; --pp-muted: #5E6E86; color: var(--ink);
 }
 /* Recuadros con borde marino: en oscuro el borde se aclara para que se vea */
@@ -1989,6 +2124,7 @@ html[data-theme="dark"] :is(.custom, .mission.is-ready, .tray-food.is-fav) { bac
   .dlg--gate .pin-form { gap: 3px; }
   .dlg--gate .pin-label { font-size: 0.82rem; }
   .dlg--gate .acc-input { min-height: 40px; padding: 7px 11px; font-size: 0.95rem; }
+  .dlg--gate .country-field .acc-input.country-search { padding-left: 42px; padding-right: 38px; }
   .dlg--gate .acc-hint { font-size: 0.74rem; margin: 2px 0 4px; }
   .dlg--gate .form-error:empty { display: none; }
   .dlg--gate .switch--compact { padding: 6px 0 0; }
@@ -2067,5 +2203,5 @@ html[data-theme="dark"] :is(.custom, .mission.is-ready, .tray-food.is-fav) { bac
   .hud, .tabs, .panel, .dlg__box, .focus-status { border-color: CanvasText; }
 
   /* --- Perfil: tarjeta, foto, estadísticas y compañeros --- */
-  .gift-pet[aria-checked="true"] { outline: 3px solid Highlight; }
+  .gift-pet[aria-checked="true"], .plan[aria-checked="true"] { outline: 3px solid Highlight; }
 }

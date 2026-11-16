@@ -206,8 +206,14 @@ with sync_playwright() as p:
     # El segundo puede preguntar o enterarse antes (al revisar el servidor justo antes de guardarlo)
     check(1 <= len(claims) <= 2, f'preguntaron quién lo guarda ({len(claims)} preguntas) y ninguno lo guardó por su cuenta')
     gainA, gainB = state(A)['progress']['xp'] - xpA0, state(B)['progress']['xp'] - xpB0
-    check((gainA > 0) != (gainB > 0), f'solo uno de los dos sumó la XP (A +{gainA}, B +{gainB})')
+    # (v4.5.2) Mientras se cierra la vista de la racha (el primer pomodoro del día), el otro alcanza a
+    # traer el progreso de la nube: entonces los dos muestran lo MISMO, pero sumado una sola vez
+    cloud_xp = (fake.saves.get(uid) or {}).get('data', {}).get('progress', {}).get('xp')
+    once = (gainA > 0) != (gainB > 0) or (gainA == gainB > 0 and cloud_xp == xpA0 + gainA)
+    check(once, f'solo uno de los dos sumó la XP (A +{gainA}, B +{gainB}; en la nube {cloud_xp})')
     winner, loser = (A, B) if gainA > 0 else (B, A)
+    if gainA > 0 and gainB > 0 and 'se guardó desde tu otro aparato' in toasts(A):
+        winner, loser = B, A  # los dos ya muestran la XP: el que no guardó es el que lo avisa
     check('se guardó desde tu otro aparato' in toasts(loser), 'el otro avisa "Sesión completa: se guardó desde tu otro aparato"')
     done = [k for k, s in fake.sessions.items() if s['uid'] == uid and s['status'] == 'done']
     check(sid in done, 'el ranking recibió el final del pomodoro')

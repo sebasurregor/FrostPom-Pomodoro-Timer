@@ -102,11 +102,14 @@ function renderCalendar(focusKey) {
     return h('button', {
       type: 'button', 'data-key': k, tabindex: k === tabKey ? '0' : '-1', 'aria-pressed': String(sel),
       class: `cal__day lv-${G.studyLevel(min)}${isToday ? ' is-today' : ''}${sel ? ' is-sel' : ''}${joinL ? ' join-l' : ''}${joinR ? ' join-r' : ''}`,
-      'aria-label': `${U.formatDayLong(k)}${isToday ? tr(' (hoy)') : ''}: ${min ? U.formatMinutes(min) : tr('sin estudio')}`,
+      'aria-label': `${U.formatDayLong(k)}${isToday ? tr(' (hoy)') : ''}: ${min ? U.formatMinutes(min) : tr('sin estudio')}${state.daily[k] && state.daily[k].frozen > 0 ? tr(' (racha revivida)') : ''}`,
       onclick: () => { calSelected = k; renderCalendar(k); },
     },
     h('span', { class: 'cal__num', text: String(day) }),
-    min >= G.POLE_GOAL_MIN ? h('span', { class: 'cal__goal' }, pic('copo', 18)) : null);
+    // (v4.5.2) El día que cumpliste la meta del polo queda "congelado" (el dibujo que eligió el autor)
+    min >= G.POLE_GOAL_MIN ? h('span', { class: 'cal__goal' }, pic('congelada', 20))
+      // (v4.5.2) Un día que no estudiaste pero reviviste la racha: el fuego congelado
+      : state.daily[k] && state.daily[k].frozen > 0 && !G.isActiveDay(state.daily, k) ? h('span', { class: 'cal__goal cal__goal--frozen', title: tr('Racha revivida') }, pic('fuego-congelado', 18)) : null);
   }));
   $('#calDetail').textContent = calendarDetail(calSelected, sum);
   if (focusKey) {

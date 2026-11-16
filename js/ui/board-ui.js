@@ -280,7 +280,7 @@ async function claimFlow() {
         try { await CLOUD.sendRecoveryCode(email); return true; } catch (x) { err1.textContent = CLOUD.errorText(x); return false; }
       } },
     ],
-    onOpen: () => mail.focus(),
+    onOpen: () => { mail.focus(); CLOUD.warmAuth(1); }, // (v4.5.2) lo pediste tú: se prepara ya
   });
   if (step1 !== 'ok') return false;
   const code = h('input', { type: 'text', class: 'acc-input acc-input--code', id: 'claimCode', inputmode: 'numeric', autocomplete: 'one-time-code', maxlength: '10', spellcheck: 'false', placeholder: '123456' });

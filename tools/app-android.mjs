@@ -5,12 +5,18 @@
  *     android-recursos/res/ (los genera tools/recursos_android.py).
  *  2. Pone la versión de package.json en la app: versionName "4.1.0" y versionCode 40100
  *     (Google Play exige que versionCode suba en cada versión que subas).
+ *  3. (v4.5.3) Pone el ID de la app de AdMob (config.ads.appId, de js/config.js) en el
+ *     AndroidManifest.xml. El complemento de anuncios lo necesita SIEMPRE: sin él, la app se
+ *     cierra al abrirse. Si está vacío, pone el ID de PRUEBA de Google y avisa (no publiques así).
+ *  4. (v4.7.0) Revisa la clave de RevenueCat (config.premium.play): debe ser la PÚBLICA de Android
+ *     (goog_…). Si alguien pegó la secreta (sk_…), se detiene: esa clave nunca puede ir en la app.
  *
  * Se puede correr las veces que quieras. Uso: lo llaman npm run android:crear y android:actualizar.
  */
 import { cpSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { config } from '../js/config.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const APP = join(ROOT, 'android', 'app');
@@ -40,4 +46,41 @@ if (!/versionCode\s+\d+/.test(gradle) || !/versionName\s+"/.test(gradle)) {
 }
 if (gradle !== before) writeFileSync(gradlePath, gradle);
 
-console.log(`[OK] Íconos copiados. Versión de la app: ${version} (versionCode ${code}).`);
+// 3. (v4.5.3) El ID de la app de AdMob
+const TEST_APP_ID = 'ca-app-pub-3940256099942544~3347511713'; // el de prueba de Google
+const ads = config.ads || {};
+const appId = String(ads.appId || '').trim();
+if (appId && !/^ca-app-pub-\d{16}~\d{10}$/.test(appId)) {
+  console.error(`[X] config.ads.appId ("${appId}") no parece un ID de app de AdMob: es como ca-app-pub-1234567890123456~1234567890 (con "~", no "/").`);
+  process.exit(1);
+}
+if (!ads.testing && !appId && ads.enabled) {
+  console.error('[X] Los anuncios están encendidos y no de prueba (config.ads), pero falta config.ads.appId. Ver docs/ANUNCIOS.md');
+  process.exit(1);
+}
+const manifestPath = join(APP, 'src', 'main', 'AndroidManifest.xml');
+let manifest = readFileSync(manifestPath, 'utf8');
+const metaRe = /<meta-data\s+android:name="com\.google\.android\.gms\.ads\.APPLICATION_ID"[^>]*\/>/;
+const meta = `<meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="${appId || TEST_APP_ID}" />`;
+const beforeManifest = manifest;
+if (metaRe.test(manifest)) manifest = manifest.replace(metaRe, meta);
+else manifest = manifest.replace(/(<application\b[^>]*>)/, `$1\n        <!-- FrostPom v4.5.3: AdMob (tools/app-android.mjs) -->\n        ${meta}`);
+if (!manifest.includes(meta)) {
+  console.error('[X] No pude poner el ID de AdMob en android/app/src/main/AndroidManifest.xml');
+  process.exit(1);
+}
+if (manifest !== beforeManifest) writeFileSync(manifestPath, manifest);
+if (!appId) console.warn('[!] AdMob: uso el ID de app de PRUEBA de Google. Antes de publicar, pon el tuyo en config.ads.appId (docs/ANUNCIOS.md).');
+
+// 4. (v4.7.0) La clave de RevenueCat (cobro de Premium con Google Play)
+const play = (config.premium && config.premium.play) || {};
+const rcKey = String(play.revenueCatKey || '').trim();
+if (/^(sk_|atk_)/.test(rcKey)) {
+  console.error('[X] config.premium.play.revenueCatKey es una clave SECRETA de RevenueCat (sk_…). Bórrala YA de js/config.js (y de GitHub si la subiste: créala de nuevo en RevenueCat). En la app va la PÚBLICA de Android (goog_…). Ver docs/GOOGLE-PLAY-BILLING.md');
+  process.exit(1);
+}
+if (rcKey && !rcKey.startsWith('goog_')) console.warn('[!] config.premium.play.revenueCatKey no empieza por goog_: ¿es la clave pública de Android de RevenueCat? (docs/GOOGLE-PLAY-BILLING.md)');
+if (play.enabled && !rcKey) console.warn('[!] El cobro con Google Play está encendido pero falta config.premium.play.revenueCatKey: Premium seguirá en modo prueba.');
+const billing = play.enabled && rcKey ? 'cobro con Google Play ENCENDIDO' : 'Premium en modo prueba (sin cobro)';
+
+console.log(`[OK] Íconos copiados. Versión de la app: ${version} (versionCode ${code}). AdMob: ${appId ? 'tu ID de app' : 'ID de prueba'}${ads.enabled ? '' : ' (anuncios apagados en config.ads)'}. ${billing}.`);

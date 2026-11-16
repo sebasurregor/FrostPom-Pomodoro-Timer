@@ -22,6 +22,11 @@ def parse_iso(v):
         return None
 
 
+# (v4.7.0) Sin suscripción (como get_entitlements / premium-sync)
+NO_PREMIUM = {'premium': False, 'status': 'none', 'store': None, 'product': None, 'period_type': None,
+              'expires_at': None, 'will_renew': False, 'billing_issue': False, 'sandbox': False}
+
+
 class FakeSupabase:
     """Lo mínimo de Supabase Auth (anónimas, correo + contraseña, códigos) y de las funciones
     del ranking y de las cuentas en línea, en memoria."""
@@ -40,6 +45,7 @@ class FakeSupabase:
         self.saves = {}      # uid -> {data, version}
         self.require_captcha = False   # como "Enable CAPTCHA protection" en Supabase
         self.captcha_tokens = []       # (ruta, token) recibidos
+        self.guarded_at = []           # (v4.5.2) a qué hora llegó cada una (time.time())
         self.used_tokens = set()       # cada token de Turnstile sirve una sola vez
         self.reports = []              # (v4.1) (quien reporta, uid reportado, motivo)
         self.timers = {}               # (v4.5) uid -> {state, version, at (ms), device, window_start, window_count}
@@ -50,6 +56,9 @@ class FakeSupabase:
         self.notified = []             # (v4.5.1) avisos enviados: (uid, payload)
         self.realtime_off = False      # (v4.5.1) como un proyecto sin la política de Realtime
         self.revoke_on_password = True # (v4.5.1) como Supabase: cambiar la contraseña cierra las OTRAS sesiones
+        self.entitlements = {}         # (v4.7.0) uid -> Premium según el servidor (lo que devuelve get_entitlements)
+        self.rc = {}                   # (v4.7.0) uid -> lo que "RevenueCat" sabe (premium-sync lo copia al servidor)
+        self.sync_status = None        # (v4.7.0) forzar una respuesta de premium-sync (404 = no desplegada, 429…)
         seeds = [('Zorro.lector', 'MX', '🦊', 180, None), ('Luna_K', 'ES', '🦉', 95, 'luna@example.com'),
                  ('pingu.sabio', 'CL', '🐧', 60, None), ('Ana_23', 'AR', '🦭', 30, None)]
         for i, (name, country, av, mins, email) in enumerate(seeds):
@@ -134,6 +143,7 @@ class FakeSupabase:
         if guarded and req.method == 'POST':
             tok = (body.get('gotrue_meta_security') or {}).get('captcha_token')
             self.captcha_tokens.append((path, tok))
+            self.guarded_at.append(time.time())  # (v4.5.2) cuándo llegó (para medir si se esperó a Cloudflare)
             if self.require_captcha and (not tok or not str(tok).startswith('tok-') or tok in self.used_tokens):
                 return ok({'code': 400, 'error_code': 'captcha_failed', 'msg': 'captcha protection: request disallowed (captcha verification process failed)'}, 400)
             if tok:
@@ -198,6 +208,19 @@ class FakeSupabase:
                 for t in [t for t, u in self.tokens.items() if u == uid and (scope == 'global' or t == bearer)]:
                     self.tokens.pop(t, None)
             return route.fulfill(status=204, body='')
+        # (v4.7.0) La Edge Function premium-sync: revisa la sesión y le "pregunta a RevenueCat"
+        if path == '/functions/v1/premium-sync':
+            self.calls.append(('premium-sync', {}, uid))
+            if self.sync_status:
+                return ok({'error': 'forced'}, self.sync_status)
+            if not uid:
+                return ok({'error': 'auth'}, 401)
+            if self.users[uid]['anon']:
+                return ok({'error': 'account_required'}, 403)
+            st = dict(self.rc.get(uid) or NO_PREMIUM)
+            self.entitlements[uid] = st
+            self.notify(uid, {'k': 'e'})
+            return ok({**st, 'saved': True, 'management_url': 'https://play.google.com/store/account/subscriptions?sku=frostpom_premium&package=com.startupprometeus.frostpom'})
         if not path.startswith('/rest/v1/rpc/'):
             return ok({'msg': 'not found'}, 404)
 
@@ -340,6 +363,13 @@ class FakeSupabase:
             if accepted:
                 self.notify(uid, {'k': 't', 'v': t['version'], 'd': dev})
             return
+        if fn == 'get_entitlements':
+            if not uid:
+                return ok({'code': 'PGRST301', 'message': 'JWT expired'}, 401)
+            if self.users[uid]['anon']:
+                return ok({'code': '42501', 'message': 'account_required'}, 403)
+            e = self.entitlements.get(uid)
+            return ok([e] if e else [])
         if fn == 'claim_block':
             block, dev = body.get('p_block'), (str(body.get('p_device') or '')[:32] or None)
             if not isinstance(block, str) or not BLOCK_RE.match(block):

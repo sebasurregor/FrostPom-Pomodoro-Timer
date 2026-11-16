@@ -192,10 +192,17 @@
               <span class="tray-gems" title="Tus gemas"><img class="pic pic--gema" src="assets/icons/gema.png" width="18" height="18" alt="" aria-hidden="true"> <b id="trayGems">0</b><span class="sr-only"> gemas</span></span>
             </div>
             <p class="food-tray__hint" id="trayHint"></p>
+            <!-- v4.5.3: ganar gemas viendo un anuncio (solo en la app de Android, 13+; js/ui/ads-ui.js) -->
+            <div class="tray-adgems" id="trayAdGems" hidden>
+              <button type="button" class="btn btn--mint btn--sm" id="adGemsBtn"><svg class="ad-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg><span id="adGemsLbl">Ver un anuncio: +10 gemas</span></button>
+              <span class="tray-adgems__left" id="adGemsLeft"></span>
+            </div>
             <div class="tray-revive" id="trayRevive" hidden>
               <img class="tray-revive__art" src="assets/sprites/tumba.webp" width="88" height="88" alt="" aria-hidden="true" decoding="async">
               <div class="tray-revive__body">
                 <button type="button" class="btn btn--gold" id="reviveBtn">Revivir por <b id="reviveCost">30</b> <img class="pic pic--gema" src="assets/icons/gema.png" width="18" height="18" alt="gemas"></button>
+                <!-- v4.5.3: o viendo 3 anuncios (el avance se guarda) -->
+                <button type="button" class="btn btn--mint" id="reviveAdBtn" hidden><svg class="ad-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg><span id="reviveAdLbl">Revivir con anuncios</span></button>
                 <p class="tray-revive__note" id="reviveNote"></p>
               </div>
             </div>
@@ -446,6 +453,8 @@
             <h2 class="panel__title" id="h-acerca">Acerca de</h2>
             <p class="panel__text">FrostPom <span id="appVersion"></span>. No reemplaza a un profesional: si el estrés no se va, pide ayuda.</p>
             <p class="panel__text"><a class="link-btn" href="privacidad.html" data-page="privacidad.html">Política de privacidad</a> · <a class="link-btn" href="normas.html" data-page="normas.html">Normas de la comunidad</a></p>
+            <!-- v4.5.3: solo si Google lo pide en tu país (por ejemplo, en Europa) -->
+            <p class="panel__text" id="adPrivacyRow" hidden><button class="link-btn" type="button" id="adPrivacyBtn">Opciones de privacidad de los anuncios</button></p>
             <p class="panel__text credits">Banderas: Twemoji (CC BY 4.0), mediante la fuente Twemoji Country Flags. Íconos: <a class="link-btn" href="https://icons8.com" target="_blank" rel="noopener">Icons8</a>. Sonidos de concentración: <a class="link-btn" href="https://pixabay.com/sound-effects/" target="_blank" rel="noopener">Pixabay</a>.</p>
           </section>
           </div>

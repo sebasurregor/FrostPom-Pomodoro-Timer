@@ -33,6 +33,9 @@ export function configure({ render, play }) {
   playEvents = play;
 }
 
+/** (v4.7.0) Vuelve a pintar todo sin cambiar el estado (por ejemplo, cambió Premium pagado). */
+export const rerender = () => renderAll();
+
 let savedAt = null;
 /** Hora del último guardado automático correcto (null si aún no se ha guardado en esta visita). */
 export const lastSavedAt = () => savedAt;

@@ -399,10 +399,14 @@ with sync_playwright() as p:
     # Primer pomodoro completo: se pide (una vez) el permiso de alarmas exactas
     pg.clock.fast_forward('22:00'); pg.clock.run_for(3000)
     close_dialogs_but = None
-    for _ in range(4):
-        if dlg_open(pg) and '¿Te aviso justo a tiempo?' not in title(pg):
+    # (v4.5.2) Antes salen los premios y la vista de la racha (el primer pomodoro del día): se cierran
+    for _ in range(14):
+        if dlg_open(pg) and '¿Te aviso justo a tiempo?' in title(pg):
+            break
+        if dlg_open(pg):
             pg.click('#dlg .dlg__actions button:last-child'); pg.wait_for_timeout(300)
-    pg.clock.run_for(4500); pg.wait_for_timeout(500)
+        pg.clock.run_for(700); pg.wait_for_timeout(100)
+    pg.clock.run_for(500); pg.wait_for_timeout(300)
     check(title(pg) == '¿Te aviso justo a tiempo?' and 'Alarmas y recordatorios' in pg.inner_text('#dlg'),
           'después del primer pomodoro completo explica y pide el permiso de alarmas exactas')
     pg.click("#dlg button:has-text('Abrir ajustes')"); pg.wait_for_timeout(400)

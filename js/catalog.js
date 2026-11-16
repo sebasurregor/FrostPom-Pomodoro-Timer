@@ -14,7 +14,13 @@ import { t, tr } from './i18n.js';
 // =========================================================
 // Premium
 // =========================================================
-export const isPremium = (state) => !!(state.premium && state.premium.active);
+let premiumGate = null;
+/**
+ * (v4.7.0) En la app de Android con cobro, Premium lo decide el servidor (js/play-billing.js) y no
+ * el dato premium.active (el de la prueba gratis, que viaja con el progreso). null = como antes.
+ */
+export function setPremiumGate(fn) { premiumGate = typeof fn === 'function' ? fn : null; }
+export const isPremium = (state) => (premiumGate ? !!premiumGate(state) : !!(state.premium && state.premium.active));
 
 /** Un elemento del catálogo se puede usar si no es Premium o si la persona tiene Premium. */
 export function canUse(item, premium) {

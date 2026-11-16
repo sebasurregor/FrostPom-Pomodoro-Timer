@@ -115,6 +115,8 @@ export function applyStudy(state, rec, { todayKey } = {}) {
     return done(events, { reward });
   }
 
+  // (v4.5.2) ¿Con este bloque se enciende la racha de hoy? (se celebra: celebrations.js)
+  const litBefore = G.isActiveDay(state.daily, endKey);
   // Solo se guarda CUÁNTO estudiaste, no en qué (decisión de privacidad).
   day.studySec += rec.actualSec;
   day.creditedSec += reward.creditedSec;
@@ -154,7 +156,26 @@ export function applyStudy(state, rec, { todayKey } = {}) {
   addXp(state, reward.xp, events, 'study');
   refreshStreak(state, todayKey);
   checkAchievements(state, todayKey, events);
+  if (!litBefore && endKey === todayKey && G.isActiveDay(state.daily, endKey)) {
+    const days = G.computeStreak(state.daily, todayKey).current;
+    events.push({ type: 'streak', days, first: days === 1, milestone: G.STREAK_MILESTONES.includes(days) });
+  }
   return done(events, { reward });
+}
+
+/**
+ * (v4.5.2) Revive la racha que se apagó ayer pagando gemas (G.lostStreak dice cuánto). Los días que
+ * faltaron quedan congelados. via = 'gems' (o, cuando haya anuncios, 'ad': sin gemas).
+ */
+export function reviveStreak(state, todayKey, { via = 'gems' } = {}) {
+  const lost = G.lostStreak(state.daily, todayKey);
+  if (!lost) return refused({ reason: 'nolost' });
+  const gems = via === 'ad' ? 0 : lost.gems;
+  if (state.progress.gems < gems) return refused({ reason: 'gems', need: gems });
+  for (const k of lost.missed) ensureDay(state, k).frozen = 1;
+  state.progress.gems -= gems;
+  refreshStreak(state, todayKey);
+  return done([{ type: 'streakRevived', days: lost.restored, gems }], { lost });
 }
 
 /** Descanso terminado. Solo da XP si viene después de una sesión completa (evita "granjear" descansos). */
@@ -303,13 +324,27 @@ export function setPremium(state, active) {
   const events = [];
   pm.active = !!active;
   pm.since = active ? new Date().toISOString() : null;
-  if (active && !pm.bonusClaimed) {
-    pm.bonusClaimed = true;
-    addGems(state, PREMIUM_GEMS, events, 'premium');
-    pm.giftPending = C.lockedCompanions(state.progress).length > 0;
-    events.push({ type: 'premiumGift', gems: PREMIUM_GEMS, choosePet: pm.giftPending });
-  }
+  if (active) giveGift(state, events);
   return done(events);
+}
+
+function giveGift(state, events) {
+  const pm = state.premium;
+  if (pm.bonusClaimed) return;
+  pm.bonusClaimed = true;
+  addGems(state, PREMIUM_GEMS, events, 'premium');
+  pm.giftPending = C.lockedCompanions(state.progress).length > 0;
+  events.push({ type: 'premiumGift', gems: PREMIUM_GEMS, choosePet: pm.giftPending });
+}
+
+/**
+ * (v4.7.0) Premium pagado (Google Play): el regalo de bienvenida, una sola vez por cuenta, sin tocar
+ * premium.active (ese es el de la prueba gratis; el pagado lo decide el servidor).
+ */
+export function premiumGift(state) {
+  const events = [];
+  giveGift(state, events);
+  return events.length ? done(events) : refused();
 }
 
 /** Elige la mascota de regalo de Premium (solo si el regalo está pendiente y no la tenías). */
@@ -347,18 +382,29 @@ export function feedPet(state, foodId, now = new Date()) {
 }
 
 /** (v4.2) Revive a la mascota de ahora si se murió de hambre. Cuesta P.REVIVE_COST gemas. */
-export function revivePet(state, now = new Date()) {
+export function revivePet(state, now = new Date(), { via = 'gems' } = {}) {
   P.settle(state, now);
   const petId = P.currentPetId(state);
   if (!P.petStatus(state, petId, now).dead) return refused({ reason: 'alive' });
-  if (state.progress.gems < P.REVIVE_COST) return refused({ reason: 'gems' });
-  state.progress.gems -= P.REVIVE_COST;
+  // (v4.5.3) via 'ad': ya vio los anuncios (js/ads.js cuenta los 3), así que no cuesta gemas
+  const cost = via === 'ad' ? 0 : P.REVIVE_COST;
+  if (state.progress.gems < cost) return refused({ reason: 'gems' });
+  state.progress.gems -= cost;
   state.progress.totals.revived += 1;
   const rec = { ...state.pets[petId], fullness: P.REVIVE_FULLNESS, at: now.toISOString() };
   delete rec.dead;
   delete rec.rest;
   state.pets[petId] = rec;
-  return done([{ type: 'revived', petId, gems: P.REVIVE_COST }]);
+  return done([{ type: 'revived', petId, gems: cost }]);
+}
+
+/** (v4.5.3) Vio completo un anuncio para ganar gemas (js/ads.js lleva el límite del día). */
+export function adGems(state, amount) {
+  const n = Math.max(0, Math.min(100, Math.round(Number(amount) || 0)));
+  if (!n) return refused({ reason: 'none' });
+  const events = [];
+  addGems(state, n, events, 'ad');
+  return done(events);
 }
 
 /** (v4.2) Ponle nombre a la mascota de ahora ('' lo quita). */

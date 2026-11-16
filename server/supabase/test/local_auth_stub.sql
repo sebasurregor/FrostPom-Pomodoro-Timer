@@ -4,6 +4,8 @@ do $$
 begin
   if not exists (select 1 from pg_roles where rolname = 'anon') then create role anon nologin; end if;
   if not exists (select 1 from pg_roles where rolname = 'authenticated') then create role authenticated nologin; end if;
+  -- (v4.7.0) El rol de la clave secreta (lo usan las Edge Functions)
+  if not exists (select 1 from pg_roles where rolname = 'service_role') then create role service_role nologin; end if;
 end $$;
 create schema auth;
 -- Como en Supabase: las cuentas anónimas tienen is_anonymous = true.
@@ -14,7 +16,7 @@ language sql stable as $$
 $$;
 grant usage on schema auth to anon, authenticated;
 grant execute on function auth.uid() to anon, authenticated;
-grant usage on schema public to anon, authenticated;
+grant usage on schema public to anon, authenticated, service_role;
 
 -- (v4.5.1) Lo mínimo de Supabase Realtime: realtime.send() anota el aviso en realtime.messages y
 -- realtime.topic() dice el canal (en Supabase lo pone el servidor de Realtime al revisar la política).

@@ -43,10 +43,40 @@ function plugins() {
         Browser: registerPlugin('Browser'),
         // (v4.6) Solo si la app trae el complemento (si no, llamarlo daría "not implemented")
         FrostTimer: Capacitor && Capacitor.isPluginAvailable && Capacitor.isPluginAvailable('FrostTimer') ? registerPlugin('FrostTimer') : null,
+        // (v4.5.3) Anuncios de AdMob (@capacitor-community/admob). Solo los usa js/ads.js.
+        AdMob: Capacitor && Capacitor.isPluginAvailable && Capacitor.isPluginAvailable('AdMob') ? registerPlugin('AdMob') : null,
+        // (v4.7.0) Cobro de Premium con Google Play (@revenuecat/purchases-capacitor). Solo lo usa js/play-billing.js.
+        Purchases: Capacitor && Capacitor.isPluginAvailable && Capacitor.isPluginAvailable('Purchases') ? registerPlugin('Purchases') : null,
       }))
       .catch(() => null);
   }
   return loading;
+}
+
+/**
+ * (v4.5.3) El complemento de AdMob como { api }, o null (en la web, o si la app se compiló sin él).
+ * Va dentro de un objeto a propósito: el complemento de Capacitor responde a CUALQUIER nombre,
+ * también a "then", así que devolverlo solo desde una función async la dejaba esperando para siempre.
+ */
+export async function adMob() {
+  const p = await plugins();
+  return p && p.AdMob ? { api: p.AdMob } : null;
+}
+
+/** (v4.7.0) El complemento de RevenueCat como { api }, o null (mismo motivo que adMob()). */
+export async function purchases() {
+  const p = await plugins();
+  return p && p.Purchases ? { api: p.Purchases } : null;
+}
+
+/** ¿Es la app de Android? (los anuncios solo van ahí) */
+export function isAndroid() {
+  try {
+    const c = cap();
+    return isNative() && typeof c.getPlatform === 'function' && c.getPlatform() === 'android';
+  } catch {
+    return false;
+  }
 }
 
 const quiet = async (fn) => {

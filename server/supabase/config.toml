@@ -1,0 +1,15 @@
+# FrostPom (v4.7.0) — ajustes de las Edge Functions para la CLI de Supabase.
+# Las dos revisan la autorización por su cuenta (rc-webhook: la clave de RevenueCat;
+# premium-sync: la sesión de la persona con /auth/v1/user). Por eso verify_jwt = false:
+# la revisión automática de Supabase no entiende las claves nuevas (sb_publishable_…) ni la
+# cabecera que manda RevenueCat. Paso a paso: docs/GOOGLE-PLAY-BILLING.md
+# Se usa desde la carpeta server/:  npx supabase functions deploy rc-webhook --no-verify-jwt
+
+# Nombre local del proyecto (solo para la CLI; NO es el id de tu proyecto en Supabase)
+project_id = "frostpom"
+
+[functions.rc-webhook]
+verify_jwt = false
+
+[functions.premium-sync]
+verify_jwt = false

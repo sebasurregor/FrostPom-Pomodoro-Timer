@@ -13,9 +13,11 @@ import { $, $$ } from './ui/dom.js';
 import { toast, dlg } from './ui/feedback.js';
 import { state, store, session, prefs, configure, reloadFromStore, mutate, today } from './ui/context.js';
 import { play } from './ui/celebrations.js';
+import { checkStreak } from './ui/streak.js';
+import { bindAds, bootAds } from './ui/ads-ui.js';
 import { renderHUD, renderPole, updatePhase, bindHUD } from './ui/hud.js';
 import { startChatter } from './ui/scenery.js';
-import { renderPremium, maybePaywall, bindPremium, syncStorePremium } from './ui/premium.js';
+import { renderPremium, maybePaywall, bindPremium, syncStorePremium, initPlayPremium, bootPlayPremium } from './ui/premium.js';
 import { bindSound } from './ui/sound.js';
 import { checkReminder, bindReminders } from './ui/reminders.js';
 import { renderTimer, renderPresets, renderToday, startOrToggle, tick, onDue, wakeLock, bindFocus, renderBuddy } from './ui/focus.js';
@@ -239,12 +241,13 @@ function boot() {
   watchTyping(); // en el celular, el paisaje se queda quieto mientras escribes
   initSheets(); // (v4.3) en el celular, varias secciones se abren como ventana
   configure({ render: renderAll, play });
+  initPlayPremium(); // (v4.7.0) en la app de Android con cobro, Premium lo decide el servidor (antes de pintar)
   initNative(); // solo dentro de la app de Android: botón atrás, avisos, vibración
   bindHUD();
   updatePhase();
   setInterval(() => { updatePhase(); checkNewDay(); checkSeason(); checkPet(); }, 60 * 1000);
   startChatter(() => session.running && session.state.mode === 'study');
-  for (const bind of [bindPremium, bindSound, bindReminders, bindFocus, bindProgress, bindActivity, bindProfile, bindRanking, bindSettings, bindFeeding, bindGlobal]) bind();
+  for (const bind of [bindPremium, bindSound, bindReminders, bindFocus, bindProgress, bindActivity, bindProfile, bindRanking, bindSettings, bindFeeding, bindAds, bindGlobal]) bind();
   initPip(); // (v4.4.1) "Siempre encima" (solo donde el navegador lo permite)
   renderAll();
   route(false);
@@ -255,7 +258,16 @@ function boot() {
   // Cuentas en línea (v4.0) primero: si hay progreso más nuevo en la nube, se trae antes del ranking.
   // (v4.5) Después, el reloj en vivo con tus otros aparatos.
   // (v4.5.1) Si tu nombre ya no está permitido (normas nuevas), se pide otro antes de unirte al ranking.
-  Promise.resolve(greet()).then(bootCloud).then(() => renameIfBlocked().catch(() => {})).then(() => bootLive().catch(() => {})).then(bootBoard).catch(() => {}).finally(() => { checkSeason(); checkPet(); });
+  Promise.resolve(greet()).then(bootCloud).then(() => renameIfBlocked().catch(() => {})).then(() => bootLive().catch(() => {})).then(bootBoard).catch(() => {}).finally(() => {
+    checkSeason(); checkPet();
+    // (v4.5.3) Anuncios (solo en la app de Android, 13+): el consentimiento de Google, si tu país lo
+    // pide, y AdMob. Se espera un momento para que la racha apagada ya ofrezca "Ver un anuncio".
+    // (v4.5.2) Si tu racha se apagó ayer, tu compañero te cuenta y puedes revivirla (después de traer
+    // el progreso de la nube: quizá estudiaste en otro aparato)
+    // (v4.7.0) Primero se pregunta al servidor por tu Premium pagado (así nadie con Premium ve el
+    // anuncio del descanso), después los anuncios.
+    bootPlayPremium().catch(() => {}).then(() => bootAds()).catch(() => false).then(() => checkStreak({ running: session.running })).catch(() => {});
+  });
   syncStorePremium(); // con cobro real: Premium sigue a la suscripción de Microsoft Store
   hintReducedMotion();
   registerServiceWorker();

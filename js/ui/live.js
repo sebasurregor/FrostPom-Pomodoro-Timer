@@ -290,6 +290,11 @@ function onNotify(n) {
     if (Number(n.v) > SYNC.load().version) pull(true);
     return;
   }
+  // (v4.7.0) Cambió tu Premium pagado (compraste o se renovó en otro aparato): se pregunta al servidor
+  if (n.k === 'e') {
+    document.dispatchEvent(new CustomEvent('frostpom:premium'));
+    return;
+  }
   // Un aviso de una acción de ESTE aparato (mismo número al azar) no hace falta preguntarlo
   const mine = TS.lastSent();
   const p = TS.pending();

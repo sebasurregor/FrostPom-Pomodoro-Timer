@@ -1438,3 +1438,179 @@ test('sin conexión (v4.5): cada módulo de la app queda guardado en el service 
   const mods = walk('js').filter((f) => f.endsWith('.js') && f !== 'js/vendor/capacitor-core.js');
   for (const f of mods) assert.ok(sw.includes(`'./${f}'`), `${f} está en el PRECACHE de service-worker.js`);
 });
+
+// ---------------------------------------------------------------------------------------------
+// (v4.5.2) La racha se ve: se enciende, crece y se revive
+// ---------------------------------------------------------------------------------------------
+test('racha (v4.5.2): un día congelado cuenta para la racha, pero no como día estudiado', () => {
+  const day = (sec, frozen = 0) => ({ ...G.emptyDay(), studySec: sec, frozen });
+  const daily = { '2026-11-01': day(900), '2026-11-02': day(0, 1), '2026-11-03': day(900) };
+  assert.equal(G.isActiveDay(daily, '2026-11-02'), false);
+  assert.equal(G.isStreakDay(daily, '2026-11-02'), true);
+  assert.deepEqual(G.computeStreak(daily, '2026-11-03'), { current: 3, activeToday: true });
+  assert.equal(G.streakBefore(daily, '2026-11-03'), 2);
+  // Hoy no puede ser un día congelado que "ya cuenta": hay que estudiar
+  assert.deepEqual(G.computeStreak({ ...daily, '2026-11-04': day(0, 1) }, '2026-11-04'), { current: 3, activeToday: false });
+  assert.equal(G.emptyDay().frozen, 0);
+});
+
+test('racha (v4.5.2): el fuego crece en 5, 10, 20, 50, 100, 200 y 365 días', () => {
+  assert.deepEqual([1, 4, 5, 9, 10, 20, 49, 50, 100, 200, 365, 900].map(G.streakTier), [0, 0, 1, 1, 2, 3, 3, 4, 5, 6, 7, 7]);
+});
+
+test('racha (v4.5.2): qué racha apagada se puede revivir y cuánto cuesta', () => {
+  const on = { ...G.emptyDay(), studySec: 900 };
+  const days = (...keys) => Object.fromEntries(keys.map((k) => [k, { ...on }]));
+  // Estudió del 1 al 4, el 5 no: el 6 se puede revivir (1 día, 100 gemas)
+  let lost = G.lostStreak(days('2026-11-01', '2026-11-02', '2026-11-03', '2026-11-04'), '2026-11-06');
+  assert.deepEqual(lost, { length: 4, missed: ['2026-11-05'], gems: 100, restored: 5 });
+  // Faltaron 2 días: 200 gemas
+  lost = G.lostStreak(days('2026-11-01', '2026-11-02', '2026-11-03', '2026-11-04'), '2026-11-07');
+  assert.deepEqual(lost, { length: 4, missed: ['2026-11-05', '2026-11-06'], gems: 200, restored: 6 });
+  // Faltaron 3: ya no
+  assert.equal(G.lostStreak(days('2026-11-01', '2026-11-02', '2026-11-03', '2026-11-04'), '2026-11-08'), null);
+  // Sigue viva (falta estudiar hoy): nada que revivir
+  assert.equal(G.lostStreak(days('2026-11-01', '2026-11-02'), '2026-11-03'), null);
+  // De 1 día: no se ofrece
+  assert.equal(G.lostStreak(days('2026-11-01'), '2026-11-03'), null);
+  // Ya estudió hoy después del día que faltó: se puede unir (4 + 1 + hoy = 6)
+  lost = G.lostStreak(days('2026-11-01', '2026-11-02', '2026-11-03', '2026-11-04', '2026-11-06'), '2026-11-06');
+  assert.deepEqual(lost, { length: 4, missed: ['2026-11-05'], gems: 100, restored: 6 });
+  // Pero si ya van 2 días de la racha nueva, no
+  assert.equal(G.lostStreak(days('2026-11-01', '2026-11-02', '2026-11-03', '2026-11-05', '2026-11-06'), '2026-11-06'), null);
+});
+
+test('racha (v4.5.2): revivir con gemas congela los días que faltaron', () => {
+  const st = S.defaultState();
+  for (const k of ['2026-11-01', '2026-11-02', '2026-11-03']) st.daily[k] = { ...G.emptyDay(), studySec: 1500, creditedSec: 1500 };
+  st.progress.gems = 90;
+  let r = E.reviveStreak(st, '2026-11-05');
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, 'gems');
+  assert.equal(r.need, 100);
+  st.progress.gems = 130;
+  r = E.reviveStreak(st, '2026-11-05');
+  assert.equal(r.ok, true);
+  assert.equal(st.progress.gems, 30);
+  assert.equal(st.daily['2026-11-04'].frozen, 1);
+  assert.deepEqual(r.events, [{ type: 'streakRevived', days: 4, gems: 100 }]);
+  assert.deepEqual(G.computeStreak(st.daily, '2026-11-05'), { current: 4, activeToday: false });
+  assert.equal(E.reviveStreak(st, '2026-11-05').reason, 'nolost'); // ya está viva
+  // Con un anuncio (cuando existan): sin gemas
+  const st2 = S.defaultState();
+  for (const k of ['2026-11-01', '2026-11-02']) st2.daily[k] = { ...G.emptyDay(), studySec: 1500 };
+  st2.progress.gems = 0;
+  assert.equal(E.reviveStreak(st2, '2026-11-04', { via: 'ad' }).ok, true);
+  // Un día congelado sobrevive a guardar y cargar (sanitizeDay)
+  const back = S.validateState(JSON.parse(JSON.stringify(st)));
+  assert.equal((back.state || back).daily['2026-11-04'].frozen, 1);
+});
+
+test('racha (v4.5.2): al encender la racha de hoy hay un evento (y el día 1, los hitos y los demás)', () => {
+  const st = S.defaultState();
+  const today = '2026-11-10';
+  let r = E.applyStudy(st, studyRec(at(2026, 11, 10, 9)), { todayKey: today });
+  assert.deepEqual(r.events.find((e) => e.type === 'streak'), { type: 'streak', days: 1, first: true, milestone: false });
+  // Otro bloque el mismo día: ya estaba encendida, no se repite
+  r = E.applyStudy(st, studyRec(at(2026, 11, 10, 11)), { todayKey: today });
+  assert.equal(r.events.some((e) => e.type === 'streak'), false);
+  // 4 días antes estudiados: hoy es el día 5 (un hito)
+  const st5 = S.defaultState();
+  for (const k of ['2026-11-06', '2026-11-07', '2026-11-08', '2026-11-09']) st5.daily[k] = { ...G.emptyDay(), studySec: 1500, creditedSec: 1500 };
+  r = E.applyStudy(st5, studyRec(at(2026, 11, 10, 9)), { todayKey: today });
+  assert.deepEqual(r.events.find((e) => e.type === 'streak'), { type: 'streak', days: 5, first: false, milestone: true });
+  // Un bloque de otro día (por ejemplo, terminó ayer a medianoche) no celebra hoy
+  const sty = S.defaultState();
+  r = E.applyStudy(sty, studyRec(at(2026, 11, 9, 23, 50)), { todayKey: today });
+  assert.equal(r.events.some((e) => e.type === 'streak'), false);
+});
+
+// ---------------------------------------------------------------------------------------------
+// (v4.5.3) Anuncios: quién los ve y cuándo (decisiones del autor, 16 nov 2026)
+// ---------------------------------------------------------------------------------------------
+import * as AR from '../js/ad-rules.js';
+
+test('anuncios (v4.5.3): nunca a menores de 13 ni a edad desconocida', () => {
+  const now = new Date(2026, 10, 16);
+  assert.equal(AR.audience(null, now), null);
+  assert.equal(AR.audience({ birth: '2015-03' }, now), null); // 11 años
+  assert.equal(AR.audience({ birth: '2013-12' }, now), null); // 12 (cumple en diciembre)
+  assert.equal(AR.audience({}, now), null); // cuenta del equipo sin fecha: edad desconocida
+  assert.deepEqual(AR.audience({ birth: '2012-10' }, now), { age: 14, under16: true, under18: true });
+  assert.deepEqual(AR.audience({ birth: '2009-01' }, now), { age: 17, under16: false, under18: true });
+  assert.deepEqual(AR.audience({ birth: '2000-05' }, now), { age: 26, under16: false, under18: false });
+  // En línea sin la fecha en este equipo: 13+ (solo se crea para ellos), tratada como menor de 16
+  assert.deepEqual(AR.audience({ online: true }, now), { age: -1, under16: true, under18: true });
+  // La fecha manda: en línea pero menor (no debería pasar) = nada
+  assert.equal(AR.audience({ online: true, birth: '2016-01' }, now), null);
+});
+
+test('anuncios (v4.5.3): pantalla completa cada 4 pomodoros o 90 min de estudio, lo que llegue primero', () => {
+  const day = '2026-11-16';
+  let c = null;
+  assert.equal(AR.interstitialDue(c, day), false); // sin pomodoros, nunca (ni al abrir la app)
+  // Pomodoros de 25 min: el 4.º (100 min) llega a los dos límites a la vez
+  for (let i = 1; i <= 3; i++) { c = AR.noteStudy(c, day, 1500); assert.equal(AR.interstitialDue(c, day), false, `pomodoro ${i}`); }
+  c = AR.noteStudy(c, day, 1500);
+  assert.equal(AR.interstitialDue(c, day), true);
+  c = AR.interstitialShown(c, day);
+  assert.equal(AR.interstitialDue(c, day), false);
+  // Pomodoros de 50 min: a los 90 min de estudio (el 2.º)
+  c = AR.noteStudy(c, day, 3000);
+  assert.equal(AR.interstitialDue(c, day), false);
+  c = AR.noteStudy(c, day, 3000);
+  assert.equal(AR.interstitialDue(c, day), true);
+  // Pomodoros de 15 min: a los 4 (60 min)
+  c = AR.interstitialShown(c, day);
+  for (let i = 0; i < 3; i++) c = AR.noteStudy(c, day, 900);
+  assert.equal(AR.interstitialDue(c, day), false);
+  c = AR.noteStudy(c, day, 900);
+  assert.equal(AR.interstitialDue(c, day), true);
+  // Un día nuevo empieza de cero
+  assert.equal(AR.interstitialDue(c, '2026-11-17'), false);
+  assert.equal(AR.noteStudy(c, '2026-11-17', 1500).pomos, 1);
+});
+
+test('anuncios (v4.5.3): gemas: +10 por anuncio, hasta 5 al día', () => {
+  const day = '2026-11-16';
+  let c = null;
+  assert.equal(AR.rules().gemsPerAd, 10);
+  assert.equal(AR.rules().petReviveAds, 3);
+  for (let i = 5; i > 0; i--) { assert.equal(AR.gemAdsLeft(c, day), i); c = AR.gemAdSeen(c, day); }
+  assert.equal(AR.gemAdsLeft(c, day), 0);
+  assert.equal(AR.gemAdsLeft(c, '2026-11-17'), 5); // mañana, otra vez 5
+  // Ver anuncios por gemas no cambia el contador del anuncio de pantalla completa
+  assert.equal(AR.today(c, day).pomos, 0);
+});
+
+test('anuncios (v4.5.3): gemas por anuncio y revivir a la mascota viendo anuncios (sin gemas)', () => {
+  const st = S.defaultState();
+  st.progress.gems = 5;
+  let r = E.adGems(st, 10);
+  assert.equal(r.ok, true);
+  assert.equal(st.progress.gems, 15);
+  assert.deepEqual(r.events, [{ type: 'gems', amount: 10, reason: 'ad' }]);
+  assert.equal(E.adGems(st, 0).ok, false);
+  // La mascota se murió: con 0 gemas no se puede con gemas, pero sí con anuncios
+  const petId = PET.currentPetId(st);
+  st.pets[petId] = { fullness: 0, at: new Date(2026, 10, 1).toISOString(), dead: new Date(2026, 10, 4).toISOString() };
+  st.progress.gems = 0;
+  assert.equal(E.revivePet(st, new Date(2026, 10, 16)).reason, 'gems');
+  r = E.revivePet(st, new Date(2026, 10, 16), { via: 'ad' });
+  assert.equal(r.ok, true);
+  assert.equal(st.progress.gems, 0);
+  assert.deepEqual(r.events, [{ type: 'revived', petId, gems: 0 }]);
+});
+
+test('anuncios (v4.5.3): apagados por defecto y con los ID de prueba de Google', async () => {
+  const { config } = await import('../js/config.js');
+  assert.equal(config.ads.enabled, false, 'los zips salen con los anuncios apagados');
+  assert.equal(config.ads.testing, true);
+  const ADS = await import('../js/ads.js');
+  assert.equal(ADS.enabled(), false); // en Node no hay app de Android
+  assert.equal(ADS.TEST_IDS.app, 'ca-app-pub-3940256099942544~3347511713');
+  assert.match(ADS.TEST_IDS.rewarded, /^ca-app-pub-3940256099942544\/\d+$/);
+  // El complemento está en package.json (Android lo compila en tu PC)
+  const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+  assert.match(pkg.dependencies['@capacitor-community/admob'], /^8\./);
+});

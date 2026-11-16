@@ -95,6 +95,8 @@ Está hecho para Supabase (PostgreSQL), y sus reglas se probaron en un PostgreSQ
 - La clave **publicable** (`sb_publishable_…`) puede ir en la app: es pública por diseño. La clave **secreta** (`sb_secret_…` o `service_role`) **NUNCA** puede ir en la app, ni en el repositorio, ni en capturas de pantalla.
 - El dominio de Supabase ya está en `connect-src` de la *Content Security Policy* (`index.html` y `_headers`).
 - CAPTCHA (v4.0.3): la app ya envía el token de Cloudflare Turnstile. Para encenderlo, sigue `docs/CAPTCHA.md` **en orden**: primero la clave del sitio y publicar, después encenderlo en Supabase.
+- (v4.7.0) **Premium con Google Play:** el cliente nunca decide si eres Premium. Solo las Edge Functions (`rc-webhook`, `premium-sync`) escriben `private.entitlements`, con la clave secreta de Supabase, después de preguntarle a RevenueCat. `billing_apply()` y `billing_sync_gate()` solo las puede llamar `service_role` (probado en `server/supabase/test/tests.sql`). El webhook se rechaza sin la clave `RC_WEBHOOK_AUTH`, y `premium-sync` solo revisa la cuenta de la sesión (máximo una vez cada 10 s).
+- (v4.7.0) **Claves de RevenueCat:** la pública de Android (`goog_…`) va en `js/config.js`. La secreta (`sk_…`) y `RC_WEBHOOK_AUTH` van **solo** en los secretos de las Edge Functions de Supabase. El JSON de la cuenta de servicio de Google va **solo** a RevenueCat. `tools/app-android.mjs` se detiene si encuentra una clave `sk_` en la app.
 
 ## 4. Si la publicas en la web
 
@@ -138,7 +140,7 @@ Si vas a decir que parte de los ingresos ayuda a los polos:
 - [ ] Llenar la "etiqueta de privacidad" de Apple y la sección "Seguridad de los datos" de Google.
 - [ ] Cuentas: borrado desde la app (ya existe en la app y en el servidor, también para las cuentas en línea). Para los menores de 13 no hay cuenta en línea; para 13 a 17, revisar con un abogado si hace falta consentimiento del adulto.
 - [ ] Mantener cero SDKs de terceros (analítica, anuncios, crash reporting) o usar solo los certificados para niños.
-- [ ] Revisar que la clave `service_role` no esté en ningún archivo del repositorio.
+- [ ] Revisar que la clave `service_role` (y, desde la v4.7.0, la secreta de RevenueCat `sk_…` y el JSON de la cuenta de servicio de Google) no estén en ningún archivo del repositorio.
 - [ ] Confirmar que toda imagen agregada a `assets/companions/` tiene permiso de uso.
 - [ ] Repetir las pruebas: `node --test tests/logic.test.js`, `tests/e2e_smoke.py`, `tests/e2e_ranking.py`, `tests/e2e_cuentas.py` y `server/supabase/test/run_local.sh`.
 

@@ -64,15 +64,21 @@ function classify(status, data) {
 const needsCaptcha = (path, method) => method === 'POST'
   && (path === '/signup' || path === '/recover' || path.startsWith('/token?grant_type=password'));
 
+const ms = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
+
 async function call(path, { body, token, method = 'POST' } = {}) {
   if (!isConfigured()) throw new CloudError('off');
+  const t0 = ms();
+  let waited = -1; // cuánto se esperó a Cloudflare (-1 = esta llamada no lo necesita)
   if (body && CAPTCHA.enabled() && needsCaptcha(path, method)) {
     // Si Cloudflare no responde se intenta igual: con el CAPTCHA apagado en Supabase funciona,
     // y con el CAPTCHA encendido Supabase responde 'captcha' y la app lo explica.
     try { body = { ...body, gotrue_meta_security: { captcha_token: await CAPTCHA.getToken() } }; } catch { /* sin token */ }
+    waited = ms() - t0;
   }
   const headers = { apikey: cfg().key, 'Content-Type': 'application/json' };
   if (token) headers.Authorization = `Bearer ${token}`;
+  const t1 = ms();
   let res;
   try {
     res = await fetch(`${cfg().url}/auth/v1${path}`, { method, headers, body: body ? JSON.stringify(body) : undefined, cache: 'no-store', credentials: 'omit' });
@@ -81,8 +87,44 @@ async function call(path, { body, token, method = 'POST' } = {}) {
   }
   let data = {};
   try { data = await res.json(); } catch { /* respuesta vacía */ }
+  // (v4.5.2) Cuánto tardó cada parte: en el celular se ve con chrome://inspect (docs/CAPTCHA.md)
+  if (waited >= 0) console.info(`[FrostPom] ${path.split('?')[0]}: CAPTCHA ${Math.round(waited)} ms, servidor ${Math.round(ms() - t1)} ms`);
   if (!res.ok) throw new CloudError(classify(res.status, data || {}), data);
   return data || {};
+}
+
+/**
+ * (v4.5.2) Abre de antemano la conexión con Supabase (sin enviar nada): el primer "Entrar" se ahorra
+ * el saludo de la conexión segura, que en el celular puede tardar medio segundo.
+ */
+let preconnected = false;
+export function preconnect() {
+  if (preconnected || !isConfigured() || typeof document === 'undefined') return;
+  preconnected = true;
+  try {
+    const link = document.createElement('link');
+    link.rel = 'preconnect';
+    link.href = String(cfg().url).replace(/\/+$/, '');
+    link.crossOrigin = 'anonymous'; // como las llamadas de la app (credentials: 'omit')
+    document.head.appendChild(link);
+  } catch { /* no importa */ }
+}
+
+/**
+ * (v4.5.2) La persona empezó a escribir en una ventana de entrar, crear o conectar la cuenta: se
+ * prepara todo mientras escribe (la conexión y el token de Cloudflare). n = cuántas llamadas con
+ * CAPTCHA puede hacer esa ventana. Nunca se llama para cuentas de menores de 13.
+ */
+export function warmAuth(n = 1) {
+  if (!isConfigured()) return;
+  preconnect();
+  CAPTCHA.warm(n);
+}
+
+/** Llama a warmAuth al escribir en estos campos (si ok() lo permite en ese momento). */
+export function warmOnInput(fields, n = 1, ok = () => true) {
+  const go = () => { if (ok()) warmAuth(n); };
+  for (const f of fields) if (f) f.addEventListener('input', go);
 }
 
 /** Contraseña aleatoria para el usuario de Supabase (nadie la conoce ni la necesita). */
@@ -240,6 +282,34 @@ export async function rpc(fn, args = {}, token = '') {
   else if (code === 'PGRST202' || code === '42883' || code === 'PGRST205') kind = 'notready';
   else if (res.status === 404) kind = 'notfound';
   else if (res.status === 429 || code === '54000') kind = 'rate';
+  throw new CloudError(kind, data);
+}
+
+/**
+ * (v4.7.0) Llama una Edge Function de Supabase (/functions/v1/…) con la sesión de la persona.
+ * Errores: 'auth', 'rate' (pidió hace muy poco), 'notready' (la función no está desplegada),
+ * 'account_required', 'offline' o 'server'.
+ */
+export async function callFunction(name, token, body = {}) {
+  if (!isConfigured()) throw new CloudError('off');
+  let res;
+  try {
+    res = await fetch(`${cfg().url}/functions/v1/${name}`, {
+      method: 'POST',
+      headers: { apikey: cfg().key, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body), cache: 'no-store', credentials: 'omit',
+    });
+  } catch {
+    throw new CloudError('offline');
+  }
+  let data = null;
+  try { data = await res.json(); } catch { /* sin cuerpo */ }
+  if (res.ok) return data;
+  let kind = 'server';
+  if (res.status === 401) kind = 'auth';
+  else if (res.status === 429) kind = 'rate';
+  else if (res.status === 404) kind = 'notready';
+  else if (res.status === 403) kind = 'account_required';
   throw new CloudError(kind, data);
 }
 

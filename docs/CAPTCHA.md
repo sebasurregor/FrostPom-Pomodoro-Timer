@@ -142,10 +142,16 @@ Si la consola muestra un error de Turnstile en este paso, **no hagas el paso 4**
 
 - `js/captcha.js` carga el script de Turnstile **solo cuando hace falta**, y solo desde `https://challenges.cloudflare.com` (lo permite la CSP de `index.html`, con su propia regla de Trusted Types, `st-captcha`).
 - `js/cloud.js` pide un token **nuevo** antes de cada llamada protegida (`/signup`, `/token?grant_type=password`, `/recover`) y lo envía a Supabase en `gotrue_meta_security.captcha_token`. Supabase se lo pregunta a Cloudflare con la secret key.
+- **(v4.5.2) El token se pide mientras escribes.** En las ventanas de entrar, crear la cuenta (al escribir el correo, solo con 13 años o más), conectar y recuperar, `CLOUD.warmOnInput` llama a `CAPTCHA.warm(n)` con la primera tecla. Así el token ya está listo cuando tocas "Entrar" y "Conectando…" solo espera a Supabase.
+  - Cada token se usa una sola vez.
+  - Si pasan más de 4,5 minutos, se cambia por uno nuevo (Cloudflare los da por 5 minutos).
+  - Si la ventana se cierra antes de que llegue, se deja de pedir.
+- **Cuánto tardó:** la consola muestra `[FrostPom] /token: CAPTCHA 3 ms, servidor 640 ms` en cada llamada protegida, y `[FrostPom] Entrar: … ms en total` al entrar. En el celular se ve conectándolo al computador y abriendo `chrome://inspect` en Chrome. Si "CAPTCHA" sale alto, Cloudflare tardó (por ejemplo, porque tocaste "Entrar" antes de que terminara). Si "servidor" sale alto, el que tardó fue Supabase.
+- Si Cloudflare no responde en **30 s** (antes 90 s), la app sigue sin token. Si muestra la casilla, espera hasta 3 minutos a que la toques.
 - Si Cloudflare no responde, la app intenta igual: con el CAPTCHA apagado en Supabase funciona, y con el CAPTCHA encendido Supabase lo rechaza y la app lo explica.
 - La casilla aparece dentro de la ventana abierta porque lo que queda fuera de una ventana no se puede tocar.
 - Si Turnstile falla, la consola muestra un aviso amarillo con el código de Cloudflare: `[FrostPom] Cloudflare Turnstile no respondió (código …)`. La app le pide a Turnstile **no reintentar solo** (`retry: 'never'`): antes, a los 8 s intentaba reiniciar una casilla ya quitada y dejaba el error rojo "Nothing to reset found for provided container".
-- Pruebas: `python tests/e2e_captcha.py http://localhost:8000/` (24 comprobaciones con Supabase y Turnstile simulados; el Turnstile simulado reintenta como el real).
+- Pruebas: `python tests/e2e_captcha.py http://localhost:8000/` (34 comprobaciones con Supabase y Turnstile simulados; el Turnstile simulado reintenta como el real y puede ser lento, como en Android).
 
 ## Fuentes
 

@@ -1,6 +1,6 @@
 {
   "name": "frostpom",
-  "version": "4.5.1",
+  "version": "4.7.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,15 +10,18 @@
     "android:www": "node tools/app-www.mjs",
     "android:crear": "npm run android:www && npx cap add android && node tools/app-android.mjs && npx cap sync android",
     "android:actualizar": "npm run android:www && node tools/app-android.mjs && npx cap sync android",
-    "android:abrir": "npx cap open android"
+    "android:abrir": "npx cap open android",
+    "edge:pegar": "node tools/edge-pegar.mjs"
   },
   "dependencies": {
+    "@capacitor-community/admob": "8.4.0",
     "@capacitor/android": "8.6.0",
     "@capacitor/app": "8.1.2",
     "@capacitor/browser": "8.0.5",
     "@capacitor/core": "8.6.0",
     "@capacitor/haptics": "8.0.2",
-    "@capacitor/local-notifications": "8.3.1"
+    "@capacitor/local-notifications": "8.3.1",
+    "@revenuecat/purchases-capacitor": "14.1.0"
   },
   "devDependencies": {
     "@capacitor/cli": "8.6.0"

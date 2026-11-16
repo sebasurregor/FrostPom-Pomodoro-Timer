@@ -22,6 +22,7 @@ import { syncAmbient } from './sound.js';
 import { pic } from './pics.js';
 import { onStudyStart, onStudyRecorded, onStudyDropped } from './board-ui.js';
 import * as LIVE from './live.js';
+import * as ADS_UI from './ads-ui.js';
 import { state, mutate, prefs, today, session, isPremium, poleNow } from './context.js';
 import { t, tr } from '../i18n.js';
 
@@ -86,6 +87,8 @@ export function startOrToggle(opts) {
       // Ranking global: el servidor anota la hora. (v4.5) Su número viaja con el reloj en vivo.
       const block = session.state.block;
       Promise.resolve(onStudyStart(session.state)).then((r) => { if (r && r.ok && r.id) LIVE.rankReady(block, r.id); });
+      // (v4.5.3) Si al terminar este pomodoro toca el anuncio del descanso, se carga desde ya
+      ADS_UI.onFocusStart(session.state.durationSec || 0);
     }
   }
   LIVE.local(action, { auto, at });
@@ -234,10 +237,14 @@ function afterRecord(rec, { auto }) {
   timerChanged();
   // (v4.3) Un solo ajuste: "Lo siguiente empieza solo" (autoBreak) vale para el estudio y el descanso.
   const autoNext = state.settings.autoBreak;
-  if (auto && rec.completed && autoNext && Date.now() - rec.endMs <= LATE_MS) {
-    setTimeout(() => {
+  const live = auto && rec.completed && Date.now() - rec.endMs <= LATE_MS;
+  // (v4.5.3) Terminó un pomodoro con la app abierta: si toca, el anuncio de pantalla completa (solo
+  // en Android, 13+, sin Premium). El descanso empieza cuando se cierra: no pierdes ni un segundo.
+  const ad = live && rec.mode === 'study' ? new Promise((r) => setTimeout(r, 1600)).then(() => ADS_UI.afterStudy(rec)).catch(() => false) : null;
+  if (live && autoNext) {
+    Promise.resolve(ad || new Promise((r) => setTimeout(r, 1600))).then(() => {
       if (session.state.status === 'idle') startOrToggle({ auto: true });
-    }, 1600);
+    });
   }
 }
 

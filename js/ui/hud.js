@@ -31,6 +31,10 @@ export function renderHUD() {
   const streak = G.computeStreak(state.daily, today());
   $('#hudStreakN').textContent = String(streak.current);
   $('#hudStreak').classList.toggle('is-hot', streak.activeToday);
+  // (v4.5.2) Mientras hoy no cuenta, el fuego está congelado
+  const fire = $('#hudStreak .pic');
+  const src = `assets/icons/${streak.activeToday ? 'fuego' : 'fuego-congelado'}.png`;
+  if (fire && fire.getAttribute('src') !== src) fire.setAttribute('src', src);
   $('#hudStreak').title = t(streak.activeToday ? 'Racha de {n} días. Hoy ya cuenta.' : 'Racha de {n} días. Estudia 10 minutos hoy para mantenerla.', { n: streak.current });
   $('#hudGemsN').textContent = fmtInt(state.progress.gems);
 }

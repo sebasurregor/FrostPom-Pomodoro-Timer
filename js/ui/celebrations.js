@@ -16,6 +16,7 @@ import { mutate } from './context.js';
 import { giftCompanionDialog } from './premium.js';
 import { pic } from './pics.js';
 import { t, tr } from '../i18n.js';
+import { showStreakLit, showStreakRevived } from './streak.js';
 
 const queue = [];
 let playing = false;
@@ -95,6 +96,9 @@ const SHOW = {
     toast(t('Nuevo estilo para tu anillo: {name}.', { name: e.skin.name }), 'good');
     return wait(100);
   },
+  // (v4.5.2) La racha: se enciende, crece y se revive (js/ui/streak.js)
+  streak: showStreakLit,
+  streakRevived: showStreakRevived,
 };
 
 function showEvent(e) {

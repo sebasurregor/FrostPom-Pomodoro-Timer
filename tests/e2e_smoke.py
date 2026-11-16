@@ -146,6 +146,9 @@ with sync_playwright() as p:
     check(state(pg)["progress"]["xp"] == 33, "1.ª sesión: 33 XP")
     check(not any(("focus" in x or "notes" in x) for x in state(pg)["sessions"]), "solo se guarda el tiempo, no en qué se estudió")
     check(pg.get_attribute("#ring", "data-mode") == "break", "arranca solo el descanso")
+    # (v4.5.2) El primer pomodoro del día enciende la racha: sale el fuego encendiéndose
+    check(pg.evaluate("document.querySelector('#dlg.dlg--streak[open] .rankup__kicker')?.textContent") == "¡Encendiste tu racha!", "el primer pomodoro enciende la racha (sale el fuego con «+1 día de racha»)")
+    pg.click("#dlg.dlg--streak [data-primary]"); pg.clock.run_for(500)
     pg.clock.fast_forward("05:00"); pg.clock.run_for(4000)
     pg.clock.fast_forward("25:00"); pg.clock.run_for(3000)
     check(pg.evaluate("document.querySelector('.rankup__name')?.textContent") == "Bronce II", "ceremonia de subida a Bronce II")
@@ -174,7 +177,7 @@ with sync_playwright() as p:
     check(pg.inner_text("#calTitle") == "Noviembre 2026", "el calendario abre en el mes actual")
     check(pg.evaluate("document.querySelectorAll('#calGrid .cal__day').length") == 30, "noviembre tiene 30 días")
     day = pg.query_selector('#calGrid .cal__day[data-key="2026-11-02"]')
-    check(day is not None and "50 min" in (day.get_attribute("aria-label") or "") and "lv-3" in (day.get_attribute("class") or "") and day.query_selector(".pic--copo") is not None, "el día muestra 50 min, meta cumplida y su copo de nieve")
+    check(day is not None and "50 min" in (day.get_attribute("aria-label") or "") and "lv-3" in (day.get_attribute("class") or "") and day.query_selector(".pic--congelada") is not None, "el día muestra 50 min, meta cumplida y su ícono congelado (v4.5.2)")
     pg.click('#calGrid .cal__day[data-key="2026-11-02"]'); pg.clock.run_for(100)
     check("Lunes 2 de noviembre: 50 min en 2 sesiones" in pg.inner_text("#calDetail"), "al tocar un día se ve cuánto estudiaste")
     check(pg.evaluate("document.getElementById('calNext').disabled && document.getElementById('calPrev').disabled"), "no se puede ir a meses sin datos ni al futuro")

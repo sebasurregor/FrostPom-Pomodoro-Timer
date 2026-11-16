@@ -47,7 +47,7 @@ Elige cuánto quieres estudiar (25 + 5, 50 + 10 o tu propio ritmo) y concéntrat
 • Modo oscuro para estudiar de noche.
 • Funciona sin internet.
 
-Privacidad primero: no pedimos tu nombre real y tu foto nunca sale de tu teléfono. Si tienes menos de 13 años, todo se guarda solo en tu dispositivo. No hay anuncios ni rastreadores.
+Privacidad primero: no pedimos tu nombre real y tu foto nunca sale de tu teléfono. Si tienes menos de 13 años, todo se guarda solo en tu dispositivo y nunca ves anuncios. Los anuncios nunca aparecen mientras estudias.
 
 Disponible en español e inglés.
 ```
@@ -87,7 +87,7 @@ Pick how long you want to study (25 + 5, 50 + 10 or your own pace) and focus whi
 • Dark mode for late-night studying.
 • Works offline.
 
-Privacy first: we don't ask for your real name and your photo never leaves your phone. If you are under 13, everything is stored only on your device. No ads, no trackers.
+Privacy first: we don't ask for your real name and your photo never leaves your phone. If you are under 13, everything is stored only on your device and you never see ads. Ads never appear while you study.
 
 Available in English and Spanish.
 ```
@@ -126,7 +126,11 @@ The app works offline; the leaderboard and syncing need internet.
 
 ### Anuncios
 
-**No**, la app no tiene anuncios.
+(v4.5.3) **Sí**, la app contiene anuncios (Google AdMob), **desde que publiques la versión con `config.ads.enabled = true`**. Mientras estén apagados puedes dejar "No". En la ficha aparece "Contiene anuncios".
+
+- Solo en Android y solo para mayores de 13 (la pantalla de edad del registro decide). Menores de 13 y edad desconocida: nunca.
+- Formatos: con recompensa (la persona elige verlos: gemas, revivir la mascota o la racha) y pantalla completa al empezar el descanso (cada 4 pomodoros o 90 min de estudio; nunca con Premium).
+- **Identificador de publicidad (Advertising ID):** en "Contenido de la app → ID de publicidad", responde **Sí, la app usa el ID de publicidad**, para **Publicidad o marketing**. El SDK de AdMob agrega solo el permiso `AD_ID`.
 
 ### Clasificación de contenido (cuestionario IARC)
 
@@ -135,20 +139,20 @@ Categoría: la que más se parezca a **educación o utilidad / productividad** (
 - Violencia, sexo, lenguaje vulgar, drogas, apuestas: **No**.
 - ¿Los usuarios interactúan o comparten contenido? **Sí, de forma limitada**: un ranking muestra el nombre de usuario, el país, el animal y los minutos de estudio. No hay chat, mensajes ni fotos. Los nombres pasan por un filtro, se pueden reportar y ocultar, y cualquiera puede salir del ranking.
 - ¿Comparte la ubicación? **No**.
-- ¿Compras digitales? **No** (Premium está en modo prueba gratis y las gemas no se venden). Si algún día cobras, repite el cuestionario.
+- ¿Compras digitales? **(v4.7.0) Sí, desde que publiques la versión con el cobro encendido** (`config.premium.play.enabled = true`): la suscripción Premium se compra con Google Play. Las gemas siguen sin venderse. Mientras el cobro esté apagado, la respuesta es **No**. Cuando lo enciendas, repite el cuestionario.
 
 ### Público objetivo (Target audience)
 
 Es una decisión tuya. Lo que significa cada opción:
 
 - **Solo 13 años o más** (13–15, 16–17, 18+): la revisión es más sencilla. Los menores de 13 no la encontrarían como app para ellos.
-- **Incluir 9–12** (o menos): FrostPom entra en la **Política de Familias** de Google, que es más estricta. FrostPom ya cumple lo principal: pregunta la edad sin sugerir respuesta (mes y año), no tiene anuncios ni rastreadores, y los menores de 13 no envían nada a ningún servidor ni cargan Cloudflare. Google puede pedir más revisión. Antes de marcar esas edades, lee la **Política de Familias** en el centro de políticas de Google Play (en Play Console, el enlace aparece al elegir esas edades).
+- **Incluir 9–12** (o menos): FrostPom entra en la **Política de Familias** de Google, que es más estricta. FrostPom ya cumple lo principal: pregunta la edad sin sugerir respuesta (mes y año), los menores de 13 no envían nada a ningún servidor ni cargan Cloudflare, y (v4.5.3) **nunca ven anuncios**: para ellos y para la edad desconocida la app no inicia AdMob. Los anuncios (para 13+) son de Google AdMob, que está en la lista de SDK de anuncios autocertificados para Familias; no son personalizados para menores de 18 y no usan tácticas para presionar a ver anuncios (son opcionales, salvo el de pantalla completa en el descanso). Google puede pedir más revisión. Antes de marcar esas edades, lee la **Política de Familias** en el centro de políticas de Google Play (en Play Console, el enlace aparece al elegir esas edades).
 
 En cualquier caso responde **"No"** a "¿Podría atraer de forma no intencional a niños?" solo si de verdad no incluyes menores; si dudas, inclúyelos y cumple la política.
 
 ### Seguridad de los datos (Data safety)
 
-**¿La app recoge o comparte datos?** Sí, recoge. **No comparte** (Supabase, Brevo y Cloudflare son proveedores que trabajan para la app; Google no lo cuenta como "compartir").
+**¿La app recoge o comparte datos?** Sí, recoge. Supabase, Brevo y Cloudflare son proveedores que trabajan para la app (Google no lo cuenta como "compartir"). **(v4.5.3) Con los anuncios encendidos, sí comparte:** el SDK de Google AdMob recoge y comparte con Google los datos de la segunda tabla (solo en Android y solo de mayores de 13).
 
 **¿Todo viaja cifrado?** Sí (HTTPS). **¿Se puede pedir el borrado?** Sí: en la app y en https://sebasurregor.github.io/FrostPom-Pomodoro-Timer/eliminar-cuenta.html
 
@@ -161,7 +165,19 @@ En cualquier caso responde **"No"** a "¿Podría atraer de forma no intencional 
 | Actividad en la app → **Interacciones con la app** (pomodoros, minutos, progreso) | Sí | Funcionalidad de la app | No |
 | Actividad en la app → **Otras acciones** (los nombres que reportas) | Sí | Seguridad, prevención de fraude y cumplimiento | Sí |
 | Actividad en la app → **Otro contenido generado por el usuario** (v4.2: el nombre que le pones a tu mascota; viaja con tu progreso y no lo ve nadie más) | Sí | Funcionalidad de la app | Sí |
-| Ubicación, fotos, contactos, salud, finanzas, ID de publicidad | **No** | | |
+| Fotos, contactos, salud | **No** | | |
+| (v4.7.0) Información financiera → **Historial de compras** (la suscripción Premium: plan, fechas y estado; **nunca** la tarjeta) | Sí, **solo con el cobro encendido** | Funcionalidad de la app | Sí (solo quien se suscribe) |
+
+**(v4.5.3) Lo que agrega Google AdMob** (según la [guía de Google para el formulario](https://developers.google.com/admob/android/play-data-disclosure?hl=en)). Márcalo como **recogido y compartido**, cifrado, para **Publicidad o marketing**, **Estadísticas** y **Prevención de fraudes, seguridad y cumplimiento**:
+
+| Tipo de dato (en Play Console) | De dónde sale |
+|---|---|
+| Ubicación → **Ubicación aproximada** | La dirección IP (Google puede estimar la zona) |
+| Actividad en la app → **Interacciones con la app** | Abrir la app, toques y videos de los anuncios |
+| Información y rendimiento de la app → **Diagnósticos** | Rendimiento de la app y del SDK |
+| ID del dispositivo u otros ID → **ID del dispositivo u otros ID** | El ID de publicidad de Android y el "app set ID" |
+
+Estos no son opcionales para quien ve anuncios, pero los menores de 13 nunca los envían (la app no inicia AdMob para ellos).
 
 Notas:
 
@@ -170,6 +186,7 @@ Notas:
 - Los recordatorios y avisos son **notificaciones locales**: no pasan por ningún servidor.
 - (v4.5) El **reloj en vivo** (el estado del pomodoro en curso, compartido entre tus equipos) entra en **Actividad en la app → Interacciones con la app**, que ya está marcado. No se guarda ningún identificador del aparato, así que **no** hay que marcar "ID del dispositivo u otros ID".
 - (v4.6) La notificación en curso y el widget funcionan dentro del teléfono: no envían nada.
+- (v4.7.0) **Premium con Google Play:** el cobro lo hace Google (la tarjeta nunca llega a FrostPom ni a RevenueCat). RevenueCat es un **proveedor** que verifica la compra para la app (no cuenta como "compartir"): recibe el **ID de usuario** (ya marcado arriba) y el **historial de compras** (la fila nueva). La app apaga la recolección automática de identificadores del aparato de RevenueCat, así que **no** se agrega "ID del dispositivo" por RevenueCat. RevenueCat solo se usa con cuentas en línea (13+) que abren Premium.
 
 ### Eliminación de la cuenta
 
@@ -179,5 +196,5 @@ Notas:
 
 ### Otras preguntas
 
-- App de noticias: **No**. App de salud: **No**. Funciones financieras: **No**. App del gobierno: **No**.
+- App de noticias: **No**. App de salud: **No**. Funciones financieras: **No** (una suscripción dentro de la app no es una "función financiera"). App del gobierno: **No**.
 - Funciones de seguimiento de contactos o COVID: **No**.

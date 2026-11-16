@@ -1018,4 +1018,151 @@ begin
 end $$;
 reset role;
 alter function realtime.send_apagado(jsonb, text, text, boolean) rename to send;
+
+-- ===================== (v4.7.0) Premium pagado: entitlements =====================
+-- Pau tiene cuenta con correo y se suscribe; Quique es anónimo (solo ranking).
+reset role;
+insert into auth.users (id, email, is_anonymous) values
+  ('b4700000-0000-0000-0000-000000000001', 'pau@ejemplo.com', false),
+  ('b4700000-0000-0000-0000-000000000002', null, true);
+delete from realtime.messages;
+
+-- Desde la app nadie puede escribir su Premium (ni con sesión ni sin ella)
+set role authenticated;
+set request.jwt.claim.sub = 'b4700000-0000-0000-0000-000000000001';
+do $$
+begin
+  begin
+    perform public.billing_apply('b4700000-0000-0000-0000-000000000001', '{"premium":true,"status":"active"}');
+    raise exception 'FALLO: una cuenta con sesión se dio Premium a sí misma';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    perform public.billing_sync_gate('b4700000-0000-0000-0000-000000000001');
+    raise exception 'FALLO: una cuenta con sesión usó billing_sync_gate';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    perform count(*) from private.entitlements;
+    raise exception 'FALLO: una cuenta con sesión leyó la tabla de Premium';
+  exception when insufficient_privilege then null;
+  end;
+  assert not exists (select 1 from public.get_entitlements()), 'FALLO: sin suscripción, get_entitlements devolvió algo';
+  raise notice 'OK  Premium: nadie se lo da desde la app; sin suscripción no hay nada';
+end $$;
+-- Una cuenta anónima (la del ranking) no tiene Premium pagado
+set request.jwt.claim.sub = 'b4700000-0000-0000-0000-000000000002';
+do $$
+begin
+  begin
+    perform public.get_entitlements();
+    raise exception 'FALLO: una cuenta anónima preguntó por Premium';
+  exception when insufficient_privilege then null;
+  end;
+end $$;
+reset role;
+set role anon;
+do $$
+begin
+  begin
+    perform public.get_entitlements();
+    raise exception 'FALLO: sin sesión se pudo preguntar por Premium';
+  exception when insufficient_privilege then null;
+  end;
+  raise notice 'OK  Premium: sin sesión o con cuenta anónima no se puede preguntar';
+end $$;
+reset role;
+
+-- Las Edge Functions (service_role) guardan lo que dice RevenueCat
+set role service_role;
+do $$
+declare ok boolean;
+begin
+  ok := public.billing_apply('b4700000-0000-0000-0000-000000000001',
+    jsonb_build_object('premium', true, 'status', 'trial', 'store', 'play_store', 'product', 'frostpom_premium:anual',
+                       'period_type', 'trial', 'expires_at', now() + interval '7 days', 'will_renew', true, 'sandbox', true),
+    '{"id":"evt-1","type":"INITIAL_PURCHASE","environment":"SANDBOX"}');
+  assert ok, 'FALLO: no se guardó la suscripción de Pau';
+  -- El mismo aviso repetido (RevenueCat reintenta) no se anota dos veces
+  ok := public.billing_apply('b4700000-0000-0000-0000-000000000001',
+    jsonb_build_object('premium', true, 'status', 'trial', 'expires_at', now() + interval '7 days', 'will_renew', true, 'sandbox', true,
+                       'store', 'play_store', 'product', 'frostpom_premium:anual', 'period_type', 'trial'),
+    '{"id":"evt-1","type":"INITIAL_PURCHASE","environment":"SANDBOX"}');
+  assert not public.billing_apply('b4700000-0000-0000-0000-000000000002', '{"premium":true,"status":"active"}'), 'FALLO: se dio Premium a una cuenta anónima';
+  assert not public.billing_apply('$RCAnonymousID:abc123', '{"premium":true,"status":"active"}', '{"id":"evt-2","type":"TEST"}'), 'FALLO: aceptó un id que no es de FrostPom';
+  assert not public.billing_apply('00000000-0000-0000-0000-00000000dead', '{"premium":true,"status":"active"}'), 'FALLO: aceptó una cuenta que no existe';
+  begin
+    perform public.billing_apply('b4700000-0000-0000-0000-000000000001', '{"premium":true,"status":"gratis-para-siempre"}');
+    raise exception 'FALLO: aceptó un estado inventado';
+  exception when invalid_parameter_value then null;
+  end;
+  raise notice 'OK  Premium: las Edge Functions guardan la suscripción (y solo de cuentas con correo)';
+end $$;
+reset role;
+do $$
+begin
+  assert (select count(*) from private.billing_events) = 2, 'FALLO: los avisos no se anotaron una sola vez cada uno';
+  assert exists (select 1 from realtime.messages m where m.topic = 'frostpom:b4700000-0000-0000-0000-000000000001' and m.payload = '{"k":"e"}'::jsonb),
+    'FALLO: los otros aparatos de Pau no se enteraron';
+  raise notice 'OK  Premium: cada aviso se anota una vez y avisa a los otros aparatos';
+end $$;
+set role authenticated;
+set request.jwt.claim.sub = 'b4700000-0000-0000-0000-000000000001';
+do $$
+declare r record;
+begin
+  select * into r from public.get_entitlements();
+  assert r.premium and r.status = 'trial' and r.will_renew and r.sandbox and r.product = 'frostpom_premium:anual',
+    format('FALLO: Pau debería estar en la prueba gratis: %s', row_to_json(r));
+  raise notice 'OK  Premium: la app lee "prueba gratis" del servidor';
+end $$;
+reset role;
+-- Si la fecha pasó y no llegó el aviso, el servidor ya no dice Premium
+update private.entitlements set expires_at = now() - interval '1 minute' where user_id = 'b4700000-0000-0000-0000-000000000001';
+set role authenticated;
+do $$
+declare r record;
+begin
+  select * into r from public.get_entitlements();
+  assert not r.premium and r.status = 'expired', format('FALLO: con la fecha vencida sigue siendo Premium: %s', row_to_json(r));
+  raise notice 'OK  Premium: con la fecha vencida, el servidor ya no dice Premium';
+end $$;
+reset role;
+
+-- Límite de uso de premium-sync: una vez cada 10 s por cuenta
+set role service_role;
+do $$
+begin
+  assert public.billing_sync_gate('b4700000-0000-0000-0000-000000000001'), 'FALLO: la primera revisión no se permitió';
+  assert not public.billing_sync_gate('b4700000-0000-0000-0000-000000000001'), 'FALLO: se permitieron dos revisiones seguidas';
+  assert not public.billing_sync_gate('b4700000-0000-0000-0000-000000000002'), 'FALLO: una cuenta anónima pidió revisar';
+end $$;
+reset role;
+update private.entitlements set synced_at = now() - interval '11 seconds' where user_id = 'b4700000-0000-0000-0000-000000000001';
+set role service_role;
+do $$
+begin
+  assert public.billing_sync_gate('b4700000-0000-0000-0000-000000000001'), 'FALLO: pasados 10 s no se permitió revisar';
+  raise notice 'OK  Premium: revisar la suscripción tiene límite (una vez cada 10 s)';
+end $$;
+reset role;
+
+-- Descargar y borrar los datos incluye Premium
+set role authenticated;
+set request.jwt.claim.sub = 'b4700000-0000-0000-0000-000000000001';
+do $$
+declare d jsonb;
+begin
+  d := public.export_my_data();
+  assert d->'premium'->>'status' = 'expired' or d->'premium'->>'status' = 'trial', format('FALLO: la descarga no trae Premium: %s', d->'premium');
+  assert not (d->'premium' ? 'user_id') and not (d->'premium' ? 'synced_at'), 'FALLO: la descarga trae campos internos';
+  perform public.delete_my_cloud_account();
+end $$;
+reset role;
+do $$
+begin
+  assert not exists (select 1 from private.entitlements where user_id = 'b4700000-0000-0000-0000-000000000001'), 'FALLO: Premium quedó después de borrar la cuenta';
+  assert not exists (select 1 from private.billing_events where app_user_id = 'b4700000-0000-0000-0000-000000000001'), 'FALLO: los avisos quedaron después de borrar la cuenta';
+  raise notice 'OK  Premium: descargar tus datos lo incluye y borrar la cuenta lo borra';
+end $$;
 \echo 'Todas las pruebas del servidor pasaron.'

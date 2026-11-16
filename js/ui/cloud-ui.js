@@ -82,6 +82,8 @@ export async function signInFlow(prefill = '', { signedOut = false, notice = '' 
     h('p', { text: 'Ábrela allá y ve a Ajustes → Tu cuenta → Conectar. Después entra aquí con el mismo correo y la misma contraseña.' }));
   let session = null;
   let remote = null;
+  // (v4.5.2) Mientras escribes, se prepara la entrada: al tocar "Entrar" ya no se espera a Cloudflare
+  CLOUD.warmOnInput([mail, pass], 1);
   const res = await openDialog({
     className: 'dlg--onb dlg--gate dlg--signin',
     dismissable: false,
@@ -110,11 +112,14 @@ export async function signInFlow(prefill = '', { signedOut = false, notice = '' 
         if (!e) { err.textContent = tr('Revisa el correo: parece que está mal escrito.'); mail.focus(); return false; }
         if (!pass.value) { err.textContent = tr('Escribe tu contraseña.'); pass.focus(); return false; }
         err.textContent = tr('Conectando…');
+        const t0 = Date.now();
         try {
           session = await CLOUD.signIn(e, pass.value);
           BOARD.forget(); // este equipo no tenía cuenta: empieza limpio
           await BOARD.adoptSession(session);
+          err.textContent = tr('Trayendo tu progreso…'); // (v4.5.2) ya entró: se nota que avanza
           remote = await SYNC.pull();
+          console.info(`[FrostPom] Entrar: ${Date.now() - t0} ms en total`);
           return true;
         } catch (x) {
           err.textContent = errText(x, 'login');
@@ -263,7 +268,7 @@ async function forgotOnlineFlow(prefill = '') {
       err1.textContent = tr('Enviando…');
       try { await CLOUD.sendRecoveryCode(email); return true; } catch (x) { err1.textContent = errText(x); return false; }
     } }],
-    onOpen: () => mail.focus(),
+    onOpen: () => { mail.focus(); CLOUD.warmAuth(1); }, // (v4.5.2) tocaste "¿Olvidaste la contraseña?": se prepara ya
   });
   if (s1 !== 'ok') return signInFlow(prefill);
   const code = h('input', { type: 'text', class: 'acc-input acc-input--code', id: 'fgCode', inputmode: 'numeric', autocomplete: 'one-time-code', maxlength: '10', spellcheck: 'false', placeholder: '123456' });
@@ -295,6 +300,7 @@ async function forgotOnlineFlow(prefill = '') {
         if (!session || typeof session !== 'object') throw Object.assign(new Error('server'), { kind: 'server' });
         BOARD.forget();
         await BOARD.adoptSession(session);
+        err2.textContent = tr('Trayendo tu progreso…');
         remote = await SYNC.pull();
         // (v4.5.1) Sin progreso en línea, la contraseña TODAVÍA no se cambia: cambiarla cerraría la
         // sesión de tu otro equipo (y allá el ranking dejaba de sumar). Primero se pregunta.
@@ -342,6 +348,9 @@ export async function connectFlow({ pending = false } = {}) {
   let birth = state.account.birth || '';
   let session = null;
   let needsCode = false;
+  // (v4.5.2) Se prepara mientras escribes (hasta 2 llamadas: crear la cuenta y, si ya existía, entrar).
+  // Nunca para menores de 13: sin la fecha elegida (o con menos de 13) no se prepara nada.
+  CLOUD.warmOnInput([mail, pass], 2, () => (b ? !!b.value() && BOARD.oldEnough(b.value()) : true));
   const res = await openDialog({
     title: pending ? 'Termina de crear tu cuenta en línea' : 'Conecta tu cuenta',
     body: [
@@ -360,6 +369,7 @@ export async function connectFlow({ pending = false } = {}) {
         }
         email = CLOUD.cleanEmail(mail.value);
         if (!email) { err.textContent = tr('Revisa el correo: parece que está mal escrito.'); mail.focus(); return false; }
+        err.textContent = tr('Conectando…');
         const v = await verifyWithGuard(pass.value, { wrong: 'La contraseña no es correcta.' });
         if (!v.ok) { err.textContent = v.message; pass.value = ''; return false; }
         err.textContent = tr('Conectando…');
@@ -519,6 +529,7 @@ export async function reconnectFlow() {
   const err = h('p', { class: 'form-error', role: 'alert' });
   const codeBtn = h('p', { class: 'dlg__note', hidden: true }, h('button', { type: 'button', class: 'link-btn', id: 'recCode', onclick: () => dlg.close('code') }, '¿No la recuerdas? Entra con un código del correo'));
   let session = null;
+  CLOUD.warmOnInput([pass], 1); // (v4.5.2)
   const res = await openDialog({
     title: 'Vuelve a entrar a tu cuenta',
     body: [
