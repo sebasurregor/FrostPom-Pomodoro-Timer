@@ -102,6 +102,7 @@ function sessionFrom(data) {
     exp: Date.now() + Math.max(60, Number(data.expires_in) || 3600) * 1000,
     uid: String(user.id || ''),
     anon: user.is_anonymous === true || !user.email,
+    email: String(user.email || '').trim().toLowerCase(), // (v4.5.1) de qué cuenta es la sesión
   };
 }
 
@@ -242,11 +243,16 @@ export async function rpc(fn, args = {}, token = '') {
   throw new CloudError(kind, data);
 }
 
-/** Mensaje para la persona según el tipo de error. */
-export function errorText(err) {
+/**
+ * Mensaje para la persona según el tipo de error. (v4.5.1) when = 'login' (entrar con correo y
+ * contraseña) cambia el texto de "demasiados intentos" (antes hablaba de códigos).
+ */
+export function errorText(err, { when = '' } = {}) {
   switch (err && err.kind) {
     case 'offline': return tr('No hay conexión a internet. Inténtalo cuando vuelvas a estar en línea.');
-    case 'rate': return tr('Se pidieron demasiados códigos. Espera un minuto y vuelve a intentarlo.');
+    case 'rate': return when === 'login'
+      ? tr('Demasiados intentos seguidos. Espera unos minutos y vuelve a intentarlo.')
+      : tr('Se pidieron demasiados códigos. Espera un minuto y vuelve a intentarlo.');
     case 'badcode': return tr('El código no es correcto o ya venció. Revisa el correo o pide uno nuevo.');
     case 'email': return tr('Revisa el correo: parece que está mal escrito.');
     case 'disabled': return tr('La recuperación por correo no está activa en este momento.');

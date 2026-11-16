@@ -8,4 +8,4 @@ createdb "$DB"
 trap 'dropdb --if-exists "$DB"' EXIT
 psql -v ON_ERROR_STOP=1 -q -d "$DB" -f "$DIR/local_auth_stub.sql"
 psql -v ON_ERROR_STOP=1 -q -d "$DB" -f "$DIR/../schema.sql"
-psql -v ON_ERROR_STOP=1 -q -d "$DB" -f "$DIR/tests.sql"
+psql -v ON_ERROR_STOP=1 -v nombres_file="$DIR/../../../tests/_nombres.json" -q -d "$DB" -f "$DIR/tests.sql"

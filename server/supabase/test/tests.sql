@@ -822,4 +822,200 @@ begin
   assert not exists (select 1 from private.timer_claims where user_id = 'd5000000-0000-0000-0000-000000000001'), 'FALLO: quedaron sus pomodoros anotados';
   raise notice 'OK  eliminar la cuenta en línea borra también el reloj en vivo';
 end $$;
+-- ===================== v4.5.1 =====================
+-- Nombres: la MISMA lista de prueba que la app (tests/_nombres.json, la lee run_local.sh)
+reset role;
+\set nombres `cat :nombres_file`
+create temp table nombres_prueba as select :'nombres'::jsonb as d;
+do $$
+declare
+  d jsonb := (select x.d from nombres_prueba x);
+  n text;
+begin
+  for n in select jsonb_array_elements_text(d->'permitidos') loop
+    if private.name_blocked(n) then raise exception 'FALLO: el servidor bloquea el nombre inocente "%"', n; end if;
+    perform private.check_username(n);
+  end loop;
+  for n in select jsonb_array_elements_text(d->'bloqueados') loop
+    if not private.name_blocked(n) then raise exception 'FALLO: el servidor deja pasar "%"', n; end if;
+  end loop;
+  assert private.name_blocked('PoossyDestroyer') and private.name_blocked('Jeffery_Epstein'), 'FALLO: pasan los nombres de la prueba cerrada';
+  raise notice 'OK  nombres (v4.5.1): el servidor decide igual que la app con la lista de prueba (% nombres)',
+    jsonb_array_length(d->'permitidos') + jsonb_array_length(d->'bloqueados');
+end $$;
+
+-- Los nombres YA guardados que el filtro nuevo no permite: review_names() los muestra; al volver a correr
+-- el schema se esconden solos y, al elegir un nombre permitido, la persona vuelve a aparecer.
+insert into auth.users (id, email, is_anonymous) values
+  ('e4510000-0000-0000-0000-000000000001', 'malo@example.com', false),
+  ('e4510000-0000-0000-0000-000000000002', 'bueno@example.com', false);
+insert into private.profiles (user_id, username) values
+  ('e4510000-0000-0000-0000-000000000001', 'Jeffery_Epstein'),
+  ('e4510000-0000-0000-0000-000000000002', 'Pingu_Lector');
+update private.profiles set hidden = true, auto_hidden = true where not hidden and private.name_blocked(username);
+do $$
+begin
+  assert exists (select 1 from private.review_names() r where r.username = 'Jeffery_Epstein' and r.oculto_por_filtro), 'FALLO: review_names no muestra un nombre prohibido ya guardado';
+  assert not exists (select 1 from private.review_names() r where r.username = 'Pingu_Lector'), 'FALLO: review_names muestra un nombre inocente';
+  assert not exists (select 1 from public.get_leaderboard('week', 50) g where g.username = 'Jeffery_Epstein'), 'FALLO: el nombre prohibido sigue en el ranking';
+  raise notice 'OK  review_names: los nombres guardados que el filtro nuevo no permite se ven y se esconden';
+end $$;
+set role authenticated;
+set request.jwt.claim.sub = 'e4510000-0000-0000-0000-000000000001';
+do $$
+begin
+  begin
+    perform public.set_profile('Jeffery_Epstein');
+    raise exception 'FALLO: el servidor aceptó otra vez un nombre prohibido';
+  exception when invalid_parameter_value then null;
+  end;
+  perform public.set_profile('Pingu_Nuevo');
+  raise notice 'OK  con un nombre permitido, el perfil se actualiza';
+end $$;
+reset role;
+do $$
+begin
+  assert (select not hidden and not auto_hidden from private.profiles where user_id = 'e4510000-0000-0000-0000-000000000001'), 'FALLO: al cambiar el nombre no volvió a aparecer';
+  -- Lo que esconde el dueño (o los reportes) NO se destapa al cambiar el nombre
+  update private.profiles set hidden = true, auto_hidden = false where user_id = 'e4510000-0000-0000-0000-000000000002';
+end $$;
+set role authenticated;
+set request.jwt.claim.sub = 'e4510000-0000-0000-0000-000000000002';
+do $$ begin perform public.set_profile('Pingu_Lector2'); end $$;
+reset role;
+do $$
+begin
+  assert (select hidden from private.profiles where user_id = 'e4510000-0000-0000-0000-000000000002'), 'FALLO: cambiar el nombre destapó un nombre escondido por moderación';
+  raise notice 'OK  al elegir un nombre permitido vuelve a aparecer (lo escondido por moderación sigue escondido)';
+end $$;
+
+-- account_status: lo que el servidor sabe de TU cuenta (progreso, nombre y minutos del ranking)
+insert into auth.users (id, email, is_anonymous) values
+  ('e4510000-0000-0000-0000-000000000003', 'compu@example.com', false),
+  ('e4510000-0000-0000-0000-000000000004', 'cel@example.com', false);
+insert into private.profiles (user_id, username) values ('e4510000-0000-0000-0000-000000000003', 'Sebas_PC');
+do $$ begin perform pg_temp.studied('e4510000-0000-0000-0000-000000000003', 50); end $$;
+set role authenticated;
+set request.jwt.claim.sub = 'e4510000-0000-0000-0000-000000000003';
+do $$
+declare r record;
+begin
+  select * into r from public.account_status();
+  assert not r.has_progress and r.board_name = 'Sebas_PC' and r.board_minutes = 50,
+    format('FALLO: account_status dijo %s', row_to_json(r));
+  perform public.save_progress('{"profile":{"nick":"Sebas_PC"}}'::jsonb, 0);
+  select * into r from public.account_status();
+  assert r.has_progress, 'FALLO: account_status no ve el progreso guardado';
+  raise notice 'OK  account_status: progreso, nombre y minutos de tu cuenta';
+end $$;
+reset role;
+set role anon;
+set request.jwt.claim.sub = '';
+do $$
+begin
+  begin
+    perform public.account_status();
+    raise exception 'FALLO: sin sesión se pudo preguntar por una cuenta';
+  exception when insufficient_privilege then null;
+  end;
+  raise notice 'OK  account_status necesita sesión (nadie averigua cuentas ajenas)';
+end $$;
+
+-- account_check (solo el dueño, en el SQL Editor): cómo está la cuenta de un correo
+reset role;
+do $$
+declare txt text;
+begin
+  select string_agg(que || ': ' || valor, ' | ') into txt from private.account_check('compu@example.com');
+  assert txt like '%Progreso guardado: Sí%' and txt like '%Sebas_PC%', 'FALLO: account_check no describe la cuenta: ' || txt;
+  select string_agg(que || ': ' || valor, ' | ') into txt from private.account_check('cel@example.com');
+  assert txt like '%Progreso guardado: NO%', 'FALLO: account_check no dice que no hay progreso: ' || txt;
+  select string_agg(valor, ' ') into txt from private.account_check('nadie@example.com');
+  assert txt like 'NO existe%', 'FALLO: account_check con un correo sin cuenta: ' || txt;
+  raise notice 'OK  account_check: describe una cuenta en palabras simples';
+end $$;
+set role authenticated;
+do $$
+begin
+  begin
+    perform private.account_check('compu@example.com');
+    raise exception 'FALLO: alguien con sesión usó account_check';
+  exception when insufficient_privilege then null;
+  end;
+  raise notice 'OK  account_check es solo para el dueño';
+end $$;
+
+-- move_name (unir a mano un caso roto): el perfil viejo (con sus minutos y su XP) pasa a la cuenta
+-- con correo, que se queda con ESE nombre y la XP más alta
+reset role;
+insert into auth.users (id, is_anonymous) values ('e4510000-0000-0000-0000-000000000005', true);
+insert into private.profiles (user_id, username, xp) values ('e4510000-0000-0000-0000-000000000005', 'Sebas_Viejo', 900);
+insert into private.profiles (user_id, username, xp) values ('e4510000-0000-0000-0000-000000000004', 'Sebas_Cel', 20);
+do $$ begin perform pg_temp.studied('e4510000-0000-0000-0000-000000000005', 120); end $$;
+do $$ begin perform pg_temp.studied('e4510000-0000-0000-0000-000000000004', 25); end $$;
+do $$
+declare
+  msg text := private.move_name('Sebas_Viejo', 'cel@example.com');
+  p private.profiles%rowtype;
+begin
+  select * into p from private.profiles where user_id = 'e4510000-0000-0000-0000-000000000004';
+  assert p.username = 'Sebas_Viejo' and p.xp = 900, format('FALLO: move_name dejó %s', row_to_json(p));
+  assert (select sum(credited_sec) / 60 from private.study_sessions where user_id = 'e4510000-0000-0000-0000-000000000004') = 145, 'FALLO: no se sumaron los minutos';
+  assert not exists (select 1 from auth.users where id = 'e4510000-0000-0000-0000-000000000005'), 'FALLO: la sesión anónima vieja no se borró';
+  raise notice 'OK  move_name: une el perfil viejo con la cuenta con correo (%)', msg;
+end $$;
+
+-- Realtime: set_timer y save_progress AVISAN al canal privado de la cuenta (sin datos personales)
+delete from realtime.messages;
+set role authenticated;
+set request.jwt.claim.sub = 'e4510000-0000-0000-0000-000000000004';
+do $$
+declare r record;
+begin
+  select * into r from public.set_timer('{"mode":"study","status":"running","durationSec":1500}', now(), 'tok-aaaa1111');
+  assert r.accepted, 'FALLO: set_timer no aceptó';
+  perform public.set_timer('{"mode":"study","status":"paused","durationSec":1500}', now() - interval '1 hour', 'tok-bbbb2222');
+  perform public.save_progress('{"profile":{"nick":"Sebas_Viejo"}}'::jsonb, 0);
+end $$;
+reset role;
+do $$
+declare
+  t jsonb := (select m.payload from realtime.messages m where m.payload->>'k' = 't' order by m.id limit 1);
+begin
+  assert (select count(*) from realtime.messages m where m.payload->>'k' = 't') = 1, 'FALLO: un cambio viejo (que no ganó) también avisó';
+  assert (select bool_and(m.topic = 'frostpom:e4510000-0000-0000-0000-000000000004' and m.private and m.extension = 'broadcast') from realtime.messages m), 'FALLO: el aviso no fue al canal privado de la cuenta';
+  assert t->>'d' = 'tok-aaaa1111' and (t->>'v')::int = 1, format('FALLO: el aviso del reloj dice %s', t);
+  assert exists (select 1 from realtime.messages m where m.payload = '{"k":"p","v":1}'::jsonb), 'FALLO: guardar el progreso no avisó';
+  assert not exists (select 1 from realtime.messages m where m.payload::text ~ '@|nick|Sebas'), 'FALLO: el aviso lleva datos personales';
+  raise notice 'OK  Realtime: cada cambio del reloj o del progreso avisa al canal privado de la cuenta';
+end $$;
+-- Solo TÚ escuchas tu canal (la política de realtime.messages)
+set role authenticated;
+set request.jwt.claim.sub = 'e4510000-0000-0000-0000-000000000004';
+do $$ begin perform set_config('realtime.topic', 'frostpom:e4510000-0000-0000-0000-000000000004', false); end $$;
+do $$ begin assert (select count(*) from realtime.messages) = 2, 'FALLO: la cuenta no puede escuchar su propio canal'; end $$;
+do $$ begin perform set_config('realtime.topic', 'frostpom:e4510000-0000-0000-0000-000000000003', false); end $$;
+do $$
+begin
+  assert (select count(*) from realtime.messages) = 0, 'FALLO: una cuenta escuchó el canal de otra';
+  begin
+    insert into realtime.messages (topic, extension, payload) values ('frostpom:e4510000-0000-0000-0000-000000000003', 'broadcast', '{}');
+    raise exception 'FALLO: alguien con sesión envió un aviso falso';
+  exception when insufficient_privilege then null;
+  end;
+  raise notice 'OK  Realtime: cada cuenta escucha solo su canal y nadie puede enviar avisos falsos';
+end $$;
+reset role;
+-- Sin Realtime (proyecto sin el esquema realtime) guardar sigue funcionando
+alter function realtime.send(jsonb, text, text, boolean) rename to send_apagado;
+set role authenticated;
+do $$
+declare r record;
+begin
+  select * into r from public.set_timer('{"mode":"study","status":"idle","durationSec":1500}', now(), 'tok-cccc3333');
+  assert r.accepted, 'FALLO: sin Realtime, set_timer dejó de funcionar';
+  raise notice 'OK  sin Realtime todo sigue funcionando (los aparatos preguntan cada 10 s)';
+end $$;
+reset role;
+alter function realtime.send_apagado(jsonb, text, text, boolean) rename to send;
 \echo 'Todas las pruebas del servidor pasaron.'

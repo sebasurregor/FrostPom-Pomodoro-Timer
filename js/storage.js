@@ -9,7 +9,7 @@
 import * as U from './util.js';
 import * as G from './game.js';
 import * as C from './catalog.js';
-import { isValidNick, checkUsername, isCountry, AVATARS } from './identity.js';
+import { isValidNick, checkUsernameFormat, isCountry, AVATARS } from './identity.js';
 import { MAX_SESSIONS, applyRecord } from './engine.js';
 import { isSeasonId, MAX_ARCHIVE } from './season.js';
 import { isPetId, checkPetName, migrateFromV3 } from './pet.js';
@@ -180,7 +180,8 @@ export function validateState(raw) {
   out.settings = sanitizeSettings(obj(raw.settings));
 
   const acc = obj(raw.account);
-  if (checkUsername(acc.username).ok && /^[0-9a-f]{64}$/.test(acc.hash || '') && /^[0-9a-f]{32}$/.test(acc.salt || '')) {
+  // (v4.5.1) Solo la forma del nombre: si el filtro de palabras se amplía, la cuenta NO se pierde
+  if (checkUsernameFormat(acc.username).ok && /^[0-9a-f]{64}$/.test(acc.hash || '') && /^[0-9a-f]{32}$/.test(acc.salt || '')) {
     out.account = { username: acc.username, hash: acc.hash, salt: acc.salt, iter: int(acc.iter, 100000, 2000000, 210000) };
     // Huella del "mantener sesión iniciada" (el token vive aparte, en st2_remember).
     if (/^[0-9a-f]{64}$/.test(acc.remember || '')) out.account.remember = acc.remember;

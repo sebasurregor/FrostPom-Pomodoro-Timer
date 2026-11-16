@@ -72,9 +72,17 @@ export function load() {
       noticed: v.noticed === true,
       active: v.active && Number.isFinite(v.active.start) && typeof v.active.id === 'string' ? { start: v.active.start, id: v.active.id } : null,
       pending: Array.isArray(v.pending) ? v.pending.filter((p) => p && typeof p.id === 'string').slice(-20) : [],
+      // (v4.5.1) El correo de la sesión (para saber si es la de TU cuenta en línea)
+      email: typeof v.email === 'string' ? v.email : '',
+      // (v4.5.1) La sesión con correo se cerró en este equipo: hay que volver a entrar (no se crea una anónima)
+      relink: v.relink === true,
+      // (v4.5.1) Sesión anterior cuyo lugar en el ranking falta pasar a esta cuenta (se reintenta)
+      from: typeof v.from === 'string' ? v.from : '',
+      // (v4.5.1) El último problema al avisarle al ranking (para decir la causa real en la vista Ranking)
+      issue: v.issue && typeof v.issue.kind === 'string' && Number.isFinite(v.issue.at) ? { kind: v.issue.kind, at: v.issue.at } : null,
     };
   } catch {
-    return { uid: '', refresh: '', anon: true, joined: false, name: '', asked: false, noticed: false, active: null, pending: [] };
+    return { uid: '', refresh: '', anon: true, joined: false, name: '', asked: false, noticed: false, active: null, pending: [], email: '', relink: false, from: '', issue: null };
   }
 }
 function save(patch) {
@@ -85,6 +93,8 @@ function save(patch) {
 export const isJoined = () => load().joined;
 export const joinedName = () => load().name;
 export function markAsked() { save({ asked: true }); }
+/** (v4.5.1) El nombre cambió sin internet: al volver, ensureJoined lo manda otra vez. */
+export function markRejoin() { save({ joined: false }); }
 export function markNoticed() { save({ noticed: true }); }
 /** Olvida todo lo del ranking en este dispositivo (al borrar la cuenta o salir del ranking). */
 export function forget() {
@@ -96,14 +106,37 @@ export function forget() {
 // Sesión con Supabase (la de acceso dura 1 hora; se renueva con el refresh token)
 // ---------------------------------------------------------------------
 let mem = null; // { access, exp }
+
+/**
+ * (v4.5.1) Lo que dice el token de acceso de Supabase (un JWT): sub, email, is_anonymous…
+ * Solo se LEE para saber de qué cuenta es la sesión; la firma la revisa el servidor.
+ */
+export function claimsOf(access) {
+  try {
+    const part = String(access || '').split('.')[1];
+    if (!part) return null;
+    const b64 = part.replace(/-/g, '+').replace(/_/g, '/');
+    const bin = atob(b64 + '='.repeat((4 - (b64.length % 4)) % 4));
+    const c = JSON.parse(new TextDecoder().decode(Uint8Array.from(bin, (ch) => ch.charCodeAt(0))));
+    return c && typeof c === 'object' ? c : null;
+  } catch {
+    return null;
+  }
+}
+
 const withLock = (fn) => (globalThis.navigator && navigator.locks && navigator.locks.request
   ? navigator.locks.request('frostpom-board-auth', fn)
   : fn());
 
 function keep(session) {
   mem = { access: session.access, exp: session.exp };
-  save({ uid: session.uid, refresh: session.refresh, anon: session.anon });
+  const c = claimsOf(session.access);
+  const email = String(session.email || (c && c.email) || '').trim().toLowerCase();
+  save({ uid: session.uid, refresh: session.refresh, anon: session.anon, email: session.anon ? '' : email, relink: false });
 }
+
+/** (v4.5.1) Un error con su tipo, como los de cloud.js. */
+const fail = (kind) => Object.assign(new Error(kind), { kind });
 
 /** Token de acceso. create = crear una cuenta anónima si todavía no hay. '' si no hay sesión. */
 async function token({ create = false } = {}) {
@@ -117,12 +150,21 @@ async function token({ create = false } = {}) {
         return mem.access;
       } catch (e) {
         if (e.kind === 'offline' || e.kind === 'rate') throw e;
-        // La sesión ya no sirve (revocada o vencida): se empieza de nuevo
-        save({ refresh: '', uid: '', joined: false, active: null, pending: [] });
         mem = null;
+        if (!st.anon) {
+          // (v4.5.1) Se cerró la sesión de tu cuenta CON CORREO (por ejemplo, cambiaste o recuperaste la
+          // contraseña en otro equipo: Supabase cierra las demás sesiones). Antes aquí se creaba una
+          // cuenta anónima nueva: aparecías en el ranking como otra persona, tu nombre quedaba "ocupado"
+          // por ti mismo y tus horas iban a otro lado. Ahora se espera a que vuelvas a entrar.
+          save({ refresh: '', joined: false, relink: true });
+          console.warn('[FrostPom] La sesión de tu cuenta con correo se cerró en este equipo: hay que volver a entrar.');
+          return '';
+        }
+        // La sesión anónima ya no sirve (se borró por inactividad): se empieza de nuevo
+        save({ refresh: '', uid: '', joined: false, active: null, pending: [] });
       }
     }
-    if (!create) return '';
+    if (!create || load().relink) return '';
     keep(await CLOUD.anonSignIn());
     return mem.access;
   });
@@ -134,16 +176,35 @@ export const callServer = (fn, args, opts) => call(fn, args, opts);
 export const authToken = (opts) => token(opts);
 /** ¿La sesión guardada es de una cuenta con correo (no anónima)? */
 export const hasAccountSession = () => { const st = load(); return !!st.refresh && !st.anon; };
+/**
+ * (v4.5.1) ¿La sesión de este equipo es de OTRA cuenta con correo, distinta de email? Pasaba al
+ * conectar con un correo distinto al de recuperación: el progreso se guardaba en la otra cuenta.
+ */
+export function sessionMismatch(email) {
+  const st = load();
+  const want = String(email || '').trim().toLowerCase();
+  return !!(st.refresh && !st.anon && st.email && want && st.email !== want);
+}
+/** (v4.5.1) ¿Hay que volver a entrar para que el ranking siga sumando en tu cuenta con correo? */
+export const needsRelink = () => load().relink;
+/** (v4.5.1) Anota (o borra, con kind = '') el último problema al hablar con el ranking. */
+export function noteIssue(kind) {
+  save({ issue: kind ? { kind, at: Date.now() } : null });
+}
 
 /** Llama una función del servidor; si la sesión venció, la renueva y reintenta una vez. */
 async function call(fn, args, { create = false, auth = true } = {}) {
   const tk = auth ? await token({ create }) : '';
+  // (v4.5.1) Sin sesión no se molesta al servidor: se sabe que va a decir que no
+  if (auth && !tk) throw fail(load().relink ? 'relink' : 'nosession');
   try {
     return await CLOUD.rpc(fn, args, tk);
   } catch (e) {
     if (e.kind !== 'auth' || !auth) throw e;
     mem = null;
-    return CLOUD.rpc(fn, args, await token({ create }));
+    const again = await token({ create });
+    if (!again) throw fail(load().relink ? 'relink' : 'nosession');
+    return CLOUD.rpc(fn, args, again);
   }
 }
 
@@ -164,6 +225,7 @@ export async function join({ username, country = '', avatar = '', show = true },
   try {
     // create = false (cuenta en línea): nunca se inventa una sesión anónima; si la sesión de la
     // cuenta se cerró, hay que volver a entrar (si no, el nombre quedaba "ocupado" por la otra)
+    if (load().relink) return { ok: false, kind: 'relink' };
     if (!create && !load().refresh) return { ok: false, kind: 'nosession' };
     await call('set_profile', {
       p_username: username, p_country: country || null, p_avatar: avatar || null,
@@ -213,10 +275,10 @@ export async function startSession(startMs, plannedSec) {
   try {
     const id = await call('start_session', { p_planned_sec: Math.round(plannedSec) });
     if (typeof id !== 'string') throw Object.assign(new Error('server'), { kind: 'server' });
-    save({ active: { start: startMs, id } });
+    save({ active: { start: startMs, id }, issue: null });
     return { ok: true, id };
   } catch (e) {
-    save({ active: null });
+    save({ active: null, issue: { kind: e.kind || 'server', at: Date.now() } });
     console.warn(`[FrostPom] El ranking no pudo anotar el inicio de este pomodoro (${e.kind || 'server'}).`);
     return { ok: false, kind: e.kind || 'server' };
   }
@@ -260,9 +322,11 @@ export function flush() {
         const r = Array.isArray(rows) ? rows[0] : rows;
         credited += (r && r.credited_sec) || 0;
       } catch (e) {
-        if (e.kind === 'offline' || e.kind === 'rate' || e.kind === 'auth') return { ok: false, kind: e.kind, credited };
+        // (v4.5.1) Sin sesión (o hay que volver a entrar) tampoco se descarta: se envía después
+        if (['offline', 'rate', 'auth', 'nosession', 'relink'].includes(e.kind)) return { ok: false, kind: e.kind, credited };
         // 'Sesión no encontrada o ya terminada' u otro error definitivo: se descarta (y queda en F12)
         console.warn(`[FrostPom] El ranking no aceptó el final de un pomodoro (${e.kind || 'server'}).`);
+        save({ issue: { kind: 'finish', at: Date.now() } });
       }
       st = save({ pending: load().pending.filter((x) => x.id !== p.id) });
     }
@@ -336,27 +400,68 @@ export async function deleteData() {
 // ---------------------------------------------------------------------
 // Pasar tu lugar a tu cuenta con correo
 // ---------------------------------------------------------------------
+/** Pasa el perfil del ranking de la sesión `fromAccess` a la sesión `toAccess` (códigos de un solo uso). */
+async function transfer(fromAccess, toAccess) {
+  const code = await CLOUD.rpc('create_transfer_code', {}, fromAccess);
+  await CLOUD.rpc('redeem_transfer_code', { p_code: code }, toAccess);
+}
+
 /**
- * session = sesión de la cuenta con correo (al agregar el correo o al recuperar la contraseña).
- * Si tu lugar estaba en una cuenta anónima, el servidor lo pasa a la del correo con un código
- * de un solo uso. Desde ahí, el ranking usa la cuenta con correo.
+ * session = sesión de la cuenta con correo (al agregar el correo, al recuperar la contraseña, al
+ * conectar o al entrar). Si tu lugar estaba en otra sesión de este equipo, el servidor lo pasa a esta
+ * cuenta con un código de un solo uso. Desde ahí, el ranking usa la cuenta con correo.
+ *
+ * (v4.5.1) takeover = la cuenta EN LÍNEA de este equipo es la de `session` (conectar, entrar de
+ * nuevo, crear la cuenta). Entonces:
+ *  - la sesión SIEMPRE pasa a ser la de esa cuenta (antes, si fallaba el paso del lugar, se quedaba
+ *    la anónima o la de OTRO correo, y el progreso no se guardaba o se guardaba en otra cuenta);
+ *  - el lugar se pasa también desde una sesión con otro correo (las dos están en este equipo: es la
+ *    misma persona);
+ *  - si no se pudo pasar ahora (sin internet), se reintenta después (retryTransfer).
  */
-export async function adoptSession(session) {
+export async function adoptSession(session, { takeover = false } = {}) {
   if (!session || !session.access || !session.refresh) return { ok: false, kind: 'nosession' };
   if (!enabled()) { keep(session); return { ok: true }; } // sin ranking: solo se guarda la sesión (cuenta en línea)
   const st = load();
-  if (st.uid === session.uid) { keep(session); return { ok: true }; }
-  if (st.refresh && !st.anon) return { ok: false, kind: 'already' }; // ya está en una cuenta con correo
-  if (st.refresh && st.joined) {
+  if (st.uid === session.uid) {
+    keep(session); // la misma cuenta (por ejemplo, al volver a entrar): todo sigue igual
+    return { ok: true };
+  }
+  if (st.refresh && !st.anon && !takeover) return { ok: false, kind: 'already' }; // ya está en una cuenta con correo
+  let pendingFrom = '';
+  if (st.refresh && (st.joined || takeover)) {
     try {
-      const code = await call('create_transfer_code', {});
-      await CLOUD.rpc('redeem_transfer_code', { p_code: code }, session.access);
+      const old = await token(); // la sesión anterior (si ya no sirve, no hay nada que pasar)
+      if (old) await transfer(old, session.access);
     } catch (e) {
-      return { ok: false, kind: e.kind || 'server' };
+      if (!takeover) return { ok: false, kind: e.kind || 'server' };
+      // Sin internet o el servidor no respondió: se guarda la sesión anterior para reintentarlo
+      if (['offline', 'rate', 'server', 'notready', 'timeout'].includes(e.kind)) pendingFrom = load().refresh;
+      console.warn(`[FrostPom] Tu lugar en el ranking se pasará a tu cuenta más tarde (${e.kind || 'server'}).`);
     }
   }
   keep(session);
-  // El pomodoro en curso quedó en la cuenta anterior (el servidor lo cerró): no se puede terminar
-  save({ active: null, pending: [] });
+  // El pomodoro en curso quedó en la cuenta anterior (el servidor lo cerró): no se puede terminar.
+  // joined = false: al unirse se vuelve a mandar tu nombre (si las dos tenían perfil, queda el tuyo).
+  save({ active: null, pending: [], joined: false, from: pendingFrom, issue: null });
   return { ok: true };
+}
+
+/**
+ * (v4.5.1) Reintenta pasar tu lugar del ranking desde la sesión anterior de este equipo (si al
+ * conectar no había internet). { ok, moved } o { ok: false, kind }.
+ */
+export async function retryTransfer() {
+  const st = load();
+  if (!enabled() || !st.from || !st.refresh || st.anon) return { ok: true, moved: false };
+  try {
+    const old = await CLOUD.refreshSession(st.from);
+    save({ from: old.refresh });
+    await transfer(old.access, await token());
+    save({ from: '', joined: false });
+    return { ok: true, moved: true };
+  } catch (e) {
+    if (!['offline', 'rate', 'timeout'].includes(e.kind)) save({ from: '' }); // ya no se puede: no se insiste
+    return { ok: false, kind: e.kind || 'server' };
+  }
 }

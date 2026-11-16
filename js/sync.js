@@ -19,7 +19,7 @@ import { config } from './config.js';
 import * as CLOUD from './cloud.js';
 import * as BOARD from './board.js';
 import { validateState } from './storage.js';
-import { checkUsername } from './identity.js';
+import { checkUsernameFormat } from './identity.js';
 import { mergeStates } from './merge.js';
 
 const KEY = 'st2_sync';
@@ -130,7 +130,7 @@ export function restore(data, local) {
   const account = local && local.account ? { ...local.account } : null;
   // El nombre de usuario viaja con el progreso: si se cambió en otro equipo, aquí también cambia
   const nick = data && data.profile && data.profile.nick;
-  if (account && checkUsername(nick).ok) account.username = checkUsername(nick).value;
+  if (account && checkUsernameFormat(nick).ok) account.username = checkUsernameFormat(nick).value;
   const next = validateState({ ...data, account });
   next.profile.onboarded = !!next.profile.nick;
   next.profile.photo = (local && local.profile && local.profile.photo) || '';

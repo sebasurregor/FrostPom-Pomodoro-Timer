@@ -20,7 +20,7 @@ Comprueba que:
 Uso (con la app servida: python -m http.server 8000):
     python tests/e2e_android.py http://localhost:8000/
 """
-import json
+import re, json
 import os
 import sys
 import time
@@ -99,6 +99,7 @@ def device(browser, fake, locale='es-CO', native=False, timer=False):
     ctx = browser.new_context(viewport={'width': 412, 'height': 900}, locale=locale,
                               service_workers='allow' if native else 'block')
     ctx.route(f'{SUPA}/**', fake.handle)
+    ctx.route_web_socket(re.compile(r'^wss://[^/]*supabase\.co/realtime/'), fake.ws_connect)  # (v4.5.1) los avisos de Realtime, simulados
     if native:
         ctx.add_init_script(FAKE_CAP)
     if timer:

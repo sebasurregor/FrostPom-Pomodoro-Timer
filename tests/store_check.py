@@ -17,7 +17,7 @@ Revisa:
   7. Accesibilidad (axe-core): sin problemas graves o críticos.
 Termina con código 1 si algo falla.
 """
-import io, json, os, sys
+import re, io, json, os, sys
 from urllib.parse import urljoin
 from playwright.sync_api import sync_playwright
 
@@ -64,7 +64,9 @@ with sync_playwright() as p:
         # En local, el ranking y las cuentas en línea hablan con un Supabase simulado (sin internet)
         sys.path.insert(0, HERE)
         from _fake_supabase import FakeSupabase
-        ctx.route("https://*.supabase.co/**", FakeSupabase().handle)
+        _fk = FakeSupabase()
+        ctx.route("https://*.supabase.co/**", _fk.handle)
+        ctx.route_web_socket(re.compile(r"^wss://[^/]*supabase\.co/realtime/"), _fk.ws_connect)
     pg = ctx.pages[0] if ctx.pages else ctx.new_page()
     errors, missing = [], []
     pg.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)

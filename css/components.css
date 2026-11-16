@@ -1350,6 +1350,16 @@ html[data-theme="dark"] .skin.is-premium { background: #2C2A1C; }
 /* Ranking: "todo en orden, tus pomodoros suman desde aquí" */
 .board-ok { margin: 0 0 12px; padding: 8px 14px; border-radius: 14px; font-weight: 800; font-size: 0.88rem; background: #EFFFF8; border: 2px solid #A6EBD3; color: #0B6B4D; }
 html[data-theme="dark"] .board-ok { background: #12352C; border-color: #2B7A63; color: #BFF5E2; }
+/* (v4.5.1) El último pomodoro no sumó en el ranking: se dice por qué */
+.board-ok--warn { background: #FFF6E0; border-color: #F2C76B; color: #7A4B00; }
+html[data-theme="dark"] .board-ok--warn { background: #3A2E12; border-color: #8C6A22; color: #FFE3A6; }
+/* (v4.5.1) "Inicia sesión": qué hacer si el correo o la contraseña no coinciden */
+.signin-hint { margin: 4px 0 10px; padding: 10px 12px; border-radius: 12px; background: #EEF6FF; border: 2px solid #B9D7F5; color: #1F3B5C; font-size: 0.86rem; font-weight: 700; text-align: left; }
+.signin-hint p { margin: 0 0 6px; }
+.signin-hint p:last-child { margin-bottom: 0; }
+html[data-theme="dark"] .signin-hint { background: #16273A; border-color: #2E4E72; color: #D3E6FA; }
+.steps-list { margin: 4px 0 6px; padding-left: 22px; text-align: left; font-weight: 700; }
+.steps-list li { margin: 4px 0; }
 
 .row {
   display: grid;
@@ -1683,6 +1693,9 @@ html[data-theme="dark"] .toast--warn { background: #3A3015; border-color: #8A6D1
 .dlg__text { font-weight: 600; margin-bottom: 12px; }
 .dlg__note { margin-top: 14px; font-size: 0.85rem; font-weight: 700; }
 .dlg__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--sp-5); margin-top: 18px; }
+/* (v4.5.1) Mientras se comprueba ("Conectando…"), el botón no se puede volver a tocar */
+.dlg__actions.is-busy .btn { cursor: progress; }
+.dlg__actions.is-busy .btn[data-primary] { opacity: 0.7; }
 /* Subida de rango: el momento estrella */
 .dlg--rankup { width: min(94vw, 520px); margin: auto; max-height: 100dvh; }
 .dlg--rankup .dlg__box { background: transparent; border: 0; overflow: visible; text-align: center; }

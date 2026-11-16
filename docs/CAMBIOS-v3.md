@@ -1,5 +1,94 @@
 # Cambios de la v2 a la v3
 
+## v4.5.1: arreglos de la prueba cerrada (cuentas, ranking, reloj en vivo y nombres)
+
+Arreglos de lo que reportaron los usuarios de la prueba cerrada de Google Play. El diagnóstico completo y las consultas para revisar casos están en `docs/DIAGNOSTICO-CUENTAS.md`.
+
+**Antes de publicar:**
+
+1. Haz la copia de seguridad (`docs/COPIA-DE-SEGURIDAD.md`).
+2. Corre el `server/supabase/schema.sql` nuevo en Supabase.
+3. Activa Realtime (`docs/MULTI-DISPOSITIVO.md`, sección 10).
+4. Vuelve a pegar tu clave del sitio de Turnstile en `js/config.js`.
+
+### Inicio de sesión y cuentas
+
+- **"El correo o la contraseña no coinciden":** casi siempre era una cuenta que vive solo en el computador (por ejemplo, con el correo de recuperación de una versión vieja). Ahora la pantalla explica qué hacer: abrir la app en ese equipo y tocar **Conectar**. "Demasiados intentos" ya no habla de códigos, y el CAPTCHA, sin internet y "no coinciden" tienen mensajes distintos.
+- **Recuperar la contraseña sin progreso en línea:** antes pedía "Elige tu nombre de usuario" y la persona empezaba de cero con otro nombre. Ahora dice **"Tu progreso todavía no está en línea"**, con su nombre del ranking y los pasos para traerlo. La persona elige:
+  - **"Lo conecto en mi otro equipo"**: la contraseña NO se cambia y el computador sigue funcionando.
+  - **"Empezar de cero aquí"**: se propone su mismo nombre.
+- **Al pedir el código**, avisa que si no llega puede que ese correo no tenga cuenta en línea. Supabase no lo dice, por privacidad.
+- **"Conectar"** ya no deja la cuenta "en línea" con otra contraseña si no pudo guardarla. Si la contraseña de FrostPom no cumple las reglas de las cuentas en línea, pide una nueva.
+- **Si el equipo guardaba en OTRA cuenta** (conectó con un correo distinto al de recuperación), al abrir lo detecta. Ya no sube nada allá y pide entrar con la suya: el progreso, la sesión y el lugar del ranking pasan a su cuenta. Si la contraseña en línea no coincide, se puede entrar con un código del correo.
+- **Tocar "Entrar" muchas veces** mientras dice "Conectando…" ya no lanza varios intentos a la vez. Esos intentos podían cerrar la ventana siguiente y desarmar la pantalla. Lo mismo vale para todos los botones que comprueban algo.
+
+### Ranking
+
+- **Cambiar o recuperar la contraseña en otro equipo** cierra las demás sesiones (lo hace Supabase). Antes, en una cuenta solo del computador, la app creaba una sesión **anónima nueva**: aparecías como otra persona, tu nombre "ya existía" (el dueño eras tú) y tus horas iban a otro lado. Ahora:
+  - no crea nada;
+  - al abrir explica **"Vuelve a conectar tu lugar en el ranking"**, con dos salidas: conectar la cuenta o recibir un código;
+  - tus pomodoros sin enviar se guardan para después.
+- **Conectar, entrar de nuevo o crear la cuenta** siempre deja la sesión en TU cuenta. Antes, si fallaba el paso del lugar del ranking, se quedaba la sesión anónima y el progreso no se guardaba. Si no se pudo pasar tu lugar (sin internet), se reintenta solo al abrir la app.
+- **Si las dos sesiones tenían perfil**, al unirlas queda tu nombre de este equipo.
+- **La vista Ranking dice la causa real** cuando un pomodoro no sumó: sin internet al empezar, sesión cerrada, otra cuenta, muchos seguidos, terminado en otro equipo… Antes decía "✓ suma" aunque no estuviera sumando.
+- **En "Ese nombre ya está en el ranking"**, una cuenta en línea ahora recibe los pasos para recuperarlo sola: Conectar en el otro equipo con el mismo correo.
+
+### Reloj en vivo: de 15 a 20 s a 1 o 2 s
+
+- **Con Supabase Realtime**, el servidor **avisa al instante** a tus otros aparatos por un canal privado de tu cuenta (`js/realtime.js`, sin librerías). El aviso solo dice "algo cambió" y el aparato pregunta al servidor, que sigue mandando.
+- **Al tocar se envía enseguida.** Guardar el progreso también avisa.
+- **Si el aviso no llega**, se sigue preguntando cada 10 s como antes. Con los avisos funcionando, la pregunta de respaldo es cada 30 s.
+- **La conexión solo está abierta mientras se ve la app.** La CSP permite `wss://` al proyecto de Supabase.
+
+### Nombres (riesgo legal: hay niños)
+
+- **Pasaron "PoossyDestroyer" y "Jeffery_Epstein".** El filtro ahora compara también la forma "sonora" del nombre (`oo`→u, `ph`→f, `y`→i, sin letras repetidas…), lee el 1 como i o como l, cambia letras parecidas de otros alfabetos (cirílico, griego) y tiene una lista mucho más amplia en español e inglés:
+  - groserías;
+  - contenido sexual;
+  - drogas;
+  - odio y discriminación;
+  - violencia y autolesiones;
+  - criminales y abusadores conocidos;
+  - suplantación.
+- **Para no bloquear nombres inocentes**, hay una lista de permitidos ("Maricarmen", "Georgia", "Vergara", "Matsushita", "Badminton"…) y una lista de prueba de 385 nombres que usan la app y el servidor (`tests/_nombres.json`). Además, "Kike" (Enrique) ya no se bloquea.
+- **Las mascotas** usan el mismo filtro.
+- **Una cuenta vieja con un nombre que ahora no se permite NO se pierde.** Al abrir pide **"Elige un nombre nuevo"**; la cuenta, el progreso y los minutos siguen igual.
+- **En el servidor**, al correr el schema, los nombres ya guardados que el filtro no permite se **esconden solos** del ranking. Vuelven a aparecer cuando la persona elige uno permitido. Revisa la lista con `select * from private.review_names();`.
+- **Para que las listas de la app y del servidor no se separen**, se generan con `node tools/nombres-sql.mjs`. Una prueba revisa que sean iguales.
+
+### Otros arreglos
+
+- **El pescado ya no se queda pegado** en la pantalla al dárselo muy rápido en el computador, ni sigue ahí al cambiar de vista. Mientras arrastras, la bandeja no se rehace, el arrastre se sigue en toda la ventana y al cambiar de vista se cancela.
+- **Los animales ya no caminan en el aire** en el celular, sobre todo en la app de Android con la barra de gestos. El paisaje se sube lo justo para que caminen sobre la nieve.
+
+### En el servidor (`server/supabase/schema.sql`)
+
+- **`account_status()`:** para la app. Dice, con tu sesión, si tu cuenta tiene progreso guardado y tu nombre y minutos en el ranking.
+- **`private.account_check('correo')`:** para ti, en el SQL Editor. Cómo está una cuenta, en palabras simples.
+- **`private.move_name`** ahora guarda la XP más alta al unir dos perfiles.
+- **`private.review_names()`**, la columna `auto_hidden`, y `set_profile` vuelve a mostrar a quien cambió un nombre escondido por el filtro.
+- **`private.notify`:** los avisos de Realtime en `set_timer` y `save_progress`, y la política de `realtime.messages`.
+- **Se puede volver a correr** las veces que quieras.
+
+### Pruebas
+
+- **`tests/e2e_cuentas.py`, sección H:**
+  - la cuenta solo del computador (de "no coinciden" a conectar y entrar en el celular con todo su progreso);
+  - la sesión que se cerró en otro equipo (sin perfil anónimo nuevo);
+  - el equipo que guardaba en otra cuenta;
+  - tocar "Entrar" 6 veces;
+  - nombres prohibidos y una cuenta vieja con nombre prohibido.
+- **`tests/e2e_multidispositivo.py`, sección 7:** los avisos al instante y la pregunta de respaldo.
+- **`tests/e2e_mascota.py`, sección L2:** el pescado.
+- **`tests/logic.test.js`:** los nombres de los dos lados, las listas iguales a las del servidor y que la cuenta con nombre prohibido no se pierda.
+- **`server/supabase/test/tests.sql`:**
+  - nombres con la misma lista de prueba;
+  - `review_names`;
+  - `account_status` y `account_check`;
+  - `move_name`;
+  - Realtime: avisos, solo tu canal, sin avisos falsos y sin Realtime.
+- **`tests/visual.py`:** hay fotos de referencia nuevas, porque en la nube cambió cómo se dibujan las letras. Comparada con la v4.5.0 en el mismo equipo, la tableta y el computador salen idénticos; en el celular solo cambia la parte de abajo (la nieve). En tu PC, vuelve a tomar las tuyas con `python tests/visual.py --update`.
+
 ## v4.5.0: tu cuenta en todos tus aparatos (y Android, listo para compilar)
 
 El autor aprobó las fases 4 y 5 (`docs/MULTI-DISPOSITIVO.md` y `docs/ANDROID-NOTIFICACION-WIDGET.md`) para tenerlas listas y publicarlas como actualizaciones durante la prueba cerrada de Google Play.

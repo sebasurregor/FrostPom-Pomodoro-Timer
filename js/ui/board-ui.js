@@ -32,6 +32,8 @@ export function errorText(kind) {
     case 'rate': return tr('Demasiados intentos seguidos. Espera un momento y vuelve a intentarlo.');
     case 'code_invalid':
     case 'badcode': return tr('El código no es correcto o ya venció. Revisa el correo o pide uno nuevo.');
+    case 'relink': return tr('Tu lugar en el ranking está en tu cuenta con correo y su sesión se cerró en este equipo. Vuelve a conectarla en Ajustes → Tu cuenta.');
+    case 'nosession': return tr('Tu sesión en línea se cerró. Vuelve a entrar en Ajustes → Tu cuenta.');
     default: return tr('Algo falló al hablar con el servidor. Inténtalo de nuevo en un rato.');
   }
 }
@@ -76,6 +78,8 @@ const inBoard = () => BOARD.isJoined() && BOARD.joinedName() === (state.account 
  * (v4.3) ¿Por qué este dispositivo NO está sumando tus pomodoros en el ranking? '' = sí suma.
  * 'off' (sin ranking) · 'noaccount' · 'nobirth' · 'minor' · 'optout' (eligió no aparecer) ·
  * 'nosession' (la sesión de la cuenta en línea se cerró) · 'notjoined'.
+ * (v4.5.1) 'mismatch' (la sesión es de OTRA cuenta con correo: los minutos iban allá) ·
+ * 'relink' (la sesión de tu cuenta con correo se cerró en una cuenta de este equipo).
  */
 export function boardBlocker() {
   if (!BOARD.enabled()) return 'off';
@@ -85,6 +89,8 @@ export function boardBlocker() {
   if (!BOARD.eligible(acc)) return 'minor';
   if (!state.settings.leaderboardOn) return 'optout';
   if (acc.online && !BOARD.hasAccountSession()) return 'nosession';
+  if (acc.online && BOARD.sessionMismatch(acc.email)) return 'mismatch';
+  if (!acc.online && BOARD.needsRelink()) return 'relink';
   if (!inBoard()) return 'notjoined';
   return '';
 }
@@ -105,6 +111,14 @@ export async function ensureJoined({ interactive = false } = {}) {
   // (v4.3) Una cuenta en línea sin su sesión no se une con una sesión anónima nueva: antes eso
   // hacía que el servidor dijera "ese nombre ya está ocupado" (por la misma persona)
   if (state.account.online && !BOARD.hasAccountSession()) return { ok: false, kind: 'nosession' };
+  // (v4.5.1) Con la sesión de otra cuenta no se une (se arregla al volver a entrar: cloud-ui.js)
+  if (state.account.online && BOARD.sessionMismatch(state.account.email)) return { ok: false, kind: 'mismatch' };
+  // (v4.5.1) La sesión de tu cuenta con correo se cerró: antes se creaba una anónima y aparecías
+  // como otra persona con tu nombre "ocupado". Ahora se pide volver a conectarla.
+  if (!state.account.online && BOARD.needsRelink()) {
+    if (interactive && !store.tab.get('relink_asked')) { store.tab.set('relink_asked', '1'); return relinkFlow(); }
+    return { ok: false, kind: 'relink' };
+  }
   if (inBoard()) return { ok: true };
   const r = await BOARD.join(profileFields(), { create: !state.account.online });
   if (r.ok) {
@@ -174,7 +188,7 @@ async function nameTakenFlow(kind) {
       h('p', { class: 'dlg__text', text: kind !== 'name_taken'
         ? t('El nombre {name} no está permitido en el ranking global. Elige otro: también cambiará en tu cuenta.', { name: current })
         // (v4.3) Con cuenta en línea, casi siempre es su propio nombre guardado en otra sesión
-        : online ? t('El nombre {name} está guardado en el ranking con otra sesión: por ejemplo, de un equipo donde usaste FrostPom sin entrar con tu correo. Si es tuyo, escríbenos a {mail} y lo pasamos a tu cuenta (conservas tus minutos). Mientras tanto, puedes elegir otro nombre.', { name: current, mail: config.supportEmail })
+        : online ? t('El nombre {name} está guardado en el ranking con otra sesión: casi siempre, la de otro equipo donde usas FrostPom sin haber tocado «Conectar». Si es tuyo, abre FrostPom en ese equipo y ve a Ajustes → Tu cuenta → Conectar con este mismo correo: tu nombre y tus minutos pasan solos a tu cuenta. Si no puedes, escríbenos a {mail}. Mientras tanto, puedes elegir otro nombre.', { name: current, mail: config.supportEmail })
           : t('Otra persona del ranking global ya se llama {name}. Elige otro nombre de usuario: también cambiará en tu cuenta.', { name: current }) }),
       h('label', { class: 'pin-label', for: 'boardName', text: 'Nuevo nombre de usuario' }), name,
       h('p', { class: 'acc-hint', text: '3 a 20 caracteres: letras, números, punto o guion bajo.' }),
@@ -207,6 +221,42 @@ async function nameTakenFlow(kind) {
   toast(t('Listo: ahora eres {name} y ya apareces en el ranking global.', { name: chosen }), 'good', { ms: 6000 });
   changed();
   return { ok: true };
+}
+
+/**
+ * (v4.5.1) La sesión de tu cuenta con correo se cerró en este equipo (por ejemplo, cambiaste o
+ * recuperaste la contraseña en otro equipo) y esta cuenta todavía es solo de este equipo. Lo mejor:
+ * conectarla (también guarda el progreso en línea); si no puede (menor de 13), con un código.
+ */
+export async function relinkFlow() {
+  const acc = state.account;
+  if (!acc) return { ok: false, kind: 'relink' };
+  const canOnline = SYNC.enabled() && (!acc.birth || BOARD.oldEnough(acc.birth));
+  const res = await openDialog({
+    className: 'dlg--board',
+    title: 'Vuelve a conectar tu lugar en el ranking',
+    body: [
+      h('p', { class: 'dlg__text', text: acc.email
+        ? t('Tu lugar en el ranking ({name}) está guardado en tu cuenta con correo ({mail}), y su sesión se cerró en este equipo (por ejemplo, porque cambiaste o recuperaste la contraseña en otro equipo). Mientras tanto, tus pomodoros no suman en el ranking.', { name: acc.username, mail: CLOUD.maskEmail(acc.email) })
+        : t('Tu lugar en el ranking ({name}) está guardado en una cuenta con correo, y su sesión se cerró en este equipo. Mientras tanto, tus pomodoros no suman en el ranking.', { name: acc.username }) }),
+      canOnline ? h('p', { class: 'dlg__text', text: 'Conecta tu cuenta con tu correo y tu contraseña: así vuelves a sumar y tu progreso queda guardado para entrar desde cualquier equipo.' }) : null,
+    ],
+    actions: [
+      { label: 'Ahora no', value: 'later' },
+      canOnline
+        ? { label: 'Conectar mi cuenta', value: 'connect', variant: 'btn--gold', primary: true }
+        : { label: 'Recibir un código', value: 'claim', variant: 'btn--gold', primary: true },
+    ],
+  });
+  if (res === 'connect') {
+    const { connectFlow } = await import('./cloud-ui.js');
+    await connectFlow();
+    changed();
+    return BOARD.needsRelink() ? { ok: false, kind: 'relink' } : { ok: true };
+  }
+  if (res === 'claim' && await claimFlow()) return ensureJoined({ interactive: true });
+  changed();
+  return { ok: false, kind: 'relink' };
 }
 
 /** Recuperar tu lugar con el correo (código de Supabase, el mismo de "¿Olvidaste la contraseña?"). */
@@ -282,6 +332,9 @@ export async function bootBoard() {
       if (state.account && BOARD.eligible(state.account) && state.settings.leaderboardOn && !inBoard()) ensureJoined().catch(() => {});
     });
   }
+  // (v4.5.1) ¿La sesión del ranking sigue viva? Si se cerró en otro equipo (por ejemplo, cambiaste
+  // la contraseña allá), se nota ahora al abrir y se explica, en vez de esperar al próximo pomodoro
+  if (BOARD.load().refresh && navigator.onLine !== false) await BOARD.authToken().catch(() => '');
   BOARD.flush().catch(() => {});
   if (!state.account.birth && !state.account.online) { // una cuenta en línea ya es de 13+
     if (!BOARD.load().asked) await joinDialog();
@@ -303,11 +356,16 @@ export function onStudyStart(st) {
   const why = boardBlocker();
   if (why) {
     // (v4.3) Queda escrito en F12 (Consola) por qué no cuenta, para poder revisarlo
-    if (!['off', 'noaccount', 'optout'].includes(why)) console.info(`[FrostPom] Este pomodoro no suma en el ranking global (${why}).`);
-    if (why === 'nosession' && !warnedSession) {
+    if (!['off', 'noaccount', 'optout', 'minor', 'nobirth'].includes(why)) console.info(`[FrostPom] Este pomodoro no suma en el ranking global (${why}).`);
+    if (['nosession', 'mismatch', 'relink'].includes(why) && !warnedSession) {
       warnedSession = true;
-      toast('Tu sesión en línea se cerró: este pomodoro no sumará en el ranking. Vuelve a entrar en Ajustes → Tu cuenta.', 'warn', { ms: 8000 });
+      toast(why === 'relink'
+        ? 'Tu lugar en el ranking necesita que vuelvas a conectar tu cuenta: este pomodoro no sumará allí. Ve a Ajustes → Tu cuenta.'
+        : why === 'mismatch'
+          ? 'Este equipo está guardando en otra cuenta: este pomodoro no sumará en tu ranking. Vuelve a entrar en Ajustes → Tu cuenta.'
+          : 'Tu sesión en línea se cerró: este pomodoro no sumará en el ranking. Vuelve a entrar en Ajustes → Tu cuenta.', 'warn', { ms: 8000 });
     }
+    if (['nosession', 'mismatch', 'relink', 'notjoined'].includes(why)) BOARD.noteIssue(why);
     return Promise.resolve(null);
   }
   // (v4.5) Devuelve el resultado: con { ok, id } el reloj en vivo lleva el número a tus otros aparatos

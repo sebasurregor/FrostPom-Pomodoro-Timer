@@ -30,7 +30,7 @@ Uso:
 Sin dirección, la prueba sirve la carpeta del proyecto ella misma. Termina con código 1 si algo
 cambió. La guía está en docs/PRUEBAS-VISUALES.md.
 """
-import argparse
+import re, argparse
 import datetime
 import functools
 import http.server
@@ -211,6 +211,7 @@ class Fotos:
             servidor(fake)
         pg = self.pg = self.ctx.new_page()
         pg.route(f'{SUPA}/**', fake.handle)
+        pg.route_web_socket(re.compile(r'^wss://[^/]*supabase\.co/realtime/'), fake.ws_connect)
         pg.on('pageerror', lambda e: self.errores.append(str(e)))
         pg.clock.set_fixed_time(AHORA)
         pg.goto(self.url + 'manifest.webmanifest')  # una página cualquiera del sitio, para poder guardar los datos

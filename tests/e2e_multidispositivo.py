@@ -9,6 +9,8 @@ Dos navegadores con la MISMA cuenta en línea y el mismo servidor simulado:
   5. Los dos sin internet → al reconectar se suman los minutos de los dos y no se pierde la compra
      (la mezcla de tres copias, js/merge.js) y el pomodoro que terminó en los dos se cuenta una vez.
   6. Un servidor sin la v4.5 (schema.sql viejo): la app sigue como antes, sin errores.
+  7. (v4.5.1) Avisos al instante (Supabase Realtime): empezar o pausar en A se ve en B en menos de 1 s;
+     si los avisos se caen, B se entera igual con la pregunta de respaldo (cada 10 s).
 
 Uso (con la app servida: python -m http.server 8000):
     python tests/e2e_multidispositivo.py http://localhost:8000/
@@ -34,6 +36,8 @@ def device(browser, fake, locale='es-CO'):
     net = {'off': False}
     # Sin internet: las llamadas al servidor simulado fallan (set_offline no frena las rutas simuladas)
     ctx.route(f'{SUPA}/**', lambda r: r.abort('internetdisconnected') if net['off'] else fake.handle(r))
+    # (v4.5.1) Los avisos al instante (Realtime), simulados; sin internet, el WebSocket no conecta
+    ctx.route_web_socket(re.compile(r'^wss://[^/]*supabase\.co/realtime/'), lambda ws: ws.close() if net['off'] else fake.ws_connect(ws))
     # Se anotan todos los avisos (así la prueba no depende de cuánto duran en pantalla)
     ctx.add_init_script("document.addEventListener('frostpom:toast', (e) => { (window.__toasts = window.__toasts || []).push(e.detail.text); });")
     pg = ctx.new_page()
@@ -239,13 +243,18 @@ with sync_playwright() as p:
     jump(fake, both, 10_000)
     check(status(A)[0] in ('idle', 'running') and status(A)[1] != 'study' or status(A)[0] == 'idle', f'A ya no tiene el pomodoro terminado ({status(A)})')
     check('Terminado y guardado desde otro aparato' in toasts(A), 'A avisa "Terminado y guardado desde otro aparato"')
-    check(state(A)['progress']['xp'] == xpA1, 'A no guarda ese pomodoro por su cuenta')
+    # (v4.5.1) Con los avisos al instante, el progreso que guardó B (con ese pomodoro) llega enseguida a A:
+    # A puede tener la XP de B, pero el pomodoro aparece UNA sola vez (A no lo guardó por su cuenta)
+    stA2, stB2 = state(A), state(B)
+    check([x['id'] for x in stA2['sessions']].count(block2) <= 1 and stA2['progress']['xp'] in (xpA1, stB2['progress']['xp']),
+          f"A no guarda ese pomodoro por su cuenta (XP de A {stA2['progress']['xp']}, de B {stB2['progress']['xp']})")
 
     # ================= 5. Los dos sin internet =================
     # Otro aparato (simulado) guardó gemas en la cuenta: llegan solas a los dos, sin volver a abrir la app
     sv = fake.saves[uid]
     sv['data']['progress']['gems'] = int(sv['data']['progress'].get('gems') or 0) + 500
     sv['version'] += 1
+    fake.notify(uid, {'k': 'p', 'v': sv['version']})  # (v4.5.1) como el servidor real al guardar
     gems_cloud = sv['data']['progress']['gems']
     jump(fake, both, 10_000)
     settle(fake, both, 800, 3)
@@ -315,6 +324,44 @@ with sync_playwright() as p:
     owners = [d for (u, b), d in fake.claims.items() if u == uid and b == blockX]
     check(len(owners) == 1, 'el servidor anotó un solo dueño para ese pomodoro')
     check(not errsA and not errsB, 'sin errores en los dos aparatos' + (': ' + ' | '.join(errsA + errsB) if errsA or errsB else ''))
+
+    # ================= 7. (v4.5.1) Avisos al instante (Supabase Realtime) =================
+    joins = [c for c in fake.fn_calls('rt_join') if c[2] == uid]
+    check(len(joins) >= 2, f'los dos aparatos escuchan los avisos de su cuenta ({len(joins)} conexiones)')
+    check(all(c[1]['topic'] == f'realtime:frostpom:{uid}' for c in joins), 'cada aparato escucha SOLO el canal privado de su cuenta')
+    for pg in both:
+        pg.goto(URL + '#/enfocar')
+    settle(fake, both, 700, 2)
+    for pg in both:
+        dismiss(pg)
+    if status(A)[1] != 'study':
+        A.click('#skipBtn'); settle(fake, both, 700, 2)
+    if status(A)[0] == 'running':
+        A.click('#mainBtn'); settle(fake, both, 700, 2)
+    jump(fake, both, 10_000)
+    check(status(A) == status(B) and status(A)[0] != 'running', f'preparación: los dos quietos ({status(A)} y {status(B)})')
+    clear_toasts(A, B)
+    A.click('#mainBtn')
+    settle(fake, both, 300, 3)
+    check(status(B)[0] == 'running', f'empezar en A se ve en B en menos de 1 s, sin esperar la pregunta de cada 10 s ({status(B)})')
+    check(abs(clock_sec(A) - clock_sec(B)) <= 1, f'con la misma cuenta regresiva ({A.inner_text("#clock")} y {B.inner_text("#clock")})')
+    clear_toasts(A, B)
+    B.click('#mainBtn')
+    settle(fake, both, 300, 3)
+    check(status(A)[0] == 'paused' and 'Pausado desde otro aparato' in toasts(A), f'pausar en B se ve en A al instante ({status(A)})')
+    check(not [n for n in fake.notified if n[0] != uid], 'los avisos van solo a esa cuenta')
+    check(all(set(n[1]) <= {'k', 'v', 'd'} for n in fake.notified), 'los avisos no llevan datos personales (solo versión y número al azar)')
+    # Si los avisos se caen (por ejemplo, Realtime apagado), se sigue preguntando cada 10 s
+    fake.realtime_off = True
+    fake.ws_disconnect_all()
+    settle(fake, both, 1200, 3)
+    A.click('#mainBtn')
+    settle(fake, both, 300, 3)
+    check(status(B)[0] == 'paused', 'sin avisos, B no se entera al instante…')
+    jump(fake, both, 10_000)
+    check(status(B)[0] == 'running', '…pero sí con la pregunta de respaldo (cada 10 s), como antes')
+    fake.realtime_off = False
+    check(not errsA and not errsB, 'sin errores con los avisos al instante' + (': ' + ' | '.join(errsA + errsB) if errsA or errsB else ''))
 
     A.screenshot(path=os.path.join(OUT, 'A.png')); B.screenshot(path=os.path.join(OUT, 'B.png'))
     ctxA.close(); ctxB.close()

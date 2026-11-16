@@ -61,6 +61,8 @@ Supabase Realtime avisa al instante por una conexión abierta (websocket), pero 
 
 Preguntar cada 10 s es simple, funciona igual en la web, en Windows y en Android, y se puede probar con el servidor simulado. Si algún día hace falta más rapidez, se cambia la forma de enterarse sin tocar lo demás.
 
+> **(v4.5.1) Ya llegó ese día.** En la prueba cerrada, los cambios tardaban 15 a 20 s en verse en el otro aparato. Ahora se usa Realtime **solo para avisar**: la sección 10 cuenta cómo quedó.
+
 ## 3. El progreso: juntar los cambios en vez de elegir una copia
 
 **La idea (mezcla de tres copias):** cada aparato guarda, además de su progreso, **la última copia que sincronizó** (la "base"). Si al guardar el servidor tiene algo más nuevo, se comparan las tres:
@@ -175,3 +177,61 @@ Ninguna de las dos es necesaria para publicar en Google Play: pueden salir como 
 **Limitaciones conocidas:**
 - Un aparato que no se está viendo no pregunta: si pausas en el computador con el celular en el bolsillo, el aviso del final del celular puede sonar igual. Al abrirlo, el reloj se corrige.
 - Los premios que se calculan en cada aparato (gemas por subir de rango) pueden sobrar o faltar un poco en una mezcla sin internet.
+
+## 10. Avisos al instante con Supabase Realtime (v4.5.1)
+
+**Por qué:** en la prueba cerrada, pausar o empezar en un aparato tardaba 15 a 20 s en verse en el otro. Se sumaban la pregunta cada 10 s y el tiempo de enviar y recibir.
+
+**Cómo funciona ahora:**
+
+1. **Al tocar** un botón en Enfocar, el cambio se envía enseguida. Antes se esperaban 400 ms; si tocas varias veces seguidas, los cambios se juntan en uno.
+2. **El servidor guarda el cambio** (`set_timer`) y, en la misma operación, manda un **aviso** por el canal privado de tu cuenta, `frostpom:<tu id>` (`private.notify`, que usa `realtime.send`).
+3. **Tus otros aparatos** reciben el aviso en menos de un segundo y preguntan al servidor (`get_timer`). El aviso solo dice "algo cambió": lo que vale sigue siendo lo que guarda el servidor.
+4. **Guardar el progreso** (`save_progress`) también avisa. Los otros aparatos traen la XP, las gemas o las compras sin esperar.
+5. **Si el aviso no llega** (WebSocket caído, Realtime apagado o sin internet), cada aparato sigue preguntando **cada 10 s**, como antes. Si el aviso funciona, la pregunta de respaldo es cada 30 s.
+
+**Seguridad y privacidad:**
+
+- **Solo tú escuchas tu canal:** lo revisa la política de `realtime.messages`, que permite LEER solo el canal `frostpom:<tu id>` y solo con tu sesión.
+- **Nadie puede enviar avisos desde la app:** no hay política para escribir. Un aviso falso igual no cambiaría nada, porque el aparato siempre le pregunta al servidor.
+- **El aviso no lleva datos personales.** Lleva `{k: 't', v: versión, d: número al azar de la acción}` para el reloj y `{k: 'p', v: versión}` para el progreso. Con `d`, el aparato que hizo el cambio sabe que el aviso es suyo y no pregunta.
+- **La conexión solo está abierta mientras ves la app.** Si la escondes más de 1 minuto, se cierra y el teléfono ahorra batería. Al volver, se reconecta y pregunta.
+- **La CSP** (en `index.html` y `_headers`, que deben ser iguales) ahora permite `wss://tcxdmziakgppabwyrydd.supabase.co`.
+
+**Dónde está el código:**
+
+- **`js/realtime.js` (nuevo):** el protocolo de Realtime (Phoenix) sin librerías. Se une al canal con tu sesión, manda una señal cada 25 s, renueva la sesión y se reconecta solo con esperas de 1 s, 2 s, 5 s… hasta 1 min.
+- **`js/ui/live.js`:**
+  - qué hacer con cada aviso;
+  - abrir o cerrar la conexión según se vea la app;
+  - la pregunta de respaldo (10 s, o 30 s si los avisos funcionan);
+  - enviar al instante.
+- **`server/supabase/schema.sql`:** `private.notify`, los avisos en `set_timer` y `save_progress`, y la política de `realtime.messages`.
+
+### Qué tienes que hacer en el panel de Supabase
+
+1. **Copia de seguridad** ([COPIA-DE-SEGURIDAD.md](COPIA-DE-SEGURIDAD.md)) y después correr el `server/supabase/schema.sql` de la v4.5.1 en el **SQL Editor**. Ese archivo crea la política de `realtime.messages` y los avisos.
+2. Ve a **Realtime → Settings** y revisa que Realtime esté **encendido**. En proyectos nuevos viene encendido.
+3. En esa misma pantalla, apaga **"Allow public access"** si aparece. La app usa solo canales privados, y así nadie puede escuchar canales públicos de tu proyecto.
+4. No hace falta encender "Replication" ni "Postgres Changes" para ninguna tabla. La app usa **Broadcast**, que es lo que envía `realtime.send`.
+5. **Para probar:** abre la app en tu computador y en tu celular con la misma cuenta, y pausa en uno. El otro debe pausarse en 1 o 2 s. En F12 → Consola no debe salir "Los avisos al instante no están disponibles".
+6. **Si al correr el schema sale** "No se pudo crear la política de Realtime (permisos)", créala a mano en el SQL Editor. Si tampoco te deja, hazlo desde **Realtime → Policies → New policy**, con el mismo nombre y la misma condición:
+
+   ```sql
+   create policy "frostpom: cada cuenta escucha sus avisos" on realtime.messages
+     for select to authenticated
+     using ( (select realtime.topic()) = 'frostpom:' || (select auth.uid())::text
+             and extension = 'broadcast' );
+   ```
+
+**Si no lo activas:** todo funciona como en la v4.5.0, preguntando cada 10 s. En F12 sale un aviso, una sola vez.
+
+**Pruebas:**
+
+- **`tests/e2e_multidispositivo.py`, sección 7:** con el servidor y el WebSocket simulados. Empezar o pausar en un aparato se ve en el otro en menos de 1 s; los avisos van solo a esa cuenta y sin datos personales; si los avisos se caen, la pregunta de respaldo sigue funcionando.
+- **`server/supabase/test/tests.sql`:**
+  - `set_timer` y `save_progress` avisan, y un cambio viejo que no ganó NO avisa;
+  - cada cuenta escucha solo su canal;
+  - nadie puede enviar avisos falsos;
+  - sin Realtime, guardar sigue funcionando.
+

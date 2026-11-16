@@ -312,6 +312,42 @@ export async function createAccountFlow({ required = false } = {}) {
   }
 }
 
+/**
+ * (v4.5.1) Las normas de nombres se ampliaron: si tu nombre ya no está permitido, se pide otro al
+ * abrir la app. La cuenta, el progreso y los minutos del ranking siguen igual (antes, una cuenta
+ * con un nombre que dejaba de pasar el filtro se habría perdido al abrir la app).
+ */
+export async function renameIfBlocked() {
+  if (!state.account || checkUsername(state.account.username).ok) return;
+  const old = state.account.username;
+  const f = accountFields({ withPassword: false, initialName: '' });
+  let rec = null;
+  await openDialog({
+    className: 'dlg--onb',
+    dismissable: false,
+    title: 'Elige un nombre nuevo',
+    body: [h('p', { class: 'dlg__text', text: t('Actualizamos las normas de la comunidad y el nombre {name} ya no está permitido. Elige otro: tu cuenta, tu progreso y tus minutos siguen igual.', { name: old }) }), ...f.nodes],
+    actions: [{ label: 'Guardar', value: 'ok', variant: 'btn--gold', primary: true, validate: async () => {
+      rec = await f.validate();
+      if (!rec) return false;
+      if (BOARD.enabled() && BOARD.isJoined()) {
+        f.setError(tr('Comprobando…'));
+        const r = await BOARD.update({ username: rec.username, country: state.profile.country, avatar: state.profile.avatar, show: state.settings.leaderboardOn });
+        // Sin internet (o sin sesión) se guarda aquí y el ranking lo recibe después
+        if (!r.ok && !['offline', 'nosession', 'relink', 'rate'].includes(r.kind)) { f.setError(boardErrorText(r.kind)); return false; }
+        if (!r.ok) BOARD.markRejoin();
+        f.setError('');
+      }
+      return true;
+    } }],
+    onOpen: f.focus,
+  });
+  if (rec) {
+    applyRename(rec.username);
+    toast(t('Listo: ahora eres {name}.', { name: rec.username }), 'good');
+  }
+}
+
 export async function renameFlow() {
   const f = accountFields({ withPassword: false, initialName: state.profile.nick });
   let rec = null;

@@ -5,20 +5,27 @@
  *
  *  - Solo con cuenta en línea (y con su sesión). Las cuentas solo de este aparato (menores de
  *    13 años) siguen como siempre: el reloj vive en el aparato.
- *  - Lo que tocas en Enfocar se envía un momento después (por si tocas varias veces seguidas).
- *  - Para enterarse de tus otros aparatos, pregunta al abrir la app, al volver a ella, al
- *    recuperar el internet y cada 10 s mientras se ve (también con la ventanita "Siempre encima").
+ *  - Lo que tocas en Enfocar se envía al instante (si tocas varias veces seguidas, se juntan).
+ *  - (v4.5.1) Para enterarse de tus otros aparatos, escucha los avisos AL INSTANTE del servidor
+ *    (Supabase Realtime, js/realtime.js) y, de respaldo, pregunta al abrir la app, al volver a ella,
+ *    al recuperar el internet y cada 10 s mientras se ve (cada 30 s si los avisos funcionan).
  *  - Si el cambio llegó de otro aparato, sale un aviso corto: "Pausado desde otro aparato".
  *  - Si el servidor todavía no tiene la v4.5 (schema.sql), todo sigue como antes.
  */
 import * as TS from '../timer-sync.js';
+import * as RT from '../realtime.js';
 import * as BOARD from '../board.js';
 import * as SYNC from '../sync.js';
 import { isBlockId } from '../timer.js';
 import { toast } from './feedback.js';
 import { state, session } from './context.js';
 
-const PUSH_DELAY_MS = 400;
+// (v4.5.1) Antes se esperaban 400 ms "por si tocabas varias veces": ahora se envía enseguida (si
+// llegan más toques mientras se envía, sync() los junta en una vuelta más)
+const PUSH_DELAY_MS = 0;
+// (v4.5.1) Con los avisos al instante funcionando, la pregunta de respaldo es cada 30 s
+const POLL_LIVE_MS = 30_000;
+const pollEvery = () => (RT.isLive() ? POLL_LIVE_MS : TS.POLL_MS);
 /** Un cambio de hace más de minuto y medio ya no se anuncia (por ejemplo, al abrir la app). */
 const NEWS_MS = 90_000;
 const NEWS = {
@@ -46,7 +53,9 @@ let warned = false;
 
 /** ¿Este aparato comparte el reloj con tus otros aparatos? */
 export function active() {
-  return !disabled && SYNC.enabled() && !!state.account && state.account.online === true && BOARD.hasAccountSession();
+  // (v4.5.1) Y con la sesión de TU cuenta (no la de otro correo)
+  return !disabled && SYNC.enabled() && !!state.account && state.account.online === true && BOARD.hasAccountSession()
+    && !BOARD.sessionMismatch(state.account.email);
 }
 
 /** ¿Se está viendo la app (o la ventanita "Siempre encima")? */
@@ -87,7 +96,7 @@ export function rankReady(block, id) {
 // ---------------------------------------------------------------------
 // Hablar con el servidor
 // ---------------------------------------------------------------------
-const TRANSIENT = ['offline', 'rate', 'auth', 'timeout', 'nooffset'];
+const TRANSIENT = ['offline', 'rate', 'auth', 'timeout', 'nooffset', 'nosession', 'relink'];
 
 function trouble(e) {
   const kind = (e && e.kind) || 'server';
@@ -134,6 +143,7 @@ async function once({ quiet }) {
         try {
           row = await TS.sendTimer(p);
           TS.sent(p, row.sat, row.accepted);
+          if (TS.pending()) again = true; // (v4.5.1) cambió mientras se enviaba: otra vuelta
         } catch (e) {
           if (!TRANSIENT.includes(e && e.kind) && e && e.kind !== 'notready') {
             TS.dropPending(); // el servidor no la acepta (no tiene arreglo): no se reintenta
@@ -254,11 +264,53 @@ export function lost() {
 }
 
 let pulledAt = -Infinity;
-/** Pide traer el progreso de la cuenta (cloud-ui.js). Como mucho una vez cada 8 s. */
-function pull() {
-  if (Date.now() - pulledAt < 8000) return;
+let pullTimer = 0;
+/**
+ * Pide traer el progreso de la cuenta (cloud-ui.js). Como mucho una vez cada 8 s.
+ * (v4.5.1) soon = llegó un aviso: si es muy pronto, se trae apenas pasen los 8 s (no se pierde).
+ */
+function pull(soon = false) {
+  const wait = 8000 - (Date.now() - pulledAt);
+  if (wait > 0) {
+    if (soon && !pullTimer) pullTimer = setTimeout(() => { pullTimer = 0; pull(); }, wait);
+    return;
+  }
   pulledAt = Date.now();
   document.dispatchEvent(new CustomEvent('frostpom:pull'));
+}
+
+// ---------------------------------------------------------------------
+// (v4.5.1) Avisos al instante (Supabase Realtime)
+// ---------------------------------------------------------------------
+let hideTimer = 0;
+/** Llegó un aviso del servidor: { k: 't', v, d } (el reloj cambió) o { k: 'p', v } (progreso nuevo). */
+function onNotify(n) {
+  if (!booted || !active() || !n) return;
+  if (n.k === 'p') {
+    if (Number(n.v) > SYNC.load().version) pull(true);
+    return;
+  }
+  // Un aviso de una acción de ESTE aparato (mismo número al azar) no hace falta preguntarlo
+  const mine = TS.lastSent();
+  const p = TS.pending();
+  if (n.d && ((mine && mine.tok === n.d) || (p && p.tok === n.d))) return;
+  sync();
+}
+
+/** Escucha los avisos mientras la app se ve; si se esconde más de 1 minuto, deja de escuchar. */
+function socket() {
+  clearTimeout(hideTimer);
+  if (!booted || !active()) { RT.stop(); return; }
+  if (visible()) {
+    RT.start({
+      uid: BOARD.load().uid,
+      token: () => BOARD.authToken(),
+      onNotify,
+      onLive: (on) => { if (on) sync({ quiet: false }); }, // al conectar: por si algo cambió mientras tanto
+    });
+  } else {
+    hideTimer = setTimeout(() => { if (!visible()) RT.stop(); }, 60_000);
+  }
 }
 
 // ---------------------------------------------------------------------
@@ -272,13 +324,17 @@ export async function bootLive() {
     window.addEventListener('online', () => { if (booted && active()) sync(); });
     // Al volver a la app se pregunta; al salir, se envía lo que falte (en el celular, la app se duerme)
     document.addEventListener('visibilitychange', () => {
+      socket(); // (v4.5.1) los avisos al instante, solo mientras se ve la app
       if (!booted || !active()) return;
       if (document.visibilityState === 'visible' || TS.pending()) sync();
     });
     window.addEventListener('focus', () => { if (booted && active() && Date.now() - lastPoll > 2000) sync(); });
+    // (v4.5.1) Si la sesión cambió (entraste de nuevo, conectaste la cuenta…), se vuelve a escuchar
+    document.addEventListener('frostpom:cloud', socket);
   }
   booted = true;
   if (!active()) return;
+  socket();
   await sync();
 }
 
@@ -288,13 +344,13 @@ export async function bootLive() {
  * otro. Espera como mucho 4 s (sin internet sigue enseguida).
  */
 export function freshen() {
-  if (!active() || Date.now() - lastPoll < TS.POLL_MS) return Promise.resolve();
+  if (!active() || Date.now() - lastPoll < pollEvery()) return Promise.resolve();
   return Promise.race([sync(), new Promise((r) => setTimeout(r, 4000))]).catch(() => {});
 }
 
 /** Se llama 4 veces por segundo (desde Enfocar y desde la ventanita "Siempre encima"). */
 export function tick() {
   if (!booted || syncing || !active() || !visible()) return;
-  if (Date.now() - lastPoll < TS.POLL_MS) return;
+  if (Date.now() - lastPoll < pollEvery()) return;
   sync();
 }

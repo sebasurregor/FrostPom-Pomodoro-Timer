@@ -48,6 +48,7 @@ function showPetAboveTray() {
 }
 
 export function closeTray() {
+  cancelDrag(); // (v4.5.1) ni un pescado a medio arrastrar se queda en la pantalla
   tray().hidden = true;
   document.documentElement.classList.remove('tray-open');
   $('#shopBtn').setAttribute('aria-expanded', 'false');
@@ -105,7 +106,13 @@ function timeLeft(hours) {
   return h % 24 ? t('{days} y {hours}', { days, hours: hrs(h % 24) }) : days;
 }
 
+let renderLater = false;
 export function renderTray() {
+  // (v4.5.1) Mientras arrastras una comida no se rehace la bandeja: si se rehacía (por ejemplo, al
+  // terminar de comer la anterior), el botón que arrastrabas desaparecía, el navegador soltaba el
+  // "agarre" y el pescado se quedaba pegado en la pantalla (también al cambiar de vista).
+  if (drag) { renderLater = true; return; }
+  renderLater = false;
   const petId = P.currentPetId(state);
   const st = P.petStatus(state, petId);
   const full = st.fullness;
@@ -174,12 +181,34 @@ function onDown(e) {
   const btn = e.target.closest('.tray-food');
   if (!btn || btn.disabled || (e.pointerType === 'mouse' && e.button !== 0)) return;
   e.preventDefault(); // sin selección de texto ni el "arrastrar imagen" del navegador
-  drag = { id: btn.dataset.food, btn, x0: e.clientX, y0: e.clientY, moved: false, ghost: null };
-  btn.setPointerCapture(e.pointerId);
+  if (drag) cancelDrag(); // (v4.5.1) un arrastre anterior que no terminó bien
+  sweepGhosts();
+  drag = { id: btn.dataset.food, btn, pid: e.pointerId, x0: e.clientX, y0: e.clientY, moved: false, ghost: null };
+  try { btn.setPointerCapture(e.pointerId); } catch { /* sin captura: igual se escucha en la ventana */ }
+}
+
+/** (v4.5.1) Quita las comidas "fantasma" que quedaron quietas en la pantalla (las que vuelan se quitan solas). */
+function sweepGhosts() {
+  for (const g of document.querySelectorAll('.food-ghost:not(.is-eaten):not(.is-back)')) {
+    if (!drag || g !== drag.ghost) g.remove();
+  }
+}
+
+/** (v4.5.1) Se interrumpió el arrastre (cambiaste de vista, la ventana perdió el foco…): la comida vuelve. */
+function cancelDrag() {
+  if (!drag) return;
+  const d = drag;
+  drag = null;
+  d.btn.classList.remove('is-dragging');
+  const buddy = $('#buddy');
+  if (buddy) buddy.classList.remove('is-waiting', 'is-target');
+  document.documentElement.classList.remove('is-feeding');
+  if (d.ghost) d.ghost.remove();
+  if (renderLater) renderTray();
 }
 
 function onMove(e) {
-  if (!drag) return;
+  if (!drag || (e.pointerId !== undefined && e.pointerId !== drag.pid)) return;
   if (!drag.moved) {
     if (Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) < DRAG_START_PX) return;
     drag.moved = true;
@@ -203,10 +232,10 @@ function onMove(e) {
 }
 
 function onUp(e) {
-  if (!drag) return;
+  if (!drag || (e.pointerId !== undefined && e.pointerId !== drag.pid)) return;
   const d = drag;
   drag = null;
-  if (!d.moved) return; // fue un toque: lo maneja onClick
+  if (!d.moved) { if (renderLater) renderTray(); return; } // fue un toque: lo maneja onClick
   d.btn.dataset.dragged = '1'; // el "click" que llega después de soltar no cuenta
   setTimeout(() => { delete d.btn.dataset.dragged; }, 0);
   d.btn.classList.remove('is-dragging');
@@ -220,6 +249,7 @@ function onUp(e) {
   } else {
     flyGhost(d.ghost, d.home.x, d.home.y, false);
   }
+  if (renderLater) renderTray();
 }
 
 /** La comida vuela a la boca de la mascota (y se encoge) o vuelve a su lugar. */
@@ -316,7 +346,7 @@ export function bindFeeding() {
   $('#trayNameBtn').addEventListener('click', nameFlow);
   document.addEventListener('frostpom:sheet-open', () => { if (trayOpen()) closeTray(); });
   // (v4.3) Al ir a otra pantalla la tienda se cierra (si no, al volver tapaba los botones de abajo)
-  window.addEventListener('hashchange', () => { if (trayOpen()) closeTray(); });
+  window.addEventListener('hashchange', () => { cancelDrag(); sweepGhosts(); if (trayOpen()) closeTray(); });
   $('#reviveBtn').addEventListener('click', revive);
   // Tocar la tumba abre la tienda (ahí se revive); sin nombre, tocarlo abre "Ponle nombre" (v4.3.1);
   // con nombre, habla
@@ -328,9 +358,13 @@ export function bindFeeding() {
   });
   const list = $('#trayFoods');
   list.addEventListener('pointerdown', onDown);
-  list.addEventListener('pointermove', onMove);
-  list.addEventListener('pointerup', onUp);
-  list.addEventListener('pointercancel', onUp);
+  // (v4.5.1) El arrastre se sigue en TODA la ventana (no solo en la bandeja): si el navegador suelta
+  // el "agarre" (por ejemplo, al soltar muy rápido sobre la mascota), igual se sabe que terminó
+  window.addEventListener('pointermove', onMove);
+  window.addEventListener('pointerup', onUp);
+  window.addEventListener('pointercancel', onUp);
+  window.addEventListener('blur', cancelDrag);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') cancelDrag(); });
   list.addEventListener('click', onClick);
   list.addEventListener('dragstart', (e) => e.preventDefault());
   document.addEventListener('keydown', (e) => {

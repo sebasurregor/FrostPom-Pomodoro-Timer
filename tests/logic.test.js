@@ -967,9 +967,48 @@ test('ranking global: el servidor usa las mismas reglas de nombres y avatares qu
     return [...inside.matchAll(/'([^']*)'/g)].map((m) => m[1]);
   };
   assert.deepEqual(arr('blocked_patterns'), identity.BLOCKED_PATTERNS, 'private.blocked_patterns() debe coincidir con identity.BLOCKED_PATTERNS');
+  assert.deepEqual(arr('blocked_sounds'), identity.BLOCKED_SOUNDS, 'private.blocked_sounds() debe coincidir con identity.BLOCKED_SOUNDS (node tools/nombres-sql.mjs)');
   assert.deepEqual(arr('avatars'), identity.AVATARS, 'private.avatars() debe coincidir con identity.AVATARS');
   assert.ok(sql.includes(`'${identity.ALLOWED_PARTS.join('|')}'`), 'las palabras permitidas deben coincidir');
+  assert.ok(sql.includes(identity.LOOKALIKES[0]) && sql.includes(identity.LOOKALIKES[1]), 'las letras parecidas deben coincidir (node tools/nombres-sql.mjs)');
   assert.ok(sql.includes('select 4 * 60 * 60'), 'el tope diario del servidor es 4 h');
+});
+
+test('nombres (v4.5.1): la lista de prueba de los dos lados (tests/_nombres.json)', () => {
+  const d = JSON.parse(readFileSync(new URL('./_nombres.json', import.meta.url), 'utf8'));
+  for (const ok of d.permitidos) assert.equal(identity.checkUsername(ok).ok, true, `debería permitir "${ok}"`);
+  for (const bad of d.bloqueados) assert.equal(identity.isBlockedName(bad), true, `debería bloquear "${bad}"`);
+  // Los que pasaron en la prueba cerrada
+  assert.equal(identity.checkUsername('PoossyDestroyer').ok, false);
+  assert.equal(identity.checkUsername('Jeffery_Epstein').ok, false);
+});
+
+test('nombres (v4.5.1): ningún apodo que inventa la app queda bloqueado', () => {
+  const adjs = ['Veloz', 'Brillante', 'Valiente', 'Tenaz', 'Ágil', 'Feliz', 'Audaz', 'Genial', 'Fugaz', 'Estelar', 'Lunar', 'Solar', 'Imparable', 'Increíble', 'Alegre', 'Leal', 'Capaz', 'Gentil', 'Paciente', 'Constante'];
+  const bad = [];
+  for (const [animal] of identity.ANIMALS) for (const adj of adjs) for (let n = 10; n < 100; n++) {
+    if (identity.isBlockedName(`${animal}${adj}${n}`)) bad.push(`${animal}${adj}${n}`);
+  }
+  assert.deepEqual(bad.slice(0, 5), [], `apodos bloqueados por error: ${bad.length}`);
+});
+
+test('nombres (v4.5.1): una cuenta vieja con un nombre que el filtro nuevo no permite NO se pierde', () => {
+  const st = S.defaultState();
+  st.account = { username: 'Jeffery_Epstein', hash: 'a'.repeat(64), salt: 'b'.repeat(32), iter: 210000 };
+  st.profile.nick = 'Jeffery_Epstein'; st.profile.onboarded = true;
+  const v = S.validateState(JSON.parse(JSON.stringify(st)));
+  assert.ok(v.account, 'la cuenta sigue ahí');
+  assert.equal(v.account.username, 'Jeffery_Epstein');
+  assert.equal(identity.checkUsername(v.account.username).ok, false, 'pero hay que elegir otro nombre');
+});
+
+test('nombres (v4.5.1): las mascotas usan el mismo filtro (con letras de otros alfabetos)', async () => {
+  const P = await import('../js/pet.js');
+  assert.equal(P.checkPetName('Copito').ok, true);
+  assert.equal(P.checkPetName('Pingüi de Nieve').ok, true);
+  assert.equal(P.checkPetName('рuta').ok, false, 'p cirílica');
+  assert.equal(P.checkPetName('B!tch').ok, false);
+  assert.equal(P.checkPetName('Epstein').ok, false);
 });
 
 test('nombres de usuario: ya no se bloquean nombres inocentes (v3.9)', () => {
@@ -1313,6 +1352,18 @@ test('reloj en vivo (v4.5): acciones sin enviar, bloques terminados y la diferen
     assert.equal(TS.pending(), null);
     assert.equal(TS.lastSent().sat, '2026-11-11T21:00:00.000Z', 'se recuerda la hora enviada (para reenviar con el número del ranking)');
     assert.equal(TS.lastSent().tok, tok2, 'y su número al azar');
+    // (v4.5.1) Se envía al instante: si el número del ranking llega MIENTRAS se envía la acción,
+    // la misma acción (misma hora y mismo número al azar) se vuelve a enviar con él
+    TS.setPending({ at: 300, act: 'start', state: st });
+    const sending = TS.pending();
+    TS.updatePending({ ...st, rank: 'abcd1234-rank' });
+    TS.sent(sending, '2026-11-11T21:05:00.000Z', true);
+    const again = TS.pending();
+    assert.ok(again && again.state.rank === 'abcd1234-rank', 'el número del ranking que llegó mientras se enviaba no se pierde');
+    assert.equal(again.sat, '2026-11-11T21:05:00.000Z', 'se reenvía con la misma hora del servidor');
+    assert.equal(again.tok, sending.tok, 'y con el mismo número al azar (el servidor la acepta)');
+    TS.sent(again, again.sat, true);
+    assert.equal(TS.pending(), null, 'enviada otra vez, ya no queda nada pendiente');
     TS.markDone(BLK(10), 'won');
     TS.markDone(BLK(11), 'lost');
     assert.equal(TS.verdict(BLK(10)), 'won');

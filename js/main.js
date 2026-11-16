@@ -26,7 +26,7 @@ import { renderRanking, bindRanking } from './ui/ranking.js';
 import { bindFeeding, renderShopBtn, openTray, petLabel } from './ui/feeding.js';
 import { needsSettle, currentPetId, petStatus } from './pet.js';
 import { renderSettings, bindSettings } from './ui/settings.js';
-import { onboarding, loginGate, createAccountFlow } from './ui/account.js';
+import { onboarding, loginGate, createAccountFlow, renameIfBlocked } from './ui/account.js';
 import { t, translateDom, isEnglish } from './i18n.js';
 import { applyTheme } from './ui/theme.js';
 import { mountGateSnow } from './ui/gate-snow.js';
@@ -254,7 +254,8 @@ function boot() {
   checkNewDay();
   // Cuentas en línea (v4.0) primero: si hay progreso más nuevo en la nube, se trae antes del ranking.
   // (v4.5) Después, el reloj en vivo con tus otros aparatos.
-  Promise.resolve(greet()).then(bootCloud).then(() => bootLive().catch(() => {})).then(bootBoard).catch(() => {}).finally(() => { checkSeason(); checkPet(); });
+  // (v4.5.1) Si tu nombre ya no está permitido (normas nuevas), se pide otro antes de unirte al ranking.
+  Promise.resolve(greet()).then(bootCloud).then(() => renameIfBlocked().catch(() => {})).then(() => bootLive().catch(() => {})).then(bootBoard).catch(() => {}).finally(() => { checkSeason(); checkPet(); });
   syncStorePremium(); // con cobro real: Premium sigue a la suscripción de Microsoft Store
   hintReducedMotion();
   registerServiceWorker();

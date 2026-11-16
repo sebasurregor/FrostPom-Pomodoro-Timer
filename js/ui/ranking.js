@@ -18,7 +18,7 @@ import { seasonFor } from '../season.js';
 import { $, $$, h } from './dom.js';
 import { emblem } from './emblems.js';
 import { avatarContent, flagEl } from './widgets.js';
-import { joinDialog, ensureJoined, onBoardToggle, boardBlocker } from './board-ui.js';
+import { joinDialog, ensureJoined, onBoardToggle, boardBlocker, relinkFlow } from './board-ui.js';
 import { reconnectFlow } from './cloud-ui.js';
 import { openDialog, toast } from './feedback.js';
 import { state, store, mutate } from './context.js';
@@ -175,6 +175,16 @@ function soonCard() {
     h('p', { class: 'panel__text', text: 'Mientras tanto, tus minutos ya cuentan.' }));
 }
 
+/** (v4.5.1) Por qué el último pomodoro no sumó en el ranking (aunque ahora todo esté en orden). */
+const ISSUES = {
+  offline: 'Tu último pomodoro empezó sin internet: no sumó en el ranking, pero sí en tu progreso. Los siguientes con internet sí suman.',
+  rate: 'Empezaste muchos pomodoros seguidos: el último no sumó en el ranking, pero sí en tu progreso.',
+  finish: 'El ranking no contó tu último pomodoro: lo terminaste en otro equipo, empezaste otro antes de terminarlo o duró menos de un minuto.',
+  server: 'No pudimos avisarle al ranking que empezaste tu último pomodoro: no sumó allí, pero sí en tu progreso. Los siguientes deberían sumar.',
+  closed: 'Tu último pomodoro no sumó en el ranking porque tu sesión estaba cerrada. Ya está arreglado: los siguientes sí suman.',
+};
+const CLOSED = ['auth', 'nosession', 'relink', 'mismatch', 'notjoined'];
+
 /** Tarjeta de estado del ranking global (unirte, menores, saliste…). null si no hace falta. */
 function statusCard() {
   const acc = state.account;
@@ -195,13 +205,29 @@ function statusCard() {
     return card('No apareces en el ranking', 'Elegiste no aparecer. Tus pomodoros no se envían al servidor.',
       h('button', { type: 'button', class: 'btn btn--paper', id: 'boardBackBtn', onclick: async () => { mutate((s) => { s.settings.leaderboardOn = true; }); await onBoardToggle(true); renderRanking(); } }, 'Volver a aparecer'));
   }
-  if (boardBlocker() === 'nosession') {
+  const why = boardBlocker();
+  if (why === 'nosession') {
     return card('Tu sesión en línea se cerró', 'Por eso tus pomodoros no están sumando en el ranking (y tu progreso no se está guardando en tu cuenta). Vuelve a entrar con tu contraseña para arreglarlo.',
       h('button', { type: 'button', class: 'btn btn--gold', id: 'boardReconnect', onclick: () => reconnectFlow().then(renderRanking) }, 'Volver a entrar'));
+  }
+  // (v4.5.1) La sesión de este equipo es de OTRA cuenta con correo: los minutos iban allá
+  if (why === 'mismatch') {
+    return card('Este equipo está guardando en otra cuenta', 'Por eso tus pomodoros no suman en TU lugar del ranking (y tu progreso no llega a tus otros equipos). Vuelve a entrar con tu contraseña para arreglarlo: tu lugar y tus minutos pasan a tu cuenta.',
+      h('button', { type: 'button', class: 'btn btn--gold', id: 'boardReconnect', onclick: () => reconnectFlow().then(renderRanking) }, 'Volver a entrar'));
+  }
+  // (v4.5.1) La sesión de tu cuenta con correo se cerró (por ejemplo, cambiaste la contraseña en otro equipo)
+  if (why === 'relink') {
+    return card('Vuelve a conectar tu lugar en el ranking', 'La sesión de tu cuenta con correo se cerró en este equipo (por ejemplo, porque cambiaste o recuperaste la contraseña en otro equipo). Mientras tanto, tus pomodoros no suman en el ranking.',
+      h('button', { type: 'button', class: 'btn btn--gold', id: 'boardRelink', onclick: () => relinkFlow().then(renderRanking) }, 'Volver a conectar'));
   }
   if (!BOARD.isJoined() || BOARD.joinedName() !== acc.username) {
     return card('Todavía no estás en el ranking global', 'Toca «Unirme ahora» para aparecer (necesitas internet). Tus pomodoros empiezan a contar desde que te unas.',
       h('button', { type: 'button', class: 'btn btn--gold', id: 'boardRetryJoin', onclick: () => ensureJoined({ interactive: true }).then(renderRanking) }, 'Unirme ahora'));
+  }
+  // (v4.5.1) Todo en orden, pero el último pomodoro no sumó: se dice por qué (en las últimas 12 h)
+  const issue = BOARD.load().issue;
+  if (issue && Date.now() - issue.at < 12 * 3600_000) {
+    return h('p', { class: 'board-ok board-ok--warn', id: 'boardIssue', text: tr(ISSUES[CLOSED.includes(issue.kind) ? 'closed' : issue.kind] || ISSUES.server) });
   }
   // (v4.3) Todo en orden: se dice, para que nadie se quede con la duda
   return h('p', { class: 'board-ok', id: 'boardOk', text: tr('✓ Tus pomodoros con internet suman en el ranking desde este dispositivo.') });

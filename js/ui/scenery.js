@@ -22,17 +22,39 @@ const SCENE_W = 1440;
 const SCENE_H = 900;
 const PHONE_SHOW_W = 900;
 const SKY_UP = 3000; // cuánto cielo hay dibujado por encima del borde de arriba (para el celular)
+// (v4.5.1) Nieve dibujada por DEBAJO del borde de abajo: en el celular el paisaje se sube para que
+// los animales caminen SOBRE la nieve. Antes, encima de la barra de abajo (y, en la app de Android,
+// también encima de la barra de gestos del teléfono) quedaban caminando en el aire.
+const GROUND_DOWN = 400;
+const SNOW_LOW = 748; // el punto más bajo de la orilla de la nieve (y en el dibujo)
+const FEET_IN = 8;    // cuántos px se hunden las patas en la nieve
 // Degradados del cielo (y de la ventisca y el esmog) en unidades del dibujo: van de y1 a 900.
 // fitViewBox sube y1 hasta el borde de arriba de lo que se ve, así el degradado llena todo el cielo.
 const vertical = (id, stops) => lg(id, stops, 0, SCENE_H, { gradientUnits: 'userSpaceOnUse', 'data-sky': '' });
-const tallRect = (cls, fill) => s('rect', { class: cls, y: -SKY_UP, width: SCENE_W, height: SCENE_H + SKY_UP, fill });
+const tallRect = (cls, fill) => s('rect', { class: cls, y: -SKY_UP, width: SCENE_W, height: SCENE_H + SKY_UP + GROUND_DOWN, fill });
 
-/** Qué parte del dibujo se ve: en el celular de pie, 900 de ancho (y el cielo que haga falta). */
+/** (v4.5.1) A qué altura (px desde abajo de la pantalla) caminan los animales. 0 si aún no están. */
+function walkersBase() {
+  const w = rootEl && rootEl.querySelector('.scenery__walkers');
+  if (!w) return 0;
+  return Math.max(0, innerHeight - w.getBoundingClientRect().bottom);
+}
+
+/**
+ * Qué parte del dibujo se ve: en el celular de pie, 900 de ancho (y el cielo que haga falta).
+ * (v4.5.1) Si la orilla de la nieve queda por debajo de las patas de los animales, se sube el
+ * paisaje (se ve un poco más de nieve abajo) hasta que caminen sobre ella.
+ */
 function fitViewBox(el) {
   const phone = innerWidth < 900 && innerHeight > innerWidth;
   const h = phone ? Math.min(SCENE_H + SKY_UP, Math.ceil(PHONE_SHOW_W * innerHeight / innerWidth)) : SCENE_H;
-  el.setAttribute('viewBox', `0 ${SCENE_H - h} ${SCENE_W} ${h}`);
-  for (const g of el.querySelectorAll('[data-sky]')) g.setAttribute('y1', String(SCENE_H - h));
+  const scale = Math.max(innerWidth / SCENE_W, innerHeight / h) || 1; // "slice": llena la pantalla
+  const need = walkersBase() + FEET_IN - (SCENE_H - SNOW_LOW) * scale; // px que le faltan a la nieve
+  const lift = Math.min(GROUND_DOWN, Math.max(0, Math.ceil(need / scale)));
+  const top = SCENE_H - h + lift;
+  el.setAttribute('viewBox', `0 ${top} ${SCENE_W} ${h}`);
+  el.dataset.lift = String(lift);
+  for (const g of el.querySelectorAll('[data-sky]')) g.setAttribute('y1', String(top));
 }
 
 // Picos: [x, y] de cada cima; los casquetes de nieve se dibujan en las más altas.
@@ -107,9 +129,11 @@ function buildSvg() {
       ...smoke),
     s('polygon', { points: ridge(near, 720), fill: '#2d68bc' }),
     s('path', { d: 'M0 742 Q240 722 480 740 T960 736 T1440 734 V900 H0 Z', fill: 'url(#scSnow)' }),
+    s('rect', { y: SCENE_H - 1, width: SCENE_W, height: GROUND_DOWN + 1, fill: '#CFE3F8' }), // (v4.5.1) la nieve sigue hacia abajo
     s('path', { d: 'M90 790 Q180 772 270 792 M620 812 Q720 796 820 814 M1080 786 Q1180 770 1280 790', fill: 'none', stroke: '#BBD6F2', 'stroke-width': 5, 'stroke-linecap': 'round' }),
     // Contaminación sobre la nieve
     s('path', { class: 'sc-dirt', d: 'M0 742 Q240 722 480 740 T960 736 T1440 734 V900 H0 Z', fill: '#8B8472' }),
+    s('rect', { class: 'sc-dirt', y: SCENE_H - 1, width: SCENE_W, height: GROUND_DOWN + 1, fill: '#8B8472' }),
     s('g', { class: 'sc-oil' },
       s('ellipse', { class: 'sc-oil-pool', cx: 860, cy: 846, rx: 100, ry: 18, fill: 'url(#scOil)' }),
       s('ellipse', { class: 'sc-oil-sheen', cx: 840, cy: 841, rx: 34, ry: 4, fill: '#7E5BB0', opacity: '0.45' }),
@@ -120,7 +144,7 @@ function buildSvg() {
       s('rect', { x: 902, y: 806, width: 12, height: 30, rx: 5, fill: '#4F9A6B', opacity: '0.85', transform: 'rotate(20 908 821)' }),
       s('path', { d: 'M780 812 q20 -24 40 0 q-6 18 -20 16 q-14 2 -20 -16 Z', fill: '#B9B6AE', opacity: '0.9' }),
       s('rect', { x: 1080, y: 840, width: 22, height: 14, rx: 3, fill: '#E2E0D8', transform: 'rotate(12 1091 847)' })),
-    s('rect', { class: 'sc-nighttint', y: 440, width: 1440, height: 460, fill: '#071733' }),
+    s('rect', { class: 'sc-nighttint', y: 440, width: 1440, height: 460 + GROUND_DOWN, fill: '#071733' }),
     igloo(),
     camp(),
     s('g', { class: 'sc-wind' }, ...[[120, 610], [420, 690], [760, 560], [1040, 660], [300, 520]].map(([x, y], i) =>
@@ -190,7 +214,6 @@ export function mount(container) {
   rootEl = container;
   const art = buildSvg();
   rootEl.replaceChildren(art);
-  fitViewBox(art);
   window.addEventListener('resize', () => fitViewBox(art));
   const walkers = document.createElement('div');
   walkers.className = 'scenery__walkers';
@@ -211,6 +234,7 @@ export function mount(container) {
     walkers.append(w);
   });
   rootEl.append(walkers);
+  fitViewBox(art); // (v4.5.1) con los animales ya puestos: se sabe a qué altura caminan
   rootEl.dataset.weather = rootEl.dataset.weather || 'light';
   // (v4.2.1) La nieve es un solo dibujo (snow.js); no se anima mientras la tapa la pantalla de
   // entrada u otra ventana, ni mientras escribes en el celular (ver main.js: is-typing)

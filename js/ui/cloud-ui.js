@@ -14,7 +14,7 @@ import * as SEC from '../security.js';
 import * as CLOUD from '../cloud.js';
 import * as BOARD from '../board.js';
 import * as SYNC from '../sync.js';
-import { checkUsername, makeNickname } from '../identity.js';
+import { checkUsername, checkUsernameFormat, makeNickname } from '../identity.js';
 import { defaultState } from '../storage.js';
 import { $, h } from './dom.js';
 import { toast, openDialog, confirmDialog, dlg } from './feedback.js';
@@ -28,10 +28,16 @@ import * as U from '../util.js';
 
 /** ¿Esta cuenta guarda su progreso en línea? */
 export const isOnline = () => SYNC.enabled() && !!state.account && state.account.online === true;
+/**
+ * (v4.5.1) ¿La sesión de este equipo es la de TU cuenta en línea? No basta con que sea "con correo":
+ * si es de OTRO correo (por ejemplo, el de recuperación de una versión vieja), el progreso se estaba
+ * guardando en esa otra cuenta y en tu celular aparecía vacío.
+ */
+export const sessionOk = () => BOARD.hasAccountSession() && !BOARD.sessionMismatch(state.account && state.account.email);
 /** ¿Puede tener cuenta en línea? (13+ o fecha aún desconocida) */
 const canBeOnline = () => SYNC.enabled() && !!state.account && (!state.account.birth || BOARD.oldEnough(state.account.birth));
 
-const errText = (e) => (e && e.kind === 'notready' ? tr('Las cuentas en línea todavía no están disponibles.') : CLOUD.errorText(e));
+const errText = (e, when = '') => (e && e.kind === 'notready' ? tr('Las cuentas en línea todavía no están disponibles.') : CLOUD.errorText(e, { when }));
 const hours = (s) => {
   const h1 = Math.round(((s && s.progress && s.progress.totals && s.progress.totals.studySec) || 0) / 360) / 10;
   return t('{n} h estudiadas', { n: h1.toLocaleString() });
@@ -53,7 +59,7 @@ export async function createOnline(email, password) {
 /** Después de guardar la cuenta local: se guarda la sesión y se sube el progreso. */
 export async function afterOnlineCreated(session) {
   if (!session) return;
-  await BOARD.adoptSession(session); // si ya estaba en el ranking (cuenta anónima), su lugar pasa a esta cuenta
+  await BOARD.adoptSession(session, { takeover: true }); // si ya estaba en el ranking (cuenta anónima), su lugar pasa a esta cuenta
   SYNC.markDirty();
   await flush();
   ensureJoined().catch(() => {});
@@ -63,11 +69,17 @@ export async function afterOnlineCreated(session) {
 // Iniciar sesión en un equipo nuevo
 // ---------------------------------------------------------------------
 /** Devuelve true si entró (y trajo el progreso) o false si tocó "volver". */
-export async function signInFlow(prefill = '', { signedOut = false } = {}) {
+export async function signInFlow(prefill = '', { signedOut = false, notice = '' } = {}) {
   const mail = h('input', { type: 'email', class: 'acc-input', id: 'signMail', maxlength: '254', autocomplete: 'email', autocapitalize: 'off', spellcheck: 'false', inputmode: 'email', placeholder: 'tucorreo@ejemplo.com', value: prefill });
   const pass = h('input', { type: 'password', class: 'acc-input', id: 'signPass', maxlength: '64', autocomplete: 'current-password' });
   const keep = keepSignedInField('signKeep');
   const err = h('p', { class: 'form-error', role: 'alert' });
+  // (v4.5.1) "El correo o la contraseña no coinciden" casi siempre era una cuenta que vive SOLO en el
+  // computador (nunca se tocó "Conectar"): Supabase responde lo mismo en los dos casos, así que se
+  // explica qué hacer en cada uno.
+  const hint = h('div', { class: 'signin-hint', id: 'signHint', hidden: true },
+    h('p', { text: '¿Creaste tu cuenta en otro equipo, por ejemplo en tu computador? Si allá nunca tocaste «Conectar», tu cuenta todavía vive solo en ese equipo.' }),
+    h('p', { text: 'Ábrela allá y ve a Ajustes → Tu cuenta → Conectar. Después entra aquí con el mismo correo y la misma contraseña.' }));
   let session = null;
   let remote = null;
   const res = await openDialog({
@@ -77,12 +89,14 @@ export async function signInFlow(prefill = '', { signedOut = false } = {}) {
     title: 'Inicia sesión',
     body: [
       h('div', { class: 'onb__mascot' }, penguin('saludo', { size: 88 })),
-      h('p', { class: 'dlg__text', text: signedOut
-        ? 'Cerraste sesión. Tu progreso sigue guardado en tu cuenta: entra cuando quieras con tu correo y tu contraseña.'
-        : 'Entra con el correo y la contraseña de tu cuenta. Tu progreso llega contigo.' }),
+      h('p', { class: 'dlg__text', text: notice === 'connect-first'
+        ? 'Primero conecta tu cuenta en el equipo donde la creaste (Ajustes → Tu cuenta → Conectar). Después entra aquí con tu correo y tu contraseña: tu progreso llega contigo.'
+        : signedOut
+          ? 'Cerraste sesión. Tu progreso sigue guardado en tu cuenta: entra cuando quieras con tu correo y tu contraseña.'
+          : 'Entra con el correo y la contraseña de tu cuenta. Tu progreso llega contigo.' }),
       h('form', { class: 'pin-form', onsubmit: (e) => { e.preventDefault(); $('[data-primary]', dlg).click(); } },
         h('label', { class: 'pin-label', for: 'signMail', text: 'Correo' }), mail,
-        h('label', { class: 'pin-label', for: 'signPass', text: 'Contraseña' }), pass, err,
+        h('label', { class: 'pin-label', for: 'signPass', text: 'Contraseña' }), pass, err, hint,
         keep.field,
         h('button', { type: 'submit', hidden: true, tabindex: '-1' })),
       h('p', { class: 'dlg__note' }, h('button', { type: 'button', class: 'link-btn', id: 'signForgot', onclick: () => dlg.close('forgot') }, '¿Olvidaste la contraseña?')),
@@ -91,6 +105,7 @@ export async function signInFlow(prefill = '', { signedOut = false } = {}) {
     actions: [{
       label: 'Entrar', value: 'ok', variant: 'btn--gold btn--xl', primary: true,
       validate: async () => {
+        hint.hidden = true;
         const e = CLOUD.cleanEmail(mail.value);
         if (!e) { err.textContent = tr('Revisa el correo: parece que está mal escrito.'); mail.focus(); return false; }
         if (!pass.value) { err.textContent = tr('Escribe tu contraseña.'); pass.focus(); return false; }
@@ -102,7 +117,8 @@ export async function signInFlow(prefill = '', { signedOut = false } = {}) {
           remote = await SYNC.pull();
           return true;
         } catch (x) {
-          err.textContent = errText(x);
+          err.textContent = errText(x, 'login');
+          hint.hidden = x.kind !== 'badlogin';
           pass.value = '';
           return false;
         }
@@ -112,19 +128,76 @@ export async function signInFlow(prefill = '', { signedOut = false } = {}) {
   });
   if (res === 'forgot') return forgotOnlineFlow(CLOUD.cleanEmail(mail.value));
   if (res !== 'ok' || !session) return false;
+  if (!remote) {
+    // (v4.5.1) Entró, pero la cuenta no tiene progreso guardado: ¿vive en otro equipo?
+    const status = await accountStatus();
+    const choice = await notOnlineYetDialog(CLOUD.cleanEmail(mail.value), status);
+    if (choice !== 'here') {
+      await CLOUD.signOut(session.access);
+      BOARD.forget();
+      return signInFlow(CLOUD.cleanEmail(mail.value), { notice: 'connect-first' });
+    }
+    return finishSignIn({ email: CLOUD.cleanEmail(mail.value), password: pass.value, remote, keep: keep.box.checked, suggest: status && status.name });
+  }
   return finishSignIn({ email: CLOUD.cleanEmail(mail.value), password: pass.value, remote, keep: keep.box.checked });
 }
 
+/**
+ * (v4.5.1) Lo que el servidor sabe de TU cuenta (con tu sesión): si tiene progreso guardado y tu
+ * nombre y minutos en el ranking. null si no se pudo saber (por ejemplo, schema.sql viejo).
+ */
+async function accountStatus() {
+  try {
+    const rows = await BOARD.callServer('account_status', {});
+    const r = Array.isArray(rows) ? rows[0] : rows;
+    if (!r) return null;
+    return { progress: r.has_progress === true, name: typeof r.board_name === 'string' ? r.board_name : '', minutes: Number(r.board_minutes) || 0 };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * (v4.5.1) La cuenta existe pero no tiene progreso en línea. Casi siempre es una cuenta que se creó
+ * en otro equipo y allá nunca se conectó (o se conectó con otro correo): su progreso sigue allá.
+ * Antes la app pedía "Elige tu nombre de usuario" y la persona empezaba de cero, con otro nombre.
+ * Devuelve 'here' (empezar aquí) o 'other' (lo conecto en mi otro equipo).
+ */
+async function notOnlineYetDialog(email, status) {
+  const name = status && status.name;
+  return openDialog({
+    className: 'dlg--onb dlg--gate',
+    dismissable: false,
+    title: 'Tu progreso todavía no está en línea',
+    body: [
+      h('p', { class: 'dlg__text', text: name
+        ? t('Tu cuenta ({mail}) existe y en el ranking te llamas {name}, pero tu progreso todavía no está guardado en línea. Si estudiabas en otro equipo (por ejemplo, tu computador), tu progreso sigue allá:', { mail: CLOUD.maskEmail(email), name })
+        : t('Tu cuenta ({mail}) todavía no tiene progreso guardado en línea. Si estudiabas en otro equipo (por ejemplo, tu computador), tu progreso sigue allá:', { mail: CLOUD.maskEmail(email) }) }),
+      h('ol', { class: 'steps-list' },
+        h('li', { text: 'Abre FrostPom en ese equipo.' }),
+        h('li', { text: 'Ve a Ajustes → Tu cuenta → Conectar (o «Volver a entrar», si te lo pide).' }),
+        h('li', { text: 'Vuelve aquí y entra con tu correo y tu contraseña.' })),
+    ],
+    actions: [
+      { label: 'Empezar de cero aquí', value: 'here' },
+      { label: 'Lo conecto en mi otro equipo', value: 'other', variant: 'btn--gold', primary: true },
+    ],
+  });
+}
+
 /** Con la sesión abierta: arma la cuenta de este equipo con el progreso de la nube. */
-async function finishSignIn({ email, password, remote, keep }) {
+async function finishSignIn({ email, password, remote, keep, suggest = '' }) {
   const rec = await SEC.hashPassword(password);
   let next;
-  if (remote && remote.data && remote.data.profile && checkUsername(remote.data.profile.nick).ok) {
+  // (v4.5.1) Solo se revisa la FORMA del nombre: si el filtro nuevo no lo permite, se pide otro
+  // nombre después (antes, el progreso se descartaba y había que empezar de cero)
+  if (remote && remote.data && remote.data.profile && checkUsernameFormat(remote.data.profile.nick).ok) {
     next = SYNC.restore(remote.data, null);
     SYNC.adopted(remote.version, remote.data);
   } else {
     // La cuenta existe pero todavía no tiene progreso guardado: se elige el nombre de usuario
-    const username = await chooseNameFlow();
+    // (si ya estaba en el ranking, se propone ese nombre: es suyo)
+    const username = await chooseNameFlow(suggest);
     next = defaultState();
     next.profile.nick = username;
     next.profile.avatar = makeNickname().avatar;
@@ -145,8 +218,8 @@ async function finishSignIn({ email, password, remote, keep }) {
   return true;
 }
 
-async function chooseNameFlow() {
-  const name = h('input', { type: 'text', class: 'acc-input', id: 'signName', maxlength: '20', autocomplete: 'username', autocapitalize: 'off', spellcheck: 'false' });
+async function chooseNameFlow(suggest = '') {
+  const name = h('input', { type: 'text', class: 'acc-input', id: 'signName', maxlength: '20', autocomplete: 'username', autocapitalize: 'off', spellcheck: 'false', value: checkUsername(suggest).ok ? suggest : '' });
   const err = h('p', { class: 'form-error', role: 'alert' });
   let chosen = '';
   await openDialog({
@@ -198,6 +271,8 @@ async function forgotOnlineFlow(prefill = '') {
   const p2 = h('input', { type: 'password', class: 'acc-input', id: 'fgPass2', maxlength: '64', autocomplete: 'new-password' });
   const err2 = h('p', { class: 'form-error', role: 'alert' });
   let remote = null;
+  let session = null;
+  let status = null;
   const s2 = await openDialog({
     className: 'dlg--onb dlg--gate',
     dismissable: false,
@@ -205,6 +280,8 @@ async function forgotOnlineFlow(prefill = '') {
     title: 'Revisa tu correo',
     body: [
       h('p', { class: 'dlg__text', text: t('Enviamos un código a {mail}. Si no aparece, mira en spam.', { mail: CLOUD.maskEmail(email) }) }),
+      // (v4.5.1) Si el correo no tiene cuenta en línea, Supabase no envía nada (y no lo dice, por privacidad)
+      h('p', { class: 'acc-hint', text: 'Si no llega en unos minutos, puede que ese correo todavía no tenga cuenta en línea: ábrela en el equipo donde la creaste y toca Ajustes → Tu cuenta → Conectar.' }),
       h('label', { class: 'pin-label', for: 'fgCode', text: 'Código' }), code,
       h('label', { class: 'pin-label', for: 'fgPass1', text: 'Nueva contraseña' }), p1,
       h('label', { class: 'pin-label', for: 'fgPass2', text: 'Repite la nueva contraseña' }), p2, err2,
@@ -214,19 +291,38 @@ async function forgotOnlineFlow(prefill = '') {
       if (problem) { err2.textContent = tr(problem); return false; }
       err2.textContent = tr('Comprobando…');
       try {
-        const session = await CLOUD.verifyRecoveryCode(email, code.value, { keep: true });
+        session = await CLOUD.verifyRecoveryCode(email, code.value, { keep: true });
         if (!session || typeof session !== 'object') throw Object.assign(new Error('server'), { kind: 'server' });
-        await CLOUD.updatePassword(session.access, p1.value);
         BOARD.forget();
         await BOARD.adoptSession(session);
         remote = await SYNC.pull();
+        // (v4.5.1) Sin progreso en línea, la contraseña TODAVÍA no se cambia: cambiarla cerraría la
+        // sesión de tu otro equipo (y allá el ranking dejaba de sumar). Primero se pregunta.
+        if (!remote) { status = await accountStatus(); return true; }
+        await CLOUD.updatePassword(session.access, p1.value);
         return true;
       } catch (x) { err2.textContent = errText(x); return false; }
     } }],
     onOpen: () => code.focus(),
   });
   if (s2 !== 'ok') return signInFlow(email);
-  return finishSignIn({ email, password: p1.value, remote, keep: true });
+  if (!remote) {
+    const choice = await notOnlineYetDialog(email, status);
+    if (choice !== 'here') {
+      await CLOUD.signOut(session.access); // sin cambiar la contraseña: tu otro equipo sigue igual
+      BOARD.forget();
+      return signInFlow(email, { notice: 'connect-first' });
+    }
+    try {
+      await CLOUD.updatePassword(session.access, p1.value);
+    } catch (x) {
+      toast(errText(x), 'warn', { ms: 7000 });
+      await CLOUD.signOut(session.access);
+      BOARD.forget();
+      return signInFlow(email);
+    }
+  }
+  return finishSignIn({ email, password: p1.value, remote, keep: true, suggest: status && status.name });
 }
 
 // ---------------------------------------------------------------------
@@ -271,13 +367,15 @@ export async function connectFlow({ pending = false } = {}) {
           session = await CLOUD.signUp(email, pass.value);
           return true;
         } catch (x) {
+          // (v4.5.1) Una contraseña vieja que no cumple las reglas de las cuentas en línea
+          if (x.kind === 'weak') { err.textContent = tr('Tu contraseña de FrostPom no cumple las reglas de las cuentas en línea. Cámbiala en Ajustes → Tu cuenta → Cambiar contraseña y vuelve a conectar.'); return false; }
           if (x.kind !== 'exists') { err.textContent = errText(x); return false; }
         }
         // El correo ya tiene cuenta: si la contraseña es la misma, entra; si no, se confirma con un código
         try {
           session = await CLOUD.signIn(email, pass.value);
         } catch (x) {
-          if (x.kind !== 'badlogin') { err.textContent = errText(x); return false; }
+          if (x.kind !== 'badlogin') { err.textContent = errText(x, 'login'); return false; }
           needsCode = true;
         }
         return true;
@@ -290,10 +388,27 @@ export async function connectFlow({ pending = false } = {}) {
   if (needsCode) {
     session = await confirmEmailFlow(email);
     if (!session) return;
-    try { await CLOUD.updatePassword(session.access, password); } catch { /* se puede cambiar después */ }
+    // (v4.5.1) Antes, si esto fallaba, la cuenta quedaba "conectada" con OTRA contraseña en línea y
+    // en el celular decía "El correo o la contraseña no coinciden". Ahora no se sigue sin lograrlo.
+    const pw = await setOnlinePassword(session, password);
+    if (!pw) { CLOUD.signOut(session.access); return; }
+    if (pw.rec) mutate((s) => { Object.assign(s.account, pw.rec); }); // eligió otra: también aquí
   }
-  // ¿La cuenta ya tenía progreso guardado (de otro equipo)? Se elige cuál queda.
-  await BOARD.adoptSession(session);
+  await bindAccount(session, { email, birth });
+  toast(t('¡Listo! Ya puedes entrar desde cualquier equipo con {mail}.', { mail: CLOUD.maskEmail(email) }), 'good', { ms: 6000 });
+  document.dispatchEvent(new CustomEvent('frostpom:cloud'));
+}
+
+/**
+ * (v4.5.1) Deja la cuenta de este equipo EN LÍNEA con la sesión de `session` (correo `email`):
+ *  - la sesión del ranking y del progreso pasa a ser la de esa cuenta, y tu lugar en el ranking
+ *    también (aunque estuviera en una sesión anónima o con otro correo de este equipo);
+ *  - si la cuenta ya tenía progreso (de otro equipo), se elige con cuál seguir.
+ * fromOther = este equipo guardaba en OTRA cuenta: su versión del progreso no sirve para esta.
+ */
+async function bindAccount(session, { email, birth = '', fromOther = false }) {
+  await BOARD.adoptSession(session, { takeover: true });
+  if (fromOther) SYNC.forget();
   let remote = null;
   try { remote = await SYNC.pull(); } catch { /* sin progreso o sin conexión: se sube el de aquí */ }
   let useRemote = false;
@@ -320,12 +435,53 @@ export async function connectFlow({ pending = false } = {}) {
   if (useRemote) applyRemote(remote.data);
   else { SYNC.markDirty(); await flush(); }
   ensureJoined().catch(() => {});
-  toast(t('¡Listo! Ya puedes entrar desde cualquier equipo con {mail}.', { mail: CLOUD.maskEmail(email) }), 'good', { ms: 6000 });
-  document.dispatchEvent(new CustomEvent('frostpom:cloud'));
+  BOARD.retryTransfer().catch(() => {});
+}
+
+/**
+ * (v4.5.1) Pone `password` como contraseña de la cuenta en línea. Si no cumple las reglas de
+ * Supabase, pide una nueva (que también queda en este equipo). Devuelve { password } o, si se
+ * eligió otra, { password, rec } (rec = su huella para este equipo). null si no se pudo.
+ */
+async function setOnlinePassword(session, password) {
+  try {
+    await CLOUD.updatePassword(session.access, password);
+    return { password };
+  } catch (e) {
+    if (e.kind !== 'weak') { toast(errText(e), 'warn', { ms: 7000 }); return null; }
+  }
+  const p1 = h('input', { type: 'password', class: 'acc-input', id: 'npPass1', maxlength: '64', autocomplete: 'new-password' });
+  const p2 = h('input', { type: 'password', class: 'acc-input', id: 'npPass2', maxlength: '64', autocomplete: 'new-password' });
+  const err = h('p', { class: 'form-error', role: 'alert' });
+  let chosen = null;
+  const res = await openDialog({
+    title: 'Elige una contraseña nueva',
+    body: [
+      h('p', { class: 'dlg__text', text: 'Tu contraseña de FrostPom no cumple las reglas de las cuentas en línea. Elige otra: la usarás aquí y en cualquier equipo.' }),
+      h('label', { class: 'pin-label', for: 'npPass1', text: 'Nueva contraseña' }), p1,
+      h('label', { class: 'pin-label', for: 'npPass2', text: 'Repite la nueva contraseña' }), p2, err,
+    ],
+    actions: [
+      { label: 'Cancelar', value: 'cancel' },
+      { label: 'Guardar', value: 'ok', variant: 'btn--gold', primary: true, validate: async () => {
+        const problem = newPasswordError(p1.value, p2.value, state.account.username);
+        if (problem) { err.textContent = tr(problem); return false; }
+        err.textContent = tr('Guardando…');
+        try {
+          await CLOUD.updatePassword(session.access, p1.value);
+          chosen = p1.value;
+          return true;
+        } catch (x) { err.textContent = errText(x); return false; }
+      } },
+    ],
+    onOpen: () => p1.focus(),
+  });
+  if (res !== 'ok' || !chosen) return null;
+  return { password: chosen, rec: await SEC.hashPassword(chosen) };
 }
 
 /** El correo ya tiene cuenta con otra contraseña: se confirma que es tuyo con un código. */
-async function confirmEmailFlow(email) {
+async function confirmEmailFlow(email, { text = '' } = {}) {
   try { await CLOUD.sendRecoveryCode(email); } catch (x) { toast(errText(x), 'warn'); return null; }
   const code = h('input', { type: 'text', class: 'acc-input acc-input--code', id: 'conCode', inputmode: 'numeric', autocomplete: 'one-time-code', maxlength: '10', spellcheck: 'false', placeholder: '123456' });
   const err = h('p', { class: 'form-error', role: 'alert' });
@@ -333,7 +489,7 @@ async function confirmEmailFlow(email) {
   const res = await openDialog({
     title: 'Confirma que el correo es tuyo',
     body: [
-      h('p', { class: 'dlg__text', text: t('Ese correo ya tiene una cuenta. Enviamos un código a {mail}: escríbelo para conectarla con esta.', { mail: CLOUD.maskEmail(email) }) }),
+      h('p', { class: 'dlg__text', text: text || t('Ese correo ya tiene una cuenta. Enviamos un código a {mail}: escríbelo para conectarla con esta.', { mail: CLOUD.maskEmail(email) }) }),
       h('label', { class: 'pin-label', for: 'conCode', text: 'Código' }), code, err,
     ],
     actions: [
@@ -356,36 +512,87 @@ async function confirmEmailFlow(email) {
 // ---------------------------------------------------------------------
 export async function reconnectFlow() {
   if (!isOnline()) return;
+  const email = state.account.email;
+  // (v4.5.1) La sesión de este equipo es de OTRO correo: el progreso se estaba guardando allá
+  const other = BOARD.sessionMismatch(email) ? BOARD.load().email : '';
   const pass = h('input', { type: 'password', class: 'acc-input', id: 'recPass', maxlength: '64', autocomplete: 'current-password' });
   const err = h('p', { class: 'form-error', role: 'alert' });
+  const codeBtn = h('p', { class: 'dlg__note', hidden: true }, h('button', { type: 'button', class: 'link-btn', id: 'recCode', onclick: () => dlg.close('code') }, '¿No la recuerdas? Entra con un código del correo'));
   let session = null;
   const res = await openDialog({
     title: 'Vuelve a entrar a tu cuenta',
     body: [
-      h('p', { class: 'dlg__text', text: t('Escribe la contraseña de tu cuenta ({mail}) para seguir guardando tu progreso.', { mail: CLOUD.maskEmail(state.account.email) }) }),
-      h('label', { class: 'pin-label', for: 'recPass', text: 'Contraseña' }), pass, err,
+      h('p', { class: 'dlg__text', text: other
+        ? t('Este equipo estaba guardando tu progreso en otra cuenta ({other}). Escribe la contraseña de tu cuenta ({mail}) para que vuelva a guardarse en la tuya y sumar en tu ranking.', { other: CLOUD.maskEmail(other), mail: CLOUD.maskEmail(email) })
+        : t('Escribe la contraseña de tu cuenta ({mail}) para seguir guardando tu progreso.', { mail: CLOUD.maskEmail(email) }) }),
+      h('label', { class: 'pin-label', for: 'recPass', text: 'Contraseña' }), pass, err, codeBtn,
     ],
     actions: [
       { label: 'Ahora no', value: 'cancel' },
       { label: 'Entrar', value: 'ok', variant: 'btn--gold', primary: true, validate: async () => {
         err.textContent = tr('Conectando…');
-        try { session = await CLOUD.signIn(state.account.email, pass.value); return true; } catch (x) { err.textContent = errText(x); return false; }
+        try { session = await CLOUD.signIn(email, pass.value); return true; } catch (x) {
+          err.textContent = errText(x, 'login');
+          codeBtn.hidden = x.kind !== 'badlogin';
+          return false;
+        }
       } },
     ],
     onOpen: () => pass.focus(),
   });
-  if (res !== 'ok' || !session) return;
+  let password = pass.value;
+  if (res === 'code') {
+    // (v4.5.1) La contraseña en línea no coincide (por ejemplo, la de "Conectar" nunca se guardó):
+    // con un código del correo se pone una nueva, aquí y en línea
+    session = await confirmEmailFlow(email, { text: t('Enviamos un código a {mail}. Escríbelo y después eliges una contraseña nueva.', { mail: CLOUD.maskEmail(email) }) });
+    if (!session) return;
+    const pw = await newOnlinePassword(session);
+    if (!pw) { CLOUD.signOut(session.access); return; }
+    password = pw;
+  } else if (res !== 'ok' || !session) return;
   // Si la contraseña cambió en otro equipo, aquí también
-  if (!(await SEC.verifyPassword(pass.value, state.account))) {
-    const rec = await SEC.hashPassword(pass.value);
+  if (!(await SEC.verifyPassword(password, state.account))) {
+    const rec = await SEC.hashPassword(password);
     mutate((s) => { Object.assign(s.account, rec); });
   }
-  await BOARD.adoptSession(session);
-  await startOrResume();
-  await ensureJoined().catch(() => null); // (v4.3) y tus pomodoros vuelven a sumar en el ranking
+  if (other) {
+    await bindAccount(session, { email, fromOther: true });
+  } else {
+    await BOARD.adoptSession(session, { takeover: true });
+    await startOrResume();
+    await ensureJoined().catch(() => null); // (v4.3) y tus pomodoros vuelven a sumar en el ranking
+    BOARD.retryTransfer().catch(() => {});
+  }
   toast('Listo: tu progreso se vuelve a guardar en tu cuenta.', 'good');
   document.dispatchEvent(new CustomEvent('frostpom:cloud'));
   document.dispatchEvent(new CustomEvent('frostpom:board'));
+}
+
+/** (v4.5.1) Pide una contraseña nueva y la pone en la cuenta en línea. La devuelve, o null. */
+async function newOnlinePassword(session) {
+  const p1 = h('input', { type: 'password', class: 'acc-input', id: 'rpPass1', maxlength: '64', autocomplete: 'new-password' });
+  const p2 = h('input', { type: 'password', class: 'acc-input', id: 'rpPass2', maxlength: '64', autocomplete: 'new-password' });
+  const err = h('p', { class: 'form-error', role: 'alert' });
+  let chosen = null;
+  const res = await openDialog({
+    title: 'Elige una contraseña nueva',
+    body: [
+      h('p', { class: 'dlg__text', text: 'La usarás aquí y en cualquier equipo.' }),
+      h('label', { class: 'pin-label', for: 'rpPass1', text: 'Nueva contraseña' }), p1,
+      h('label', { class: 'pin-label', for: 'rpPass2', text: 'Repite la nueva contraseña' }), p2, err,
+    ],
+    actions: [
+      { label: 'Cancelar', value: 'cancel' },
+      { label: 'Guardar', value: 'ok', variant: 'btn--gold', primary: true, validate: async () => {
+        const problem = newPasswordError(p1.value, p2.value, state.account.username);
+        if (problem) { err.textContent = tr(problem); return false; }
+        err.textContent = tr('Guardando…');
+        try { await CLOUD.updatePassword(session.access, p1.value); chosen = p1.value; return true; } catch (x) { err.textContent = errText(x); return false; }
+      } },
+    ],
+    onOpen: () => p1.focus(),
+  });
+  return res === 'ok' ? chosen : null;
 }
 
 // ---------------------------------------------------------------------
@@ -500,7 +707,8 @@ function adoptFromCloud(r) {
 
 async function flush() {
   clearTimeout(timer);
-  if (!isOnline()) return;
+  // (v4.5.1) Con la sesión de OTRA cuenta no se sube nada (antes se guardaba en esa otra cuenta)
+  if (!isOnline() || !sessionOk()) return;
   // (v4.5) Antes de subir: los pomodoros guardados sin internet que otro aparato ya había guardado se quitan
   await settleClaims().catch(() => {});
   const r = await SYNC.push(state);
@@ -534,15 +742,23 @@ export async function bootCloud() {
     });
     window.addEventListener('online', () => { if (isOnline() && SYNC.load().dirty) flush(); });
     // (v4.5) Otro aparato guardó un pomodoro que también terminó aquí: se trae su progreso
-    document.addEventListener('frostpom:pull', () => { if (isOnline() && BOARD.hasAccountSession()) startOrResume({ quiet: true }).catch(() => {}); });
+    document.addEventListener('frostpom:pull', () => { if (isOnline() && sessionOk()) startOrResume({ quiet: true }).catch(() => {}); });
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && isOnline() && SYNC.load().dirty) flush(); });
   }
   if (isOnline()) {
-    if (BOARD.hasAccountSession()) await startOrResume(); // (si la sesión ya no sirve, aquí se nota)
+    // (v4.5.1) Primero se revisa la sesión: si se cerró en otro equipo, o si es de OTRA cuenta (lo dice
+    // el token), se nota ahora, ANTES de traer o subir progreso de la cuenta equivocada
+    if (BOARD.load().refresh && navigator.onLine !== false) await BOARD.authToken().catch(() => '');
+    if (sessionOk()) {
+      await startOrResume(); // (si la sesión ya no sirve, aquí se nota)
+      // (v4.5.1) Si al conectar no se pudo pasar tu lugar del ranking a tu cuenta, se reintenta
+      BOARD.retryTransfer().then((r) => { if (r.moved) ensureJoined().then(() => document.dispatchEvent(new CustomEvent('frostpom:board'))); }).catch(() => {});
+    }
     // (v4.3) Si la sesión se cerró (por ejemplo, cerraste sesión en otro equipo con una versión
     // anterior), se pide la contraseña una vez al abrir: antes solo se veía en Ajustes y, mientras
     // tanto, no se guardaba el progreso ni sumaban los pomodoros en el ranking.
-    if (!BOARD.hasAccountSession() && navigator.onLine !== false && !store.tab.get('reconnect_asked')) {
+    // (v4.5.1) También si la sesión es de OTRA cuenta (el progreso se guardaba allá).
+    if (!sessionOk() && navigator.onLine !== false && !store.tab.get('reconnect_asked')) {
       store.tab.set('reconnect_asked', '1');
       await reconnectFlow();
     }
@@ -564,8 +780,10 @@ export function renderCloudSettings() {
   const text = $('#accCloudText');
   const btn = $('#accCloudBtn');
   btn.hidden = false;
-  if (isOnline() && !BOARD.hasAccountSession()) {
-    text.textContent = tr('Tu sesión en línea se cerró. Vuelve a entrar para seguir guardando tu progreso.');
+  if (isOnline() && !sessionOk()) {
+    text.textContent = BOARD.hasAccountSession()
+      ? tr('Este equipo está guardando tu progreso en otra cuenta. Vuelve a entrar con la tuya para arreglarlo.')
+      : tr('Tu sesión en línea se cerró. Vuelve a entrar para seguir guardando tu progreso.');
     btn.textContent = tr('Volver a entrar');
     btn.dataset.action = 'reconnect';
   } else if (isOnline()) {

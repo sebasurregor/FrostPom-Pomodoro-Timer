@@ -41,6 +41,13 @@ Este documento explica qué protege la app hoy, cuáles son sus límites honesto
 - **Ocultar a una persona** se guarda solo en el dispositivo (`st2_board_hidden`), sin avisarle a nadie.
 - **App de Android:** el mismo código y la misma CSP. El puente de Capacitor entra antes que la página (`addDocumentStartJavaScript`), sin necesitar `unsafe-inline`; `@capacitor/core` va copiado en `js/vendor/` (sin `eval` ni `innerHTML`) y solo se carga dentro de la app. Solo se puede navegar dentro de la app a `challenges.cloudflare.com` (`allowNavigation`); todo lo demás se abre en el navegador del teléfono. La llave de firma (`.jks`) nunca va al repositorio (`.gitignore`).
 
+## 1g. Avisos al instante, cuentas y nombres (v4.5.1)
+
+- **Avisos al instante (Supabase Realtime):** cada cuenta escucha solo su canal privado `frostpom:<id>`. Lo exige la política de `realtime.messages`, y nadie puede enviar por ese canal desde la app. El aviso solo lleva un número de versión y el número al azar de la acción. Aun si llegara uno falso, la app le pregunta al servidor, que es el que manda. La CSP permite `wss://` solo al proyecto de Supabase. En **Realtime → Settings**, apaga "Allow public access".
+- **`account_status()`** solo responde sobre TU cuenta (con tu sesión). Para saber si un correo tiene cuenta no existe ninguna función pública. Así, nadie puede averiguar con la app si el correo de otra persona (por ejemplo, de un niño) tiene cuenta. Por eso, "no coinciden" explica los dos casos en vez de decir cuál es.
+- **Pasar tu lugar del ranking** entre sesiones sigue necesitando las dos sesiones en el mismo equipo (códigos de un solo uso). La unión a mano (`private.move_name`) es solo para el dueño en el SQL Editor, después de confirmar que el nombre es de esa persona.
+- **Filtro de nombres más fuerte** (`js/identity.js` y el mismo en el servidor). Compara también la forma "sonora", las letras de otros alfabetos y una lista amplia (sexual, drogas, odio, violencia, autolesiones, criminales y abusadores conocidos), con una lista de permitidos. Los nombres viejos que no pasan se esconden solos (`private.review_names()`), y la persona debe elegir otro sin perder su cuenta.
+
 ## 1d. Cobro de Premium (v3.8, apagado por ahora)
 
 - El pago lo hace **Microsoft Store** (Digital Goods API + Payment Request API, `js/billing.js`). La app nunca ve la tarjeta.

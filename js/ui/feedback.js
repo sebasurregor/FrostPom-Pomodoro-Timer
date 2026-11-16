@@ -55,8 +55,11 @@ export function backArrow() {
  * back = valor con el que se cierra la ventana al tocar la flecha de volver (arriba a la
  * izquierda). Sin back, no hay flecha.
  */
+let openSeq = 0; // (v4.5.1) qué ventana está abierta (para no cerrar otra por error)
 export function openDialog({ title, body = [], actions = [], className = '', dismissable = true, onOpen, back = null }) {
   const run = () => new Promise((resolve) => {
+    const me = ++openSeq;
+    let busy = false;
     dlg.className = `dlg ${className}`;
     // Entrar / crear cuenta: detrás se ve el paisaje del ártico con la fogata (no la app)
     if (/\bdlg--gate\b/.test(className)) document.documentElement.classList.add('gate-open');
@@ -71,8 +74,25 @@ export function openDialog({ title, body = [], actions = [], className = '', dis
           type: 'button',
           class: `btn ${a.variant || 'btn--paper'}`,
           'data-primary': a.primary ? 'true' : null,
-          onclick: async () => {
-            if (a.validate && !(await a.validate())) return;
+          onclick: async (ev) => {
+            // (v4.5.1) Mientras se comprueba (por ejemplo, "Conectando…"), tocar otra vez no hace nada:
+            // antes, tocar "Entrar" varias veces lanzaba varios inicios de sesión a la vez, cada uno
+            // terminaba cerrando una ventana (a veces la SIGUIENTE) y la pantalla se desarmaba.
+            if (busy) return;
+            if (a.validate) {
+              busy = true;
+              const box = ev.currentTarget.closest('.dlg__actions');
+              box.classList.add('is-busy');
+              box.setAttribute('aria-busy', 'true');
+              let ok = false;
+              try { ok = await a.validate(); } finally {
+                busy = false;
+                box.classList.remove('is-busy');
+                box.removeAttribute('aria-busy');
+              }
+              if (!ok) return;
+            }
+            if (openSeq !== me || !dlg.open) return; // esta ventana ya se cerró (por ejemplo, con la flecha)
             dlg.close(a.value);
           },
         }, a.label))) : null));

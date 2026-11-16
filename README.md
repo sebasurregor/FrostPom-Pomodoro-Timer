@@ -1,4 +1,4 @@
-# FrostPom: Pomodoro Timer (v4.5.0)
+# FrostPom: Pomodoro Timer (v4.5.1)
 
 > Antes se llamaba **StudyTimer**. Publicada en **https://sebasurregor.github.io/FrostPom-Pomodoro-Timer/**
 
@@ -34,7 +34,7 @@ Diseño: paisaje polar simple (montañas en #2d68bc, #749eda y #93c0ed) con ping
 
 | Vista | Para qué sirve |
 |---|---|
-| **Enfocar** | Temporizador con modos (Mini 15+5, Clásico 25+5, Enfoque 45+10, Profundo 50+10, Largo 60+15) y **Mi ritmo**, donde eliges tus minutos de estudio y descanso. El descanso largo llega solo cada 4 pomodoros. Solo registra *cuánto* estudiaste, no *qué*. Junto al reloj está tu compañero (v4.2): con la tienda le das de comer (corazones al comer), le pones **nombre** (etiqueta sobre su cabeza) y se le nota el hambre (triste, llora); si pasa 3 días en 0 queda una tumba y se revive con 30 gemas. **Siempre encima** (v4.4.1, en el computador con Chrome o Edge): el botón del pin abre una ventanita con el reloj que queda encima de las demás ventanas, con el diseño del widget del autor y sus cinco botones. **Reloj en vivo** (v4.5, cuentas en línea): el mismo pomodoro en todos tus equipos; lo pausas o lo terminas desde cualquiera y se guarda una sola vez. |
+| **Enfocar** | Temporizador con modos (Mini 15+5, Clásico 25+5, Enfoque 45+10, Profundo 50+10, Largo 60+15) y **Mi ritmo**, donde eliges tus minutos de estudio y descanso. El descanso largo llega solo cada 4 pomodoros. Solo registra *cuánto* estudiaste, no *qué*. Junto al reloj está tu compañero (v4.2): con la tienda le das de comer (corazones al comer), le pones **nombre** (etiqueta sobre su cabeza) y se le nota el hambre (triste, llora); si pasa 3 días en 0 queda una tumba y se revive con 30 gemas. **Siempre encima** (v4.4.1, en el computador con Chrome o Edge): el botón del pin abre una ventanita con el reloj que queda encima de las demás ventanas, con el diseño del widget del autor y sus cinco botones. **Reloj en vivo** (v4.5, cuentas en línea): el mismo pomodoro en todos tus equipos; lo pausas o lo terminas desde cualquiera y se guarda una sola vez. Desde la v4.5.1, los cambios se ven en el otro equipo en 1 o 2 s (avisos al instante con Supabase Realtime). |
 | **Premium 👑** | Corona en la barra superior. Modo prueba sin cobro: duración libre, todos los temas, sonidos y tonos, y recordatorios de enfoque. **Regalo de bienvenida (una sola vez):** 1000 gemas para alimentar a la mascota y una mascota de edición limitada que el usuario elige. |
 | **Progreso** | Salud de tu polo, rango (Bronce → Leyenda), racha, misiones diarias, **Tu estudio** (pestañas: gráfica de los últimos 7 días o calendario del mes con los minutos de cada día) e historial (las 5 últimas sesiones, con "Ver más"). |
 | **Ranking** | **Ranking global** (`docs/RANKING-GLOBAL.md`): podio y tabla de la semana y la temporada, el servidor mide el tiempo, máximo 4 h al día, aparecen los de 13+ con su nombre de usuario y se puede salir (y borrar los minutos). Con `mode: 'local'`: tu marca y el aviso "llega pronto". |
@@ -173,7 +173,8 @@ Sigue `docs/MICROSOFT-STORE.md`: GitHub Pages, cuenta individual en Partner Cent
 - [`docs/PRUEBA-DE-SEGURIDAD.md`](docs/PRUEBA-DE-SEGURIDAD.md): preparar una **prueba de seguridad** externa en un proyecto aparte.
 - [`docs/TIENDAS-MOVILES.md`](docs/TIENDAS-MOVILES.md): **llevar FrostPom a Google Play y App Store** paso a paso (Capacitor, costos, prueba cerrada de 12 personas, revisión de Apple).
 - [`docs/CUENTAS-EN-LINEA.md`](docs/CUENTAS-EN-LINEA.md): **cuentas en línea (v4.0)**: qué correr en Supabase antes de publicar, cómo probarlas y cómo atender pedidos de copia o borrado de datos.
-- [`docs/MULTI-DISPOSITIVO.md`](docs/MULTI-DISPOSITIVO.md): **tu cuenta en todos tus aparatos (v4.5)**: el reloj en vivo, un pomodoro guardado una sola vez y la mezcla del progreso sin pérdidas.
+- [`docs/MULTI-DISPOSITIVO.md`](docs/MULTI-DISPOSITIVO.md): **tu cuenta en todos tus aparatos (v4.5)**: el reloj en vivo, un pomodoro guardado una sola vez y la mezcla del progreso sin pérdidas. La sección 10 explica los avisos al instante (v4.5.1) y qué activar en Supabase.
+- [`docs/DIAGNOSTICO-CUENTAS.md`](docs/DIAGNOSTICO-CUENTAS.md): **(v4.5.1)** por qué fallaban el inicio de sesión y el ranking en la prueba cerrada, consultas de solo lectura para revisar una cuenta y cómo unir a mano un caso roto.
 - [`docs/ANDROID-NOTIFICACION-WIDGET.md`](docs/ANDROID-NOTIFICACION-WIDGET.md): **la notificación en curso y el widget de Android (fase 5)**.
 - [`docs/RANKING-GLOBAL.md`](docs/RANKING-GLOBAL.md): **encender el ranking global** paso a paso (Supabase, SQL, moderación y limpieza).
 - [`docs/SEGURIDAD.md`](docs/SEGURIDAD.md): cómo se protegen los datos hoy y qué hacer antes de lanzar.

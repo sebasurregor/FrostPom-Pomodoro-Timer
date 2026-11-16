@@ -38,6 +38,7 @@ def cfg(ranking='remote', online=True):
 def device(browser, fake, locale='es-CO', ranking='remote', online=True):
     ctx = browser.new_context(viewport={'width': 1280, 'height': 900}, locale=locale, service_workers='block')
     ctx.route(f'{SUPA}/**', fake.handle)
+    ctx.route_web_socket(re.compile(r'^wss://[^/]*supabase\.co/realtime/'), fake.ws_connect)  # (v4.5.1) los avisos de Realtime, simulados
     ctx.route('**/js/config.js', cfg(ranking, online))
     pg = ctx.new_page()
     errs = []
@@ -326,6 +327,168 @@ with sync_playwright() as p:
     check(u6 and state(pg6)['account'].get('online') is True and fake.saves.get(u6), 'con internet se termina: cuenta en línea creada y progreso guardado')
     check(not errs6, 'sin errores con la cuenta pendiente' + (': ' + ' | '.join(errs6) if errs6 else ''))
     ctx6.close()
+
+    # ================= H. (v4.5.1) Lo que pasó con usuarios reales en la prueba cerrada =================
+    # H1. Una cuenta del computador que nunca se conectó (con correo de recuperación de una versión
+    #     vieja: en Supabase la cuenta existe con una contraseña al azar y sin progreso).
+    ctx8, pg8, errs8 = device(browser, fake, online=False)
+    pg8.goto(URL); pg8.wait_for_timeout(900); tick(pg8)
+    register(pg8, 'compu_vieja', '2004-02', 'vieja@example.com', password='Polar2026')
+    skip_photo(pg8); tick(pg8, 2500)
+    u8 = fake.uid_of('vieja@example.com')
+    check(u8 and fake.users[u8]['password'] not in (None, 'Polar2026') and u8 not in fake.saves,
+          'preparación: el correo de recuperación existe en Supabase con una contraseña al azar y sin progreso')
+    if not fake.profiles.get(u8):
+        dismiss(pg8)
+    pomodoro(pg8)
+    mins8 = fake.minutes.get(u8, 0)
+    check(fake.profiles.get(u8, {}).get('username') == 'compu_vieja' and mins8 > 0, 'preparación: en el ranking suma con su nombre (en la cuenta del correo)')
+    anon_before = len(fake.fn_calls('anon_signup'))
+
+    # En el celular: "El correo o la contraseña no coinciden" ahora explica qué hacer
+    ctx9, pg9, errs9 = device(browser, fake)
+    pg9.goto(URL); pg9.wait_for_timeout(900); tick(pg9)
+    pg9.click('#toSignIn'); pg9.wait_for_timeout(400); tick(pg9)
+    pg9.fill('#signMail', 'vieja@example.com'); pg9.fill('#signPass', 'Polar2026')
+    pg9.click("#dlg button:has-text('Entrar')"); pg9.wait_for_timeout(900); tick(pg9)
+    check('no coinciden' in pg9.inner_text('#dlg .form-error') and pg9.is_visible('#signHint') and 'Conectar' in pg9.inner_text('#signHint'),
+          'si no coinciden, explica que la cuenta puede vivir solo en el computador y que allá toque «Conectar»')
+    # Tocar "Entrar" muchas veces seguidas: un solo intento (antes se lanzaban varios a la vez)
+    logins = len(fake.fn_calls('password_login')) + sum(1 for c in fake.captcha_tokens if c[0] == '/auth/v1/token')
+    pg9.fill('#signPass', 'Polar2026')
+    pg9.evaluate("() => { const b = document.querySelector('#dlg [data-primary]'); for (let i = 0; i < 6; i++) b.click(); }")
+    pg9.wait_for_timeout(900); tick(pg9)
+    tries = sum(1 for c in fake.captcha_tokens if c[0] == '/auth/v1/token') + len(fake.fn_calls('password_login')) - logins
+    check(tries == 1, f'tocar «Entrar» 6 veces seguidas hace UN solo intento ({tries})')
+    # "¿Olvidaste la contraseña?": como no hay progreso en línea, NO cambia la contraseña sin preguntar
+    pw_before = fake.users[u8]['password']
+    pg9.click('#signForgot'); pg9.wait_for_timeout(300); tick(pg9)
+    pg9.click("#dlg button:has-text('Enviarme el código')"); pg9.wait_for_timeout(800); tick(pg9)
+    check('Si no llega' in pg9.inner_text('#dlg'), 'al pedir el código avisa que, si no llega, puede que el correo no tenga cuenta en línea')
+    pg9.fill('#fgCode', '123456'); pg9.fill('#fgPass1', 'Celular2026'); pg9.fill('#fgPass2', 'Celular2026')
+    pg9.click("#dlg button:has-text('Guardar y entrar')"); pg9.wait_for_timeout(1500); tick(pg9, 1000)
+    check(title(pg9) == 'Tu progreso todavía no está en línea' and 'compu_vieja' in pg9.inner_text('#dlg'),
+          'en vez de "Elige tu nombre de usuario", dice que su progreso sigue en el otro equipo (y su nombre del ranking)')
+    pg9.click("#dlg button:has-text('Lo conecto en mi otro equipo')"); pg9.wait_for_timeout(1200); tick(pg9)
+    check(fake.users[u8]['password'] == pw_before and title(pg9) == 'Inicia sesión' and 'Primero conecta' in pg9.inner_text('#dlg'),
+          '«Lo conecto en mi otro equipo»: NO cambia la contraseña (el computador sigue igual) y vuelve a «Inicia sesión»')
+    check(not pg9.evaluate("JSON.parse(localStorage.getItem('st2_state') || '{}').account"), 'y el celular no crea una cuenta vacía')
+
+    # En el computador (ya con la versión nueva): Conectar → código → queda en línea con su progreso
+    ctx8.unroute('**/js/config.js'); ctx8.route('**/js/config.js', cfg('remote', True))
+    pg8.reload(); pg8.wait_for_timeout(1500); tick(pg8, 1500)
+    if title(pg8) == '¡Hola de nuevo!':
+        pg8.fill('#loginPass', 'Polar2026'); pg8.click("#dlg button:has-text('Entrar')"); pg8.wait_for_timeout(1200); tick(pg8, 1200)
+    dismiss(pg8)
+    pg8.goto(URL + '#/ajustes'); tick(pg8, 600)
+    pg8.click('#accCloudBtn'); pg8.wait_for_timeout(300); tick(pg8)
+    pg8.fill('#conPass', 'Polar2026'); pg8.click("#dlg button:has-text('Conectar')"); pg8.wait_for_timeout(1500); tick(pg8, 1000)
+    check('Confirma que el correo es tuyo' in title(pg8), 'Conectar: el correo ya existía con otra contraseña → pide el código')
+    pg8.fill('#conCode', '123456'); pg8.click("#dlg button:has-text('Confirmar')"); pg8.wait_for_timeout(2000); tick(pg8, 9500)
+    st8 = state(pg8)
+    check(st8['account'].get('online') is True and fake.users[u8]['password'] == 'Polar2026' and fake.saves.get(u8),
+          'queda en línea: la contraseña en línea es la de FrostPom y su progreso se guarda')
+    check(fake.profiles[u8]['username'] == 'compu_vieja' and fake.minutes.get(u8, 0) == mins8 and len(fake.fn_calls('anon_signup')) == anon_before,
+          'y en el ranking sigue siendo él, con sus minutos (sin perfil nuevo)')
+    # Ahora sí, en el celular entra y llega TODO su progreso
+    pg9.fill('#signPass', 'Polar2026'); pg9.click("#dlg button:has-text('Entrar')"); pg9.wait_for_timeout(1800); tick(pg9, 1500)
+    st9 = state(pg9)
+    check(st9 and st9['profile']['nick'] == 'compu_vieja' and st9['progress']['xp'] == st8['progress']['xp'] and st9['progress']['xp'] > 0,
+          'en el celular entra con su contraseña y llega su progreso (nombre y XP)')
+    check(not errs8 and not errs9, 'sin errores (H1)' + (': ' + ' | '.join(errs8 + errs9) if errs8 or errs9 else ''))
+    ctx9.close()
+
+    # H2. Cambiaste o recuperaste la contraseña en otro equipo y este equipo tenía una cuenta SOLO
+    #     local con tu lugar del ranking en la cuenta del correo: antes se creaba una cuenta anónima,
+    #     aparecías como otra persona, tu nombre "ya existía" y tus horas no sumaban.
+    ctx10, pg10, errs10 = device(browser, fake, online=False)
+    pg10.goto(URL); pg10.wait_for_timeout(900); tick(pg10)
+    register(pg10, 'compu_dos', '2003-06', 'dos@example.com', password='Polar2026')
+    skip_photo(pg10); tick(pg10, 2500); dismiss(pg10)
+    u10 = fake.uid_of('dos@example.com')
+    check(fake.profiles.get(u10, {}).get('username') == 'compu_dos', 'preparación: está en el ranking con la cuenta del correo')
+    # En otro equipo recupera la contraseña (Supabase cierra las demás sesiones)
+    for t in [t for t, u in fake.refresh.items() if u == u10]:
+        fake.refresh.pop(t)
+    anon_before = len(fake.fn_calls('anon_signup'))
+    pg10.reload(); pg10.wait_for_timeout(1500); tick(pg10, 1500)
+    if title(pg10) == '¡Hola de nuevo!':
+        pg10.fill('#loginPass', 'Polar2026'); pg10.click("#dlg button:has-text('Entrar')"); pg10.wait_for_timeout(1200); tick(pg10, 1200)
+    check(title(pg10) == 'Vuelve a conectar tu lugar en el ranking' and 'compu_dos' in pg10.inner_text('#dlg'),
+          'al abrir explica que su lugar del ranking necesita volver a conectarse (no «ese nombre ya existe»)')
+    pg10.click("#dlg button:has-text('Ahora no')"); pg10.wait_for_timeout(400); tick(pg10)
+    pomodoro(pg10)
+    check(len(fake.fn_calls('anon_signup')) == anon_before and fake.profiles[u10]['username'] == 'compu_dos' and board(pg10).get('relink') is True,
+          'NO crea una cuenta anónima nueva ni cambia su nombre: queda pendiente volver a conectar')
+    pg10.goto(URL + '#/ranking'); tick(pg10, 1500)
+    check(pg10.is_visible('#boardRelink'), 'la vista Ranking dice la causa real y tiene «Volver a conectar»')
+    # Con un código del correo (cuenta local de 13+ sin cuentas en línea en esta versión): vuelve a sumar
+    pg10.click('#boardRelink'); pg10.wait_for_timeout(400); tick(pg10)
+    pg10.click("#dlg button:has-text('Recibir un código')"); pg10.wait_for_timeout(400); tick(pg10)
+    pg10.click("#dlg button:has-text('Enviarme el código')"); pg10.wait_for_timeout(800); tick(pg10)
+    pg10.fill('#claimCode', '123456'); pg10.click("#dlg button:has-text('Recuperar')"); pg10.wait_for_timeout(1500); tick(pg10, 1500)
+    b10 = board(pg10)
+    check(not b10.get('relink') and b10.get('uid') == u10 and b10.get('joined') and fake.profiles[u10]['username'] == 'compu_dos',
+          'con el código vuelve a la cuenta del correo: mismo lugar, mismo nombre')
+    m_before = fake.minutes.get(u10, 0)
+    pomodoro(pg10)
+    check(fake.minutes.get(u10, 0) > m_before, 'y sus pomodoros vuelven a sumar en SU lugar del ranking')
+    check(not errs10, 'sin errores (H2)' + (': ' + ' | '.join(errs10) if errs10 else ''))
+    ctx10.close()
+
+    # H3. Cuenta EN LÍNEA cuyo equipo guardaba en OTRA cuenta (conectó con un correo distinto al de
+    #     recuperación): el progreso iba a la otra cuenta y en el celular aparecía vacío.
+    ctx11, pg11, errs11 = device(browser, fake)
+    pg11.goto(URL); pg11.wait_for_timeout(900); tick(pg11)
+    register(pg11, 'mezcla_b', '2002-01', 'b@example.com', password='Polar2026')
+    skip_photo(pg11); tick(pg11, 9500); dismiss(pg11)
+    ub = fake.uid_of('b@example.com')
+    ua = fake.add_account('a@example.com', 'OtraCosa99')
+    fake.profiles[ua] = {'username': 'mezcla_a', 'country': 'CO', 'avatar': '🐧', 'show': True, 'xp': 50}
+    fake.minutes[ua] = 40
+    sa = fake.session(ua)
+    pg11.evaluate("(s) => { const b = JSON.parse(localStorage.getItem('st2_board')); Object.assign(b, { uid: s.user.id, refresh: s.refresh_token, anon: false, joined: true, name: 'mezcla_a' }); delete b.email; localStorage.setItem('st2_board', JSON.stringify(b)); }", sa)
+    pushes_a = len([c for c in fake.fn_calls('save_progress') if c[2] == ua])
+    pg11.reload(); pg11.wait_for_timeout(1500); tick(pg11, 1500)
+    if title(pg11) == '¡Hola de nuevo!':
+        pg11.fill('#loginPass', 'Polar2026'); pg11.click("#dlg button:has-text('Entrar')"); pg11.wait_for_timeout(1200); tick(pg11, 1200)
+    check(title(pg11) == 'Vuelve a entrar a tu cuenta' and 'otra cuenta' in pg11.inner_text('#dlg'),
+          'al abrir detecta (por el token de la sesión) que guardaba en OTRA cuenta y pide entrar con la suya')
+    check(len([c for c in fake.fn_calls('save_progress') if c[2] == ua]) == pushes_a, 'mientras tanto no sube nada a la otra cuenta')
+    pg11.fill('#recPass', 'Polar2026'); pg11.click("#dlg button:has-text('Entrar')"); pg11.wait_for_timeout(1500); tick(pg11, 1000)
+    if 'ya tiene progreso' in title(pg11):
+        pg11.click("#dlg button:has-text('El de este equipo')"); pg11.wait_for_timeout(1200); tick(pg11, 1500)
+    tick(pg11, 9000)
+    b11 = board(pg11)
+    check(b11.get('uid') == ub and b11.get('email') == 'b@example.com' and fake.saves.get(ub),
+          'arreglado: la sesión y el progreso vuelven a ser de su cuenta')
+    check(fake.profiles.get(ub, {}).get('username') == 'mezcla_b' and ua not in fake.profiles or fake.profiles.get(ub, {}).get('username') == 'mezcla_b',
+          'y en el ranking aparece con su nombre')
+    check(not errs11, 'sin errores (H3)' + (': ' + ' | '.join(errs11) if errs11 else ''))
+    ctx11.close()
+
+    # H4. Nombres que las normas nuevas no permiten
+    ctx12, pg12, errs12 = device(browser, fake)
+    pg12.goto(URL); pg12.wait_for_timeout(900); tick(pg12)
+    pg12.fill('#accUser', 'Jeffery_Epstein'); tick(pg12, 200)
+    check('no está permitido' in pg12.inner_text('#dlg'), 'al crear la cuenta, «Jeffery_Epstein» no se permite')
+    pg12.fill('#accUser', 'PoossyDestroyer'); tick(pg12, 200)
+    check('no está permitido' in pg12.inner_text('#dlg'), 'ni «PoossyDestroyer»')
+    register(pg12, 'nombre_bueno', '2001-03', 'bueno@example.com', password='Polar2026')
+    skip_photo(pg12); tick(pg12, 9500); dismiss(pg12)
+    # Una cuenta de antes con un nombre que ahora no se permite: NO se pierde; se pide otro nombre
+    pg12.evaluate("() => { const s = JSON.parse(localStorage.getItem('st2_state')); s.account.username = 'Jeffery_Epstein'; s.profile.nick = 'Jeffery_Epstein'; localStorage.setItem('st2_state', JSON.stringify(s)); }")
+    pg12.reload(); pg12.wait_for_timeout(1500); tick(pg12, 1500)
+    if title(pg12) == '¡Hola de nuevo!':
+        pg12.fill('#loginPass', 'Polar2026'); pg12.click("#dlg button:has-text('Entrar')"); pg12.wait_for_timeout(1200); tick(pg12, 1200)
+    check(title(pg12) == 'Elige un nombre nuevo' and state(pg12)['account'] and state(pg12)['progress']['xp'] >= 0,
+          'una cuenta con un nombre que ya no se permite sigue ahí y pide elegir otro')
+    pg12.fill('#accUser', 'Pingu_Nuevo'); pg12.click("#dlg button:has-text('Guardar')"); pg12.wait_for_timeout(1200); tick(pg12, 1500)
+    ub12 = fake.uid_of('bueno@example.com')
+    check(state(pg12)['account']['username'] == 'Pingu_Nuevo' and fake.profiles.get(ub12, {}).get('username') == 'Pingu_Nuevo',
+          'con el nombre nuevo sigue igual (también en el ranking)')
+    check(not errs12, 'sin errores (H4)' + (': ' + ' | '.join(errs12) if errs12 else ''))
+    ctx12.close()
 
     # ================= G. En inglés =================
     SPANISH = re.compile(r"[áéíóúñ¿¡]|\b(de|la|el|los|las|tu|tus|para|con|sin|que|una|correo|contraseña|cuenta|equipo|inicia|sesión|entrar|salir|conectar|progreso)\b", re.I)

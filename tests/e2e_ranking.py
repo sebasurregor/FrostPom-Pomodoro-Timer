@@ -67,6 +67,7 @@ def new_context(browser, fake, mode, locale='es-CO'):
     # Sin service worker: así el cambio de config.js (local → remote) se ve al recargar
     ctx = browser.new_context(viewport={'width': 1280, 'height': 900}, locale=locale, service_workers='block')
     ctx.route(f'{SUPA}/**', fake.handle)
+    ctx.route_web_socket(re.compile(r'^wss://[^/]*supabase\.co/realtime/'), fake.ws_connect)  # (v4.5.1) los avisos de Realtime, simulados
     ctx.route('**/js/config.js', config_route(mode))
     return ctx
 
@@ -124,6 +125,11 @@ with sync_playwright() as p:
     check(state(pg)['progress']['xp'] > xp_before, 'pero sí cuenta en tu progreso')
     fake.abort.discard('start_session')
     dismiss(pg, pg.clock.run_for)  # ceremonia de Bronce II
+    # (v4.5.1) La vista Ranking dice la causa real de que ese pomodoro no sumara (antes decía "✓ suma")
+    pg.goto(URL + '#/ranking'); pg.clock.run_for(1200)
+    check(pg.is_visible('#boardIssue') and 'sin internet' in pg.inner_text('#boardIssue') and not pg.is_visible('#boardOk'),
+          '(v4.5.1) el ranking dice por qué tu último pomodoro no sumó (empezó sin internet)')
+    pg.goto(URL + '#/enfocar'); pg.clock.run_for(600)
 
     # Se va el internet AL TERMINAR: el aviso queda pendiente y se envía al volver
     pg.clock.fast_forward('05:00'); pg.clock.run_for(4000)  # termina el descanso; empieza solo el siguiente (con internet)

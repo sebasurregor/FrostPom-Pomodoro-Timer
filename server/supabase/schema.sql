@@ -3,6 +3,8 @@
 -- v3.9: ranking global · v4.0: guardar el progreso de las cuentas con correo (sin la foto)
 -- v4.1: reportar nombres del ranking (lo piden Google Play y App Store)
 -- v4.5: el reloj en vivo en todos tus aparatos (get_timer, set_timer, claim_block)
+-- v4.5.1: avisos al instante con Realtime, account_status, herramientas para cuentas cruzadas
+--         (account_check, move_name mejorado) y el filtro de nombres más fuerte (review_names)
 --
 -- Por qué existe: si el ranking se calculara en el teléfono, cualquiera podría
 -- editar sus minutos. Aquí el SERVIDOR mide el tiempo y decide cuánto cuenta.
@@ -72,33 +74,108 @@ $$;
 
 -- Groserías, ofensas y suplantación (js/identity.js: BLOCKED_PATTERNS, generado de BLOCKED).
 -- Cada letra lleva "+" para atrapar "puuuta" sin bloquear palabras parecidas ("esperanza").
+-- (v4.5.1) Generado con: node tools/nombres-sql.mjs
 create or replace function private.blocked_patterns() returns text[]
 language sql immutable set search_path = '' as $$
   select array[
-    'p+u+t+a+','p+u+t+o+','p+u+t+i+t+','m+i+e+r+d+a+','p+e+n+d+e+j+','m+a+r+i+c+a+','m+a+r+i+c+',
-    'm+a+l+p+a+r+i+d+','g+o+n+o+r+r+e+a+','h+i+j+u+e+p+u+t+a+','h+d+p+','c+a+r+a+j+o+','v+e+r+g+a+',
-    'c+h+i+n+g+a+d+','c+u+l+e+r+o+','j+o+d+e+r+','g+i+l+i+p+o+l+l+','i+d+i+o+t+a+','i+m+b+e+c+i+l+',
-    'e+s+t+u+p+i+d+','r+e+t+r+a+s+a+d+','m+o+g+o+l+i+c+','s+u+b+n+o+r+m+a+l+','z+o+r+r+a+','p+e+r+r+a+',
-    'c+a+b+r+o+n+','p+a+j+e+r+o+','f+u+c+k+','s+h+i+t+','b+i+t+c+h+','b+a+s+t+a+r+d+','a+s+s+h+o+l+e+',
-    'd+i+c+k+','p+u+s+s+y+','c+u+n+t+','w+h+o+r+e+','s+l+u+t+','r+e+t+a+r+d+','s+t+u+p+i+d+','s+e+x+o+',
-    'p+o+r+n+o+','p+o+r+n+','x+x+x+','v+i+o+l+a+d+','n+u+d+e+','d+e+s+n+u+d+','n+i+g+g+','n+e+g+r+a+t+a+',
-    's+u+d+a+c+a+','c+h+i+n+k+','k+i+k+e+','f+a+g+g+o+t+','t+r+a+n+n+y+','n+a+z+i+','h+i+t+l+e+r+','k+k+k+',
-    'g+e+n+o+c+i+d+','t+e+r+r+o+r+i+s+','a+d+m+i+n+','m+o+d+e+r+a+d+o+r+','s+o+p+o+r+t+e+',
-    's+t+u+d+y+t+i+m+e+r+','f+r+o+s+t+p+o+m+','o+f+i+c+i+a+l+'
+    'p+u+t+a+','p+u+t+o+','p+u+t+i+t+','m+i+e+r+d+a+','p+e+n+d+e+j+','m+a+r+i+c+a+','m+a+r+i+c+o+n+','m+a+r+i+k+o+n+',
+    'm+a+l+p+a+r+i+d+','m+a+l+n+a+c+i+d+','g+o+n+o+r+r+e+a+','h+i+j+u+e+p+u+t+a+','h+i+j+o+d+e+p+u+t+a+','h+d+p+','c+a+r+a+j+o+','v+e+r+g+a+',
+    'b+e+r+g+a+','c+h+i+n+g+a+d+','c+h+i+n+g+a+r+','c+u+l+e+r+o+','c+u+l+i+a+o+','c+u+l+i+a+d+o+','j+o+d+e+r+','j+o+d+i+d+',
+    'g+i+l+i+p+o+l+l+','i+d+i+o+t+a+','i+m+b+e+c+i+l+','e+s+t+u+p+i+d+','r+e+t+r+a+s+a+d+','m+o+g+o+l+i+c+','s+u+b+n+o+r+m+a+l+','z+o+r+r+a+',
+    'p+e+r+r+a+','c+a+b+r+o+n+','p+a+j+e+r+o+','p+a+j+e+r+a+','m+a+m+a+g+u+e+v+o+','m+a+m+a+h+u+e+v+o+','m+a+m+a+b+i+c+h+o+','c+a+r+e+c+h+i+m+b+a+',
+    'p+i+r+o+b+','f+o+l+l+a+r+','c+u+l+e+a+r+','m+a+m+a+d+a+','c+h+u+p+a+m+e+l+a+','f+u+c+k+','f+u+k+','f+c+k+',
+    'p+h+u+c+k+','s+h+i+t+','b+i+t+c+h+','b+i+a+t+c+h+','b+a+s+t+a+r+d+','a+s+s+h+o+l+e+','a+r+s+e+h+o+l+e+','d+i+c+k+',
+    'c+o+c+k+','p+u+s+s+y+','p+o+s+s+y+','c+u+n+t+','w+h+o+r+e+','s+l+u+t+','r+e+t+a+r+d+','s+t+u+p+i+d+',
+    't+w+a+t+','w+a+n+k+e+r+','j+i+z+z+','d+i+l+d+o+','d+o+u+c+h+e+b+a+g+','s+e+x+o+','s+e+x+y+','p+o+r+n+o+',
+    'p+o+r+n+','x+x+x+','v+i+o+l+a+d+','v+i+o+l+a+r+','b+i+o+l+a+d+','n+u+d+e+','d+e+s+n+u+d+','p+e+n+e+',
+    'p+e+n+i+s+','v+a+g+i+n+a+','v+u+l+v+a+','c+l+i+t+o+r+','t+e+t+a+s+','t+e+t+o+n+a+','b+o+o+b+s+','s+e+m+e+n+',
+    'e+s+p+e+r+m+a+','o+r+g+a+s+m+','o+r+g+i+a+','o+r+g+y+','m+a+s+t+u+r+b+','c+u+m+s+h+o+t+','b+l+o+w+j+o+b+','h+a+n+d+j+o+b+',
+    'm+i+l+f+','h+e+n+t+a+i+','o+n+l+y+f+a+n+s+','h+o+r+n+y+','c+a+c+h+o+n+d+','p+r+o+s+t+i+t+u+t+','s+t+r+i+p+p+e+r+','s+e+x+t+i+n+g+',
+    'r+a+p+i+s+t+','i+n+c+e+s+t+','z+o+o+f+i+l+','b+e+s+t+i+a+l+i+d+','p+e+d+o+f+i+l+','p+e+d+o+p+h+i+l+','p+a+e+d+o+p+h+i+l+','p+e+d+o+b+e+a+r+',
+    'l+o+l+i+c+o+n+','s+h+o+t+a+c+o+n+','c+o+c+a+i+n+','m+a+r+i+h+u+a+n+','m+a+r+i+g+u+a+n+','m+a+r+i+j+u+a+n+','f+e+n+t+a+n+i+l+','f+e+n+t+a+n+y+l+',
+    'm+e+t+a+n+f+e+t+','c+r+y+s+t+a+l+m+e+t+h+','m+d+m+a+','k+e+t+a+m+i+n+','n+a+r+c+o+','d+r+o+g+a+d+','w+e+e+d+','n+i+g+g+',
+    'n+e+g+r+a+t+a+','s+u+d+a+c+a+','c+h+i+n+k+','f+a+g+g+o+t+','t+r+a+n+n+y+','d+y+k+e+','w+e+t+b+a+c+k+','b+e+a+n+e+r+',
+    'g+o+o+k+','r+a+g+h+e+a+d+','t+o+w+e+l+h+e+a+d+','s+i+d+o+s+o+','t+r+a+v+e+l+o+','b+o+l+l+e+r+a+','t+o+r+t+i+l+l+e+r+','j+o+t+o+',
+    'n+a+z+i+','h+i+t+l+e+r+','h+i+m+m+l+e+r+','g+o+e+b+b+e+l+s+','m+e+n+g+e+l+e+','m+u+s+s+o+l+i+n+i+','s+t+a+l+i+n+','p+o+l+p+o+t+',
+    'k+k+k+','s+i+e+g+h+e+i+l+','h+e+i+l+h+i+t+l+e+r+','w+h+i+t+e+p+o+w+e+r+','w+h+i+t+e+p+r+i+d+e+','g+e+n+o+c+i+d+','t+e+r+r+o+r+i+s+','j+i+h+a+d+',
+    'y+i+h+a+d+','a+l+q+a+e+d+a+','b+i+n+l+a+d+e+n+','s+u+i+c+i+d+','a+u+t+o+l+e+s+i+o+n+','s+e+l+f+h+a+r+m+','c+u+t+m+y+s+e+l+f+','k+i+l+l+y+o+u+r+s+e+l+f+',
+    'k+i+l+l+u+r+s+e+l+f+','m+a+t+a+r+m+e+','a+h+o+r+c+a+r+','m+a+s+a+c+r+e+','m+a+s+s+a+c+r+e+','a+s+e+s+i+n+','s+i+c+a+r+i+o+','d+e+c+a+p+i+t+',
+    'd+e+g+o+l+l+','m+u+r+d+e+r+','s+c+h+o+o+l+s+h+o+o+t+','t+i+r+o+t+e+o+','e+p+s+t+e+i+n+','e+p+s+t+e+e+n+','e+p+s+t+i+e+n+','p+a+b+l+o+e+s+c+o+b+a+r+',
+    'e+l+c+h+a+p+o+','c+h+a+p+o+g+u+z+m+a+n+','g+a+r+a+v+i+t+o+','d+a+h+m+e+r+','t+e+d+b+u+n+d+y+','c+h+a+r+l+e+s+m+a+n+s+o+n+','c+h+i+k+a+t+i+l+o+','j+o+h+n+g+a+c+y+',
+    'w+a+y+n+e+g+a+c+y+','u+n+a+b+o+m+b+e+r+','b+r+e+i+v+i+k+','a+d+m+i+n+','m+o+d+e+r+a+d+o+r+','m+o+d+e+r+a+t+o+r+','s+o+p+o+r+t+e+','s+u+p+p+o+r+t+',
+    's+t+u+d+y+t+i+m+e+r+','f+r+o+s+t+p+o+m+','o+f+i+c+i+a+l+','o+f+f+i+c+i+a+l+'
   ]
 $$;
 
--- Forma "plana" del nombre, igual que plainName() en js/identity.js: sin tildes, 0→o, 4→a…,
--- solo letras, y sin las palabras inocentes que contienen un pedazo de grosería.
+-- (v4.5.1) Las mismas palabras en su forma "sonora" (js/identity.js: BLOCKED_SOUNDS).
+create or replace function private.blocked_sounds() returns text[]
+language sql immutable set search_path = '' as $$
+  select array[
+    'puta','puto','putit','mierda','pendej','marica','maricon','marikon',
+    'malparid','malnacid','gonorea','hijueputa','hijodeputa','carajo','uerga','berga',
+    'chingad','chingar','culero','culiao','culiado','joder','jodid','gilipol',
+    'idiota','imbecil','estupid','retrasad','mogolic','subnormal','cabron','pajero',
+    'pajera','mamagueuo','mamahueuo','mamabicho','carechimba','pirob','folar','culear',
+    'mamada','chupamela','shit','bitch','biatch','bastard','ashole','arsehole',
+    'pusi','cunt','whore','slut','retard','stupid','twat','wanker',
+    'dildo','douchebag','sexo','sexi','porno','porn','uiolad','uiolar',
+    'biolad','nude','desnud','pene','penis','uagina','ulua','clitor',
+    'tetas','tetona','semen','esperma','orgasm','orgia','masturb','cumshot',
+    'blowjob','handjob','milf','hentai','onlifans','cachond','prostitut','striper',
+    'sexting','rapist','incest','sufil','bestialid','pedofil','paedofil','pedobear',
+    'lolicon','shotacon','cocain','marihuan','mariguan','marijuan','fentanil','metanfet',
+    'cristalmeth','mdma','ketamin','narco','drogad','negrata','sudaca','chink',
+    'wetbak','beaner','raghead','towelhead','sidoso','trauelo','tortiler','joto',
+    'hitler','himler','goebels','mengele','musolini','stalin','polpot','siegheil',
+    'heilhitler','whitepower','whitepride','genocid','teroris','jihad','alkaeda','binladen',
+    'suicid','autolesion','selfharm','cutmiself','kiliourself','kilurself','matarme','ahorcar',
+    'masacre','asesin','sicario','decapit','degol','murder','schulshut','tiroteo',
+    'epstein','epsten','epstien','pabloescobar','elchapo','chapogusman','garauito','dahmer',
+    'tedbundi','charlesmanson','chikatilo','johngaci','wainegaci','unabomber','breiuik','admin',
+    'moderador','moderator','soporte','suport','studitimer','frostpom','oficial'
+  ]
+$$;
+
+-- Forma "plana" del nombre, igual que plainName() en js/identity.js: sin tildes, letras parecidas de
+-- otros alfabetos → las nuestras, 0→o, 4→a…, solo letras, y sin las palabras inocentes que contienen
+-- un pedazo de grosería.
 create or replace function private.plain_name(v text) returns text
 language sql immutable set search_path = '' as $$
   select regexp_replace(
            regexp_replace(
              lower(translate(coalesce(v, ''),
-               'ÁÀÂÄÃÅÉÈÊËÍÌÎÏÓÒÔÖÕÚÙÛÜÑÇáàâäãåéèêëíìîïóòôöõúùûüñç0134578@$',
-               'aaaaaaeeeeiiiiooooouuuuncaaaaaaeeeeiiiiooooouuuuncoieastbas')),
+               'ÁÀÂÄÃÅÉÈÊËÍÌÎÏÓÒÔÖÕÚÙÛÜÑÇáàâäãåéèêëíìîïóòôöõúùûüñçаеорсухкмтнвіјѕԁёїАВЕКМНОРСТУХІЈЅαβεικνορτυχγηωΑΒΕΖΗΙΚΜΝΟΡΤΥΧıłøđħŧßæœ0134578@$9',
+               'aaaaaaeeeeiiiiooooouuuuncaaaaaaeeeeiiiiooooouuuuncaeopcyxkmthbijsdeiabekmhopctyxijsabeikvoptuxynwabezhikmnoptyxilodhtsaooieastbasg')),
              '[^a-z]', '', 'g'),
-           'computa|computo|disputa|reputa|imputa|diputa', '', 'g')
+           'computa|computo|disputa|disputo|reputa|imputa|imputo|diputa|amputa|amputo|scunthorp|penelop|georgia|georgy|maricarmen|maricruz|maricel|maricielo|marichal|vergara|dickens|dickinson|dickson|peacock|hancock|hitchcock|cockatoo|cockatiel|cockpit|cocktail|cockroach|woodcock|babcock|shuttlecock|cocker|ashita|ushita|ishita|oshita|eshita|shiitake|shitake|badminton|therapist|terapist|semental|tweed|weedle|nazir|nazim|fukuoka|fukushima|fukuda|fukui|fukuyama|pusilan|tortilleri|tortileri|overga|tenazi', '', 'g')
+$$;
+
+-- (v4.5.1) Las formas planas que se revisan: con el 1 como i y, si hay un 1, también como l ("s1ut").
+create or replace function private.name_forms(v text) returns text[]
+language sql immutable set search_path = '' as $$
+  select array_remove(array[
+    private.plain_name(v),
+    case when position('1' in coalesce(v, '')) > 0 then private.plain_name(replace(v, '1', 'l')) end
+  ], null)
+$$;
+
+-- (v4.5.1) La forma "sonora" (soundName en js/identity.js): ph→f, ck→k, q→k, oo→u, y→i, v→u, z→s y
+-- sin letras repetidas. Atrapa "poossy", "phuck" o "puuuuta".
+create or replace function private.sound_name(p text) returns text
+language sql immutable set search_path = '' as $$
+  select regexp_replace(
+           translate(
+             replace(replace(replace(replace(coalesce(p, ''), 'ph', 'f'), 'ck', 'k'), 'q', 'k'), 'oo', 'u'),
+             'yvz', 'ius'),
+           '(.)\1+', '\1', 'g')
+$$;
+
+-- (v4.5.1) ¿El filtro rechaza este nombre? (isBlockedName en la app)
+create or replace function private.name_blocked(v text) returns boolean
+language sql immutable set search_path = '' as $$
+  select exists (select 1 from unnest(private.name_forms(v)) f(n), unnest(private.blocked_patterns()) b(p) where f.n ~ b.p)
+      or exists (select 1 from unnest(private.name_forms(v)) f(n), unnest(private.blocked_sounds()) b(w)
+                  where strpos(private.sound_name(f.n), b.w) > 0)
 $$;
 
 -- Revisa el nombre de usuario (mismas reglas que checkUsername en la app). Devuelve el nombre limpio.
@@ -106,15 +183,13 @@ create or replace function private.check_username(p text) returns text
 language plpgsql immutable set search_path = '' as $$
 declare
   v text := btrim(coalesce(p, ''));
-  n text;
 begin
   if char_length(v) < 3 or char_length(v) > 20
      or v !~ '^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9_.]+$'
      or v ~ '^[0-9_.]+$' then
     raise exception 'name_invalid' using errcode = '22023';
   end if;
-  n := private.plain_name(v);
-  if exists (select 1 from unnest(private.blocked_patterns()) as b(p) where n ~ b.p) then
+  if private.name_blocked(v) then
     raise exception 'name_blocked' using errcode = '22023';
   end if;
   return v;
@@ -149,6 +224,9 @@ create table if not exists private.profiles (
   last_active   timestamptz not null default now()
 );
 create unique index if not exists profiles_username_ci on private.profiles (lower(username));
+-- (v4.5.1) Escondido por el filtro de nombres nuevo (no por reportes): se vuelve a mostrar solo
+-- cuando la persona elige un nombre permitido.
+alter table private.profiles add column if not exists auto_hidden boolean not null default false;
 
 create table if not exists private.study_sessions (
   id           uuid primary key default gen_random_uuid(),
@@ -301,7 +379,10 @@ begin
     values (uid, v, c, a, tz, coalesce(p_show, true))
     on conflict (user_id) do update
       set username = excluded.username, country = excluded.country, avatar = excluded.avatar,
-          time_zone = excluded.time_zone, show_on_board = excluded.show_on_board, last_active = now();
+          time_zone = excluded.time_zone, show_on_board = excluded.show_on_board, last_active = now(),
+          -- (v4.5.1) Si lo había escondido el filtro de nombres, con el nombre nuevo vuelve a aparecer
+          hidden = case when pr.auto_hidden then false else pr.hidden end,
+          auto_hidden = false;
   exception when unique_violation then
     raise exception 'name_taken' using errcode = '23505';
   end;
@@ -565,6 +646,24 @@ begin
   return uid;
 end $$;
 
+-- (v4.5.1) Aviso al instante a TUS aparatos con Supabase Realtime (canal privado "frostpom:<tu id>"):
+-- "tu reloj cambió" ({k:'t'}) o "hay progreso nuevo" ({k:'p'}). Solo AVISA: cada aparato pregunta
+-- después con get_timer, y el servidor sigue siendo el que manda. El aviso no lleva datos personales
+-- (un número de versión y el número al azar de la acción). Si Realtime no está, no pasa nada: los
+-- aparatos igual preguntan cada 10 s. Un aviso que falla NUNCA impide guardar.
+create or replace function private.notify(p_uid uuid, p_payload jsonb) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  if p_uid is null or to_regprocedure('realtime.send(jsonb, text, text, boolean)') is null then
+    return;
+  end if;
+  begin
+    execute 'select realtime.send($1, $2, $3, true)' using p_payload, 'cambio', 'frostpom:' || p_uid::text;
+  exception when others then
+    null;
+  end;
+end $$;
+
 -- Trae tu progreso guardado (ninguna fila si todavía no hay).
 create or replace function public.load_progress()
 returns table (data jsonb, version int, updated_at timestamptz)
@@ -599,12 +698,14 @@ begin
   select sv.version into cur from private.saves sv where sv.user_id = uid for update;
   if cur is null then
     insert into private.saves (user_id, data, version, bytes) values (uid, d, 1, size);
+    perform private.notify(uid, jsonb_build_object('k', 'p', 'v', 1)); -- (v4.5.1) tus otros aparatos lo traen ya
     return 1;
   end if;
   if coalesce(p_base_version, 0) <> cur then
     raise exception 'save_conflict' using errcode = '40001', detail = cur::text;
   end if;
   update private.saves set data = d, version = cur + 1, bytes = size, updated_at = now() where user_id = uid;
+  perform private.notify(uid, jsonb_build_object('k', 'p', 'v', cur + 1));
   return cur + 1;
 end $$;
 
@@ -621,6 +722,23 @@ begin
   delete from auth.users where id = uid;   -- en cascada: el reloj en vivo y sus pomodoros anotados
 end $$;
 
+-- (v4.5.1) Lo que el servidor sabe de TU cuenta, para que la app explique bien qué pasa cuando
+-- entras en un equipo nuevo y no hay progreso: ¿hay progreso guardado? ¿cómo te llamas en el
+-- ranking y cuántos minutos tienes? (Si hay nombre pero no progreso, tu cuenta vive en otro equipo.)
+create or replace function public.account_status()
+returns table (has_progress boolean, board_name text, board_minutes int)
+language plpgsql stable security definer set search_path = '' as $$
+#variable_conflict use_column
+declare
+  uid uuid := private.require_account();
+begin
+  return query select
+    exists (select 1 from private.saves sv where sv.user_id = uid),
+    (select p.username from private.profiles p where p.user_id = uid),
+    coalesce((select (sum(s.credited_sec) / 60)::int from private.study_sessions s
+               where s.user_id = uid and s.status = 'done'), 0);
+end $$;
+
 -- ---------------------------------------------------------------------
 -- (v4.5) El reloj en vivo: el mismo pomodoro en todos tus aparatos (solo cuentas con correo)
 --  - get_timer: el estado del reloj y la hora del servidor (con ella, cada aparato corrige su
@@ -629,6 +747,8 @@ end $$;
 --  - set_timer: guarda un cambio solo si es MÁS NUEVO que el que hay (gana la última acción).
 --  - claim_block: el primer aparato que lo pide guarda el pomodoro; los demás reciben "no".
 -- La app pregunta cada 10 s mientras se ve; máximo 30 cambios por minuto por persona.
+-- (v4.5.1) Con Realtime, cada cambio AVISA al instante a tus otros aparatos (private.notify) y la
+-- pregunta cada 10 s queda de respaldo (cada 30 s mientras el aviso funciona).
 -- ---------------------------------------------------------------------
 -- Revisa lo que manda la app: un objeto pequeño con el modo, el estado y una duración válida.
 create or replace function private.check_timer_state(p jsonb) returns jsonb
@@ -684,6 +804,7 @@ begin
     insert into private.timers (user_id, state, version, action_at, device, window_count)
     values (uid, s, 1, at, dev, 1);
     ok := true;
+    perform private.notify(uid, jsonb_build_object('k', 't', 'v', 1, 'd', dev)); -- (v4.5.1) aviso al instante
   else
     if t.window_start > now() - interval '1 minute' then
       if t.window_count >= 30 then
@@ -700,6 +821,9 @@ begin
          set state = s, version = t.version + 1, action_at = at, device = dev, updated_at = now()
        where x.user_id = uid;
       ok := true;
+      -- (v4.5.1) Aviso al instante a tus otros aparatos (d = el número al azar de esta acción: así el
+      -- aparato que la hizo sabe que el aviso es suyo y no pregunta)
+      perform private.notify(uid, jsonb_build_object('k', 't', 'v', t.version + 1, 'd', dev));
     end if;
   end if;
   return query select x.state, x.version, x.action_at, x.device, clock_timestamp(), ok
@@ -778,7 +902,7 @@ language plpgsql security definer set search_path = '' as $$
 declare
   n int;
 begin
-  update private.profiles set hidden = coalesce(p_hide, true)
+  update private.profiles set hidden = coalesce(p_hide, true), auto_hidden = false
    where lower(username) = lower(btrim(p_username));
   get diagnostics n = row_count;
   if not coalesce(p_hide, true) then
@@ -788,6 +912,20 @@ begin
   end if;
   return n;
 end $$;
+
+-- (v4.5.1) Los nombres YA guardados que el filtro nuevo no permite (para ocultarlos o revisarlos):
+--   select * from private.review_names();
+-- Al correr este archivo, esos nombres se esconden solos (oculto_por_filtro = true): la app le pide a
+-- esa persona un nombre nuevo y, al elegirlo, vuelve a aparecer. Si alguno es inocente (el filtro se
+-- equivocó), muéstralo de nuevo con: select private.hide_name('nombre', false);
+create or replace function private.review_names()
+returns table (username text, oculto boolean, oculto_por_filtro boolean, aparece boolean, creado timestamptz, ultima_actividad timestamptz)
+language sql stable security definer set search_path = '' as $$
+  select p.username, p.hidden, p.auto_hidden, p.show_on_board and not p.hidden, p.created_at, p.last_active
+    from private.profiles p
+   where private.name_blocked(p.username)
+   order by p.last_active desc
+$$;
 
 -- (v4.1) Ver los nombres reportados, del más reportado al menos:
 --   select * from private.report_summary();
@@ -847,6 +985,12 @@ begin
     update private.profiles set user_id = dst where user_id = src;
   else
     -- Tu cuenta ya tenía otro nombre: se queda con este y se suman los minutos
+    -- (v4.5.1) y la XP más alta de las dos, y la última actividad
+    update private.profiles d
+       set xp = greatest(d.xp, s2.xp), xp_season = coalesce(greatest(d.xp_season, s2.xp_season), d.xp_season),
+           last_active = greatest(d.last_active, s2.last_active)
+      from private.profiles s2
+     where d.user_id = dst and s2.user_id = src;
     update private.study_sessions set user_id = dst where user_id = src;
     insert into private.daily_totals as dt (user_id, day, credited_sec, sessions)
     select dst, d.day, d.credited_sec, d.sessions from private.daily_totals d where d.user_id = src
@@ -908,6 +1052,44 @@ begin
    limit 15;
 end $$;
 
+-- (v4.5.1) "No puedo entrar en el celular" / "mi progreso aparece vacío" / "el ranking dice que mi
+-- nombre ya existe": muestra, en palabras simples, cómo está la cuenta de ese correo (solo lectura).
+--   select * from private.account_check('correo@ejemplo.com');
+-- Ojo: el resultado incluye datos de esa persona. No lo compartas (ni en capturas) sin taparlos.
+create or replace function private.account_check(p_email text)
+returns table (que text, valor text)
+language plpgsql stable security definer set search_path = '' as $$
+declare
+  u  auth.users%rowtype;
+  sv private.saves%rowtype;
+  p  private.profiles%rowtype;
+begin
+  select * into u from auth.users x where lower(x.email) = lower(btrim(p_email));
+  if not found then
+    return query select 'Cuenta en línea'::text, 'NO existe. La cuenta vive solo en el equipo donde se creó: allá debe tocar Ajustes → Tu cuenta → Conectar.'::text;
+    return;
+  end if;
+  return query select 'Cuenta en línea', 'Existe (creada ' || to_char(u.created_at, 'YYYY-MM-DD') || ')';
+  return query select 'Último inicio de sesión', coalesce(to_char(u.last_sign_in_at, 'YYYY-MM-DD HH24:MI'), 'nunca');
+  select * into sv from private.saves x where x.user_id = u.id;
+  if found then
+    return query select 'Progreso guardado', 'Sí: versión ' || sv.version || ', ' || round(sv.bytes / 1024.0) || ' KB, último guardado ' || to_char(sv.updated_at, 'YYYY-MM-DD HH24:MI');
+    return query select 'Nombre en el progreso', coalesce(sv.data #>> '{profile,nick}', '(sin nombre)');
+    return query select 'Horas en el progreso', round(coalesce((sv.data #>> '{progress,totals,studySec}')::numeric, 0) / 3600, 1)::text;
+  else
+    return query select 'Progreso guardado', 'NO. Si en el ranking tiene nombre, su cuenta vive en otro equipo (correo de recuperación de una versión vieja o nunca tocó Conectar).';
+  end if;
+  select * into p from private.profiles x where x.user_id = u.id;
+  if found then
+    return query select 'Nombre en el ranking', p.username || case when p.hidden then ' (oculto)' else '' end || case when not p.show_on_board then ' (eligió no aparecer)' else '' end;
+    return query select 'Minutos en el ranking (total)', coalesce((select (sum(s.credited_sec) / 60)::int from private.study_sessions s where s.user_id = u.id and s.status = 'done'), 0)::text;
+    return query select 'Última actividad en el ranking', to_char(p.last_active, 'YYYY-MM-DD HH24:MI');
+  else
+    return query select 'Nombre en el ranking', 'No tiene (su lugar puede estar en una sesión anónima: busca su nombre con private.who_has_name)';
+  end if;
+  return query select 'Reloj en vivo', coalesce((select 'Último cambio ' || to_char(t.action_at, 'YYYY-MM-DD HH24:MI') from private.timers t where t.user_id = u.id), 'nunca usado');
+end $$;
+
 -- Limpieza: borra cuentas anónimas sin actividad en p_days días (y las que nunca se unieron
 -- después de 7 días), y sesiones de hace más de 400 días. Ejemplo: select * from private.cleanup(90);
 create or replace function private.cleanup(p_days int default 90)
@@ -956,6 +1138,7 @@ revoke execute on function public.report_name(text, text) from public;
 revoke execute on function public.get_timer() from public;
 revoke execute on function public.set_timer(jsonb, timestamptz, text) from public;
 revoke execute on function public.claim_block(text, text) from public;
+revoke execute on function public.account_status() from public;
 
 do $$
 begin
@@ -970,5 +1153,39 @@ begin
     execute 'grant execute on function public.report_name(text, text) to authenticated';
     execute 'revoke execute on function public.get_timer(), public.set_timer(jsonb, timestamptz, text), public.claim_block(text, text) from anon';
     execute 'grant execute on function public.get_timer(), public.set_timer(jsonb, timestamptz, text), public.claim_block(text, text) to authenticated';
+    execute 'revoke execute on function public.account_status() from anon';
+    execute 'grant execute on function public.account_status() to authenticated';
   end if;
+end $$;
+
+-- ---------------------------------------------------------------------
+-- (v4.5.1) Los nombres ya guardados que el filtro nuevo no permite se esconden del ranking (y se
+-- anotan como "escondidos por el filtro"). Revisa la lista con: select * from private.review_names();
+-- ---------------------------------------------------------------------
+update private.profiles set hidden = true, auto_hidden = true
+ where not hidden and private.name_blocked(username);
+
+-- ---------------------------------------------------------------------
+-- (v4.5.1) Realtime: cada cuenta (con sesión) escucha SOLO su canal privado "frostpom:<su id>".
+-- Nadie puede enviar por ese canal desde la app (no hay política para insertar): los avisos los
+-- manda únicamente el servidor (private.notify). Si tu proyecto no tiene Realtime, esto no hace nada.
+-- ---------------------------------------------------------------------
+do $$
+begin
+  if to_regclass('realtime.messages') is null then
+    raise notice 'Este proyecto no tiene Realtime: los avisos al instante quedan apagados (la app pregunta cada 10 s).';
+    return;
+  end if;
+  -- (En Supabase, realtime.messages ya trae Row Level Security encendido.)
+  begin
+    execute 'drop policy if exists "frostpom: cada cuenta escucha sus avisos" on realtime.messages';
+    execute $pol$
+      create policy "frostpom: cada cuenta escucha sus avisos" on realtime.messages
+        for select to authenticated
+        using ( (select realtime.topic()) = 'frostpom:' || (select auth.uid())::text
+                and extension = 'broadcast' )
+    $pol$;
+  exception when insufficient_privilege then
+    raise notice 'No se pudo crear la política de Realtime (permisos). Créala a mano: docs/MULTI-DISPOSITIVO.md, sección 10. Todo lo demás quedó bien.';
+  end;
 end $$;

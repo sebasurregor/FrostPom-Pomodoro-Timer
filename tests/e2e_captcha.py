@@ -14,7 +14,7 @@ Comprueba que:
 Uso (con la app servida: python -m http.server 8000):
     python tests/e2e_captcha.py http://localhost:8000/
 """
-import os, sys
+import re, os, sys
 from playwright.sync_api import sync_playwright
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _fake_supabase import FakeSupabase
@@ -65,6 +65,7 @@ FAKE_TS = r"""
 def device(browser, fake, site_key='0x4AAAAAAAprueba', locale='es-CO'):
     ctx = browser.new_context(viewport={'width': 1280, 'height': 900}, locale=locale, service_workers='block')
     ctx.route(f'{SUPA}/**', fake.handle)
+    ctx.route_web_socket(re.compile(r'^wss://[^/]*supabase\.co/realtime/'), fake.ws_connect)  # (v4.5.1) los avisos de Realtime, simulados
     loads = []
 
     def ts(route):

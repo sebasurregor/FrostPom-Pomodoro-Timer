@@ -4,7 +4,7 @@ e2e_multidispositivo.py): Auth (cuentas anónimas, correo + contraseña, código
 las funciones del servidor (ranking, progreso de las cuentas en línea y, desde la v4.5, el reloj en
 vivo), en memoria. Las reglas reales se prueban aparte en PostgreSQL: server/supabase/test/run_local.sh
 """
-import json, re, time, datetime
+import json, re, time, datetime, base64
 from urllib.parse import urlparse, parse_qs
 
 BLOCK_RE = re.compile(r'^[A-Za-z0-9-]{8,64}$')
@@ -46,6 +46,10 @@ class FakeSupabase:
         self.claims = {}               # (v4.5) (uid, bloque) -> aparato
         self.skew_ms = 0               # (v4.5) la prueba adelanta el reloj del servidor junto con los aparatos
         self.missing = set()           # funciones que "todavía no existen" (schema.sql viejo)
+        self.ws_conns = []             # (v4.5.1) conexiones de Realtime: {ws, uid, topic}
+        self.notified = []             # (v4.5.1) avisos enviados: (uid, payload)
+        self.realtime_off = False      # (v4.5.1) como un proyecto sin la política de Realtime
+        self.revoke_on_password = True # (v4.5.1) como Supabase: cambiar la contraseña cierra las OTRAS sesiones
         seeds = [('Zorro.lector', 'MX', '🦊', 180, None), ('Luna_K', 'ES', '🦉', 95, 'luna@example.com'),
                  ('pingu.sabio', 'CL', '🐧', 60, None), ('Ana_23', 'AR', '🦭', 30, None)]
         for i, (name, country, av, mins, email) in enumerate(seeds):
@@ -58,9 +62,16 @@ class FakeSupabase:
         self.n += 1
         return f'00000000-0000-4000-8000-{self.n:012d}'  # como los de Supabase (UUID)
 
+    @staticmethod
+    def b64(obj):
+        return base64.urlsafe_b64encode(json.dumps(obj).encode()).decode().rstrip('=')
+
     def session(self, uid):
         self.n += 1
-        acc, ref = f'acc-{uid}-{self.n}', f'ref-{uid}-{self.n}'
+        u0 = self.users[uid]
+        # (v4.5.1) Como en Supabase, el token de acceso es un JWT: la app lee de qué correo es
+        claims = {'sub': uid, 'email': (u0.get('email') or '').lower(), 'is_anonymous': bool(u0['anon']), 'role': 'authenticated', 'session_id': str(self.n)}
+        acc, ref = f"{self.b64({'alg': 'none'})}.{self.b64(claims)}.sig-{self.n}", f'ref-{uid}-{self.n}'
         self.tokens[acc] = uid
         self.refresh[ref] = uid
         u = self.users[uid]
@@ -156,6 +167,11 @@ class FakeSupabase:
                 return ok({'error_code': 'same_password', 'msg': 'New password should be different'}, 422)
             self.users[uid]['password'] = body.get('password')
             self.calls.append(('update_password', {}, uid))
+            if self.revoke_on_password:
+                # (v4.5.1) Como Supabase (GoTrue): se cierran las OTRAS sesiones de la cuenta
+                n = bearer.rsplit('-', 1)[-1]
+                for t in [t for t, u in self.refresh.items() if u == uid and t.rsplit('-', 1)[-1] != n]:
+                    self.refresh.pop(t, None)
             return ok({'id': uid})
         if path == '/auth/v1/token':
             u = self.refresh.pop(body.get('refresh_token'), None)
@@ -279,7 +295,13 @@ class FakeSupabase:
                 return ok({'code': '40001', 'message': 'save_conflict', 'details': str(sv['version'])}, 409)
             v = (sv['version'] + 1) if sv else 1
             self.saves[uid] = {'data': data, 'version': v}
+            self.notify(uid, {'k': 'p', 'v': v})
             return ok(v)
+        if fn == 'account_status':  # (v4.5.1)
+            if self.users.get(uid, {}).get('anon'):
+                return ok({'code': '42501', 'message': 'account_required'}, 403)
+            prof = self.profiles.get(uid)
+            return ok([{'has_progress': uid in self.saves, 'board_name': prof['username'] if prof else None, 'board_minutes': self.minutes.get(uid, 0)}])
         if fn == 'delete_my_cloud_account':
             self.saves.pop(uid, None); self.profiles.pop(uid, None); self.minutes.pop(uid, None); self.users.pop(uid, None)
             self.timers.pop(uid, None)
@@ -301,7 +323,10 @@ class FakeSupabase:
             t = self.timers.get(uid)
             if not t:
                 self.timers[uid] = {'state': st, 'version': 1, 'at': at, 'device': dev, 'window_start': now, 'window_count': 1}
-                return ok([self.timer_row(uid, True)])
+                row = self.timer_row(uid, True)
+                route.fulfill(status=200, content_type='application/json', body=json.dumps([row]))
+                self.notify(uid, {'k': 't', 'v': 1, 'd': dev})
+                return
             if t['window_start'] > now - 60000:
                 if t['window_count'] >= 30:
                     return ok({'code': '54000', 'message': 'timer_rate'}, 400)
@@ -311,7 +336,10 @@ class FakeSupabase:
             accepted = at > t['at'] or (at == t['at'] and dev == t['device'])
             if accepted:
                 t.update(state=st, version=t['version'] + 1, at=at, device=dev)
-            return ok([self.timer_row(uid, accepted)])
+            route.fulfill(status=200, content_type='application/json', body=json.dumps([self.timer_row(uid, accepted)]))
+            if accepted:
+                self.notify(uid, {'k': 't', 'v': t['version'], 'd': dev})
+            return
         if fn == 'claim_block':
             block, dev = body.get('p_block'), (str(body.get('p_device') or '')[:32] or None)
             if not isinstance(block, str) or not BLOCK_RE.match(block):
@@ -322,3 +350,57 @@ class FakeSupabase:
                 return ok(True)
             return ok(dev is not None and self.claims[key] == dev)
         return ok({'code': 'PGRST202', 'message': 'Could not find the function'}, 404)
+
+    # ------------------------------------------------------------------
+    # (v4.5.1) Supabase Realtime (lo mínimo del protocolo de Phoenix): canal privado por cuenta
+    # ------------------------------------------------------------------
+    def ws_connect(self, ws):
+        conn = {'ws': ws, 'uid': None, 'topic': None}
+        self.ws_conns.append(conn)
+        ws.on_message(lambda m: self.ws_message(conn, m))
+        # (Sin ws.on_close: en Playwright 1.63 ese aviso falla con KeyError 'reason'. Las conexiones
+        # cerradas se quedan en la lista; enviarles no hace nada.)
+
+    def ws_reply(self, conn, topic, ref, ok=True, response=None):
+        conn['ws'].send(json.dumps({'topic': topic, 'event': 'phx_reply', 'ref': ref,
+                                    'payload': {'status': 'ok' if ok else 'error', 'response': response or {}}}))
+
+    def ws_message(self, conn, raw):
+        try:
+            m = json.loads(raw)
+        except Exception:
+            return
+        ev, topic, ref, payload = m.get('event'), m.get('topic'), m.get('ref'), m.get('payload') or {}
+        if ev == 'heartbeat':
+            return self.ws_reply(conn, 'phoenix', ref)
+        if ev == 'phx_join':
+            uid = self.tokens.get(payload.get('access_token'))
+            private = ((payload.get('config') or {}).get('private')) is True
+            # Como la política de realtime.messages: solo cuentas con sesión, solo SU canal y privado
+            if self.realtime_off or not uid or not private or topic != f'realtime:frostpom:{uid}':
+                self.calls.append(('rt_refused', {'topic': topic}, uid))
+                return self.ws_reply(conn, topic, ref, False, {'reason': 'Unauthorized: You do not have permissions to read from this Channel topic'})
+            conn.update(uid=uid, topic=topic)
+            self.calls.append(('rt_join', {'topic': topic}, uid))
+            return self.ws_reply(conn, topic, ref)
+        if ev == 'access_token':
+            uid = self.tokens.get(payload.get('access_token'))
+            self.calls.append(('rt_token', {}, uid))
+            return
+
+    def notify(self, uid, payload):
+        for c in list(self.ws_conns):
+            if c['uid'] == uid and c['topic']:
+                try:
+                    c['ws'].send(json.dumps({'topic': c['topic'], 'event': 'broadcast', 'ref': None,
+                                             'payload': {'type': 'broadcast', 'event': 'cambio', 'payload': payload}}))
+                except Exception:
+                    pass
+        self.notified.append((uid, payload))
+
+    def ws_disconnect_all(self):
+        for c in list(self.ws_conns):
+            try:
+                c['ws'].close()
+            except Exception:
+                pass

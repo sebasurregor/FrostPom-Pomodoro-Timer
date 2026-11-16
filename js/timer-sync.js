@@ -253,7 +253,12 @@ export const lastSent = () => load().last;
 export function sent(entry, sat, accepted) {
   const st = load();
   const patch = {};
-  if (st.pending && st.pending.seq === entry.seq) patch.pending = null;
+  if (st.pending && st.pending.seq === entry.seq) {
+    // (v4.5.1) Mientras se enviaba, el reloj de esa acción cambió (llegó el número del ranking):
+    // se reenvía la MISMA acción (misma hora y mismo número al azar), que el servidor acepta
+    const changed = JSON.stringify(st.pending.state) !== JSON.stringify(entry.state);
+    patch.pending = changed && accepted ? { ...st.pending, sat, tok: entry.tok } : null;
+  }
   if (accepted) patch.last = { seq: entry.seq, at: entry.at, act: entry.act, auto: !!entry.auto, sat, tok: isTok(entry.tok) ? entry.tok : newId() };
   if (Object.keys(patch).length) save(patch);
 }

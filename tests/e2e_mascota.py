@@ -30,7 +30,7 @@ Comprueba que:
 Uso (con la app servida: python -m http.server 8000):
     python tests/e2e_mascota.py http://localhost:8000/
 """
-import datetime
+import re, datetime
 import json
 import os
 import sys
@@ -74,7 +74,9 @@ SEED = """(s) => {
 
 def open_app(browser, st, locale='es-CO', route='#/enfocar', width=412, height=900):
     ctx = browser.new_context(viewport={'width': width, 'height': height}, locale=locale, service_workers='block')
-    ctx.route(f'{SUPA}/**', FakeSupabase().handle)
+    _fk = FakeSupabase()
+    ctx.route(f'{SUPA}/**', _fk.handle)
+    ctx.route_web_socket(re.compile(r'^wss://[^/]*supabase\.co/realtime/'), _fk.ws_connect)  # (v4.5.1) los avisos de Realtime, simulados
     pg = sheets_patch(ctx.new_page())
     errs, missing = [], []
     pg.on('pageerror', lambda e: errs.append(str(e)))
@@ -414,6 +416,49 @@ def main():
             pg.wait_for_timeout(200)
             check(not pg.evaluate("document.documentElement.classList.contains('tray-open')"), f'{w}×{hgt}: al cerrar la bandeja, el reloj vuelve a su tamaño')
             done(ctx, errs, missing)
+
+        # ------------------------------------------------------------------ L2
+        print('L2. (v4.5.1) Dar el pescado muy rápido en el computador: ninguno se queda pegado en la pantalla')
+        ctx, pg, errs, missing = open_app(browser, state(None, {'pinguino': {'fullness': 10, 'at': ago(0.1), 'name': 'Copito'}}), width=1280, height=800)
+        pg.click('#shopBtn')
+        pg.wait_for_timeout(500)
+        GHOSTS = "document.querySelectorAll('.food-ghost').length"
+
+        def fling(steps=4, mid=None, release=True):
+            a = pg.locator('#trayFoods .tray-food[data-food="pescado"]').bounding_box()
+            b = pg.locator('#buddy').bounding_box()
+            x0, y0 = a['x'] + a['width'] / 2, a['y'] + a['height'] / 2
+            x1, y1 = b['x'] + b['width'] / 2, b['y'] + b['height'] / 2
+            pg.mouse.move(x0, y0)
+            pg.mouse.down()
+            for k in range(1, steps + 1):
+                pg.mouse.move(x0 + (x1 - x0) * k / steps, y0 + (y1 - y0) * k / steps)
+                if mid and k == steps // 2:
+                    mid()
+            if release:
+                pg.mouse.up()
+
+        gems0 = saved(pg)['progress']['gems']
+        for _ in range(3):
+            fling(3)  # tres veces seguidas, rapidísimo
+        pg.wait_for_timeout(600)
+        check(pg.evaluate(GHOSTS) == 0, 'tres pescados seguidos, rapidísimo: ninguno se queda pegado')
+        check(saved(pg)['progress']['gems'] == gems0 - 6, 'y se los come los tres')
+        # El botón que arrastras desaparece a mitad de camino (como cuando la bandeja se rehacía al
+        # terminar de comer): antes el pescado se quedaba pegado y seguía ahí en otras vistas
+        fling(6, mid=lambda: pg.evaluate("document.querySelector('.tray-food.is-dragging')?.remove()"))
+        pg.wait_for_timeout(600)
+        check(pg.evaluate(GHOSTS) == 0 and not pg.evaluate("document.documentElement.classList.contains('is-feeding')"),
+              'aunque el botón desaparezca a mitad del arrastre, al soltar no queda ningún pescado pegado')
+        # Cambiar de vista a mitad del arrastre
+        pg.evaluate("document.querySelector('#shopBtn').click()") if not pg.is_visible('#trayFoods') else None
+        pg.wait_for_timeout(300)
+        fling(6, release=False)
+        pg.evaluate("location.hash = '#/progreso'")
+        pg.wait_for_timeout(500)
+        pg.mouse.up()
+        check(pg.evaluate(GHOSTS) == 0, 'al cambiar de vista a mitad del arrastre, el pescado no se queda en la otra vista')
+        done(ctx, errs, missing)
 
         # ------------------------------------------------------------------ M
         print('M. El botón de la tienda no tapa al compañero; la barra de abajo, pareja; el sol, lejos de los botones')

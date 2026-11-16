@@ -133,7 +133,19 @@ select private.hide_name('nombre_feo');
 select private.hide_name('nombre_feo', false);
 ```
 
-Si una palabra se repite mucho, agrégala a la lista `BLOCKED` de `js/identity.js` y pídeme actualizar `server/supabase/schema.sql`: las dos listas deben ser iguales (una prueba lo revisa).
+Si una palabra se repite mucho, agrégala a la lista `BLOCKED` de `js/identity.js`. Después corre `node tools/nombres-sql.mjs` y pega lo que imprime en `server/supabase/schema.sql`, reemplazando esas funciones. Las dos listas deben ser iguales (una prueba lo revisa). Si un nombre inocente queda bloqueado, agrégalo a `ALLOWED_PARTS` y a `tests/_nombres.json`, en la lista `permitidos`.
+
+**(v4.5.1) Nombres que ya estaban guardados y que el filtro nuevo no permite:**
+
+- **Al correr el schema**, se esconden solos.
+- **Para verlos**, en el SQL Editor:
+
+  ```sql
+  select * from private.review_names();
+  ```
+
+- **`oculto_por_filtro = true`** quiere decir que los escondió el filtro (no un reporte). Cuando esa persona abre la app, se le pide un nombre nuevo y vuelve a aparecer.
+- **Si alguno es inocente** (el filtro se equivocó), muéstralo con `select private.hide_name('nombre', false);`.
 
 ---
 
@@ -159,9 +171,16 @@ Si una palabra se repite mucho, agrégala a la lista `BLOCKED` de `js/identity.j
 
 Solo tú (el dueño, en el SQL Editor) puedes usar estas dos funciones. La app le dice a la persona que te escriba a `startupprometeus@gmail.com` si el nombre es suyo.
 
+> **(v4.5.1)** La causa más común de la prueba cerrada fue recuperar o cambiar la contraseña en otro equipo. Eso cerraba la sesión del computador, y la app creaba una sesión anónima nueva. Desde la v4.5.1 ya no lo hace:
+>
+> - **Al abrir**, explica **"Vuelve a conectar tu lugar en el ranking"**.
+> - **Si la persona toca Conectar en el equipo que tiene el nombre**, con el mismo correo, su nombre y sus minutos pasan solos.
+>
+> Para revisar una cuenta de una vez: `select * from private.account_check('correo@ejemplo.com');`. Hay más consultas en [DIAGNOSTICO-CUENTAS.md](DIAGNOSTICO-CUENTAS.md).
+
 ## Paso 6c. "Estudio y no me suman los minutos" (v4.3)
 
-Primero, que la persona abra **Ranking** en su app (con la v4.3): si todo está bien dice **"✓ Tus pomodoros con internet suman en el ranking desde este dispositivo"**. Si no, la tarjeta de arriba dice por qué (por ejemplo, **"Tu sesión en línea se cerró"**, con el botón **Volver a entrar**). Además, al empezar un pomodoro que no va a contar, en **F12 → Consola** queda una línea que empieza por `[FrostPom]` con el motivo.
+Primero, que la persona abra **Ranking** en su app. Desde la v4.3, si todo está bien dice **"✓ Tus pomodoros con internet suman en el ranking desde este dispositivo"**. Desde la v4.5.1, si su último pomodoro no sumó, dice por qué: sin internet al empezar, sesión cerrada, muchos seguidos, terminado en otro equipo… Si no, la tarjeta de arriba dice por qué (por ejemplo, **"Tu sesión en línea se cerró"**, con el botón **Volver a entrar**). Además, al empezar un pomodoro que no va a contar, en **F12 → Consola** queda una línea que empieza por `[FrostPom]` con el motivo.
 
 Para ver qué pasó con sus últimos pomodoros (Supabase → **SQL Editor**):
 
