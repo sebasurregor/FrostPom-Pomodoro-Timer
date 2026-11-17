@@ -1,6 +1,6 @@
 # Fase 5 (v4.6.0): la notificación tipo Spotify y el widget de Android
 
-> **Estado: PROGRAMADO, falta compilarlo en tu PC.** La parte web está en la v4.5.0 (se prende sola cuando la app trae el complemento) y el código nativo está en `native/frostpom-timer/`. Para activarlo y probarlo: `native/frostpom-timer/LEEME.md` (trae el mensaje para Claude Code). Con eso sale la v4.6.0. Decisiones aprobadas: Claude Code en tu PC, widget 4 × 2 y 2 × 2, el compañero de la barra se mueve con los cambios y cada 15 min, el permiso de alarmas exactas se pide una vez después del primer pomodoro, y el arte es `artico-amigos.webp`.
+> **Estado (v4.7.3): probado en el Galaxy (v4.7.2) y ajustado con tus decisiones** (ver CAMBIOS-v3.md). **v4.7.2, rediseño:** La notificación ahora es un **reproductor** (como Spotify, con la barra que avanza sola) y los widgets tienen el diseño del lienzo "Rediseño FrostPom" (imágenes en `native/frostpom-timer/diseno/`). Arreglado el aviso del final con el ahorro de batería. Falta compilar y probar en tu PC con Claude Code: mensaje en `native/frostpom-timer/LEEME.md` (sección v4.7.2). Las secciones 2 y 5 de abajo cuentan la primera versión (v4.6); lo nuevo está en "v4.7.2" al final de cada una. Antes (v4.7.1): ENCENDIDO en `package.json`.
 
 ## 0. Antes que nada: dónde conviene programarla
 
@@ -44,6 +44,8 @@ native/frostpom-timer/
 - Desaparece sola al llegar a cero (`setTimeoutAfter`); en ese momento suena el aviso del final, como hoy.
 - En pausa muestra "En pausa · 12:34", con el tiempo quieto.
 - Canal propio "Pomodoro en curso", de importancia baja (sin sonido ni vibración, para no molestar cada vez que cambia).
+
+**v4.7.2, estilo reproductor:** la notificación usa una "sesión de reproducción" de Android (`TimerMedia.kt`). En la pantalla de bloqueo y en el panel rápido sale como el reproductor de Spotify: los animales del ártico de fondo, el modo, la frase, la **barra que avanza sola** (Android la mueve con la hora de inicio y la velocidad, sin gastar batería) y ⏮ ⏸ ⏭ ✓. No reproduce audio. Si Android cierra la app para liberar memoria, el reproductor vuelve con la siguiente actualización (cada 5 min o al tocar un botón); plan B de una línea: `TimerNotification.MEDIA_SESSION = false`.
 
 **Sin servicio en primer plano (foreground service).** Google Play exige declarar y justificar esos servicios, y un temporizador no está entre los tipos permitidos (solo cabría como "uso especial", con revisión). El cronómetro de la notificación cuenta solo, así que no hace falta.
 
@@ -89,6 +91,8 @@ Basado en tu mockup ("FOCUS SESSION · 25:00 · Hora de concentrarse", la barra 
 | El pingüino avanza por la barra todo el tiempo | Se mueve cuando cambia el estado (empezar, pausar, al abrir la app) y, como mucho, cada 15 min | Android limita cuántas veces se actualiza un widget (por batería). La **hora sí baja cada segundo**, porque el cronómetro lo hace solo. |
 | 🔁 "lo siguiente empieza solo" | Se queda en la app (y en la ventanita de Windows) | En 4 × 2 caben bien cuatro botones; es un ajuste, no algo de cada rato. |
 
+**v4.7.2, el diseño nuevo:** una sola tarjeta con los animales de fondo (la sombra azul a la izquierda va pintada en la imagen, `tools/arte_widget.py`), la hora grande en la letra más gruesa del teléfono (los widgets no cargan Lilita One), la frase, la barra con tu compañero (blanco lo hecho, el color del modo lo que falta), lo hecho (sube solo) · el total, y los botones blancos ⏸ ⏮ ⏭ ✓. El 2 × 2: ⌛ ENFOQUE, la hora, la barrita, ✓ y el botón grande dorado (verde en el descanso, celeste en el largo). Siempre oscuros; sin tema claro. La barra avanza cada 5 min (antes 15).
+
 ## 6. Seguridad del código nativo
 
 - **Todo en `try/catch`:** un error del plugin nunca cierra la app (en el peor caso, no se ve la notificación).
@@ -101,15 +105,15 @@ Basado en tu mockup ("FOCUS SESSION · 25:00 · Hora de concentrarse", la barra 
 - `tests/e2e_android.py` con un plugin simulado: cada cambio del reloj le llega al plugin con los datos correctos, y las acciones pendientes se aplican bien al volver.
 - Pruebas del Kotlin con Robolectric, si Claude Code lo corre en tu PC.
 
-**En tu celular (lista para marcar):**
-- [ ] La notificación aparece al empezar y baja segundo a segundo con la pantalla bloqueada.
-- [ ] Pausar, Continuar, Saltar y Terminar desde la notificación con la app **abierta**.
-- [ ] Lo mismo con la app **cerrada** (deslízala en apps recientes). Al abrirla, el progreso es correcto.
-- [ ] Reinicia el teléfono con un pomodoro corriendo: vuelven la notificación y el aviso del final.
-- [ ] Ahorro de batería encendido: el aviso del final llega (quizás con un poco de retraso).
-- [ ] Modo oscuro e inglés: la notificación y el widget se ven bien.
-- [ ] Widget 4 × 2 y 2 × 2: se ven bien, sus botones funcionan con la app cerrada y abren la app al tocar la hora.
-- [ ] Con la fase 4: empiezas en el PC y el celular muestra la notificación sola.
+**En tu celular (lista para marcar, v4.7.2):**
+- [ ] El ícono nuevo (pingüino con gorro de Navidad) se ve bien en la pantalla de inicio, en el cajón de apps y en la pantalla de inicio de la app.
+- [ ] Al empezar un pomodoro sale el **reproductor** en el panel rápido y en la pantalla de bloqueo, con los animales de fondo y la barra avanzando sola.
+- [ ] ⏮ ⏸ ⏭ ✓ del reproductor funcionan con la app **abierta**, en **segundo plano** y después de que Android la cierre (Claude Code lo simula con `am kill`).
+- [ ] Widgets 4 × 2 y 2 × 2 como en `native/frostpom-timer/diseno/`: nada cortado, la hora baja cada segundo, sus botones funcionan con la app cerrada y tocar la hora o los animales abre la app.
+- [ ] Reinicia el teléfono con un pomodoro corriendo y espera 2 min después de desbloquear: vuelven la notificación y el aviso del final (si no, Claude Code revisa `adb logcat -s FrostTimer`).
+- [ ] Ahorro de batería encendido, app en segundo plano: el aviso del final llega (quizás con un poco de retraso).
+- [ ] Inglés: la notificación y los widgets se ven bien.
+- [ ] (Más adelante, con avisos push) empiezas en el PC y el celular muestra la notificación sola.
 
 ## 8. Lo que tienes que hacer tú
 

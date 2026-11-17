@@ -1,166 +1,199 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  FrostPom — widget de 4 × 2 (el mockup del autor). Solo vistas permitidas en los widgets
-  (RemoteViews): LinearLayout, FrameLayout, TextView, Chronometer, ImageView e ImageButton.
+  FrostPom (v4.7.2) — widget de 4 × 2: una sola tarjeta con los animales en la fogata de fondo
+  (a la derecha), y a la izquierda, sobre la sombra azul: ⌛ MODO ENFOQUE, la hora grande (baja
+  sola), la frase, la barra con tu compañero, 00:00 · 25:00 y los botones blancos ⏸ ⏮ ⏭ ✓.
+  Arriba a la derecha, el globito "¡Estudiando juntos!".
+  Solo vistas permitidas en los widgets (RemoteViews): FrameLayout, LinearLayout, TextView,
+  Chronometer, ImageView e ImageButton.
 -->
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/fp_root"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@android:id/background"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/fp_widget_bg"
-    android:orientation="horizontal"
-    android:padding="6dp">
+    android:background="@drawable/fp_widget_frame"
+    android:clipToOutline="true">
 
-    <!-- La sesión -->
-    <LinearLayout
-        android:id="@+id/fp_card"
-        android:layout_width="0dp"
+    <ImageView
+        android:id="@+id/fp_art"
+        android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_weight="1.2"
-        android:background="@drawable/fp_card_dark"
-        android:gravity="center_vertical"
-        android:orientation="vertical"
-        android:paddingStart="12dp"
-        android:paddingTop="8dp"
-        android:paddingEnd="12dp"
-        android:paddingBottom="8dp">
+        android:contentDescription="@string/fp_widget_large"
+        android:scaleType="centerCrop"
+        android:src="@drawable/fp_widget_art_large" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="horizontal">
 
         <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
+            android:id="@+id/fp_col"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="60"
+            android:orientation="vertical"
+            android:paddingStart="16dp"
+            android:paddingTop="13dp"
+            android:paddingEnd="4dp"
+            android:paddingBottom="11dp">
 
-            <ImageView
-                android:layout_width="13dp"
-                android:layout_height="13dp"
-                android:importantForAccessibility="no"
-                android:src="@drawable/fp_ic_hourglass" />
-
-            <TextView
-                android:id="@+id/fp_mode"
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="5dp"
-                android:letterSpacing="0.12"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:id="@+id/fp_mode_icon"
+                    android:layout_width="12dp"
+                    android:layout_height="12dp"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/fp_ic_hourglass" />
+
+                <TextView
+                    android:id="@+id/fp_mode"
+                    style="@style/FpMode"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="5dp"
+                    android:text="@string/fp_mode_study"
+                    android:textAllCaps="true"
+                    android:textSize="10sp" />
+            </LinearLayout>
+
+            <Chronometer
+                android:id="@+id/fp_time"
+                style="@style/FpTime"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:textSize="46sp" />
+
+            <TextView
+                android:id="@+id/fp_phrase"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:fontFamily="sans-serif-medium"
                 android:maxLines="1"
-                android:text="@string/fp_mode_study"
-                android:textColor="#CCDCE6FF"
-                android:textSize="11sp"
-                android:textStyle="bold" />
+                android:text="@string/fp_phrase_study_idle"
+                android:textColor="#EBFFFFFF"
+                android:textSize="12sp" />
+
+            <ImageView
+                android:id="@+id/fp_bar"
+                android:layout_width="match_parent"
+                android:layout_height="24dp"
+                android:layout_marginTop="2dp"
+                android:importantForAccessibility="no"
+                android:scaleType="fitXY" />
+
+            <LinearLayout
+                android:id="@+id/fp_labels"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <Chronometer
+                    android:id="@+id/fp_elapsed"
+                    style="@style/FpSmall"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+
+                <FrameLayout
+                    android:layout_width="0dp"
+                    android:layout_height="1dp"
+                    android:layout_weight="1" />
+
+                <TextView
+                    android:id="@+id/fp_total"
+                    style="@style/FpSmall"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="25:00" />
+            </LinearLayout>
+
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:minHeight="4dp" />
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <ImageButton
+                    android:id="@+id/fp_toggle"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:background="@drawable/fp_btn_white"
+                    android:contentDescription="@string/fp_start"
+                    android:padding="8dp"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/fp_ic_play" />
+
+                <ImageButton
+                    android:id="@+id/fp_reset"
+                    android:layout_width="26dp"
+                    android:layout_height="26dp"
+                    android:layout_marginStart="11dp"
+                    android:background="@drawable/fp_btn_ghost"
+                    android:contentDescription="@string/fp_reset"
+                    android:padding="4dp"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/fp_ic_prev" />
+
+                <ImageButton
+                    android:id="@+id/fp_skip"
+                    android:layout_width="26dp"
+                    android:layout_height="26dp"
+                    android:layout_marginStart="11dp"
+                    android:background="@drawable/fp_btn_ghost"
+                    android:contentDescription="@string/fp_skip"
+                    android:padding="4dp"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/fp_ic_next" />
+
+                <ImageButton
+                    android:id="@+id/fp_finish"
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:layout_marginStart="11dp"
+                    android:background="@drawable/fp_btn_white"
+                    android:contentDescription="@string/fp_finish"
+                    android:padding="7dp"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/fp_ic_check_navy" />
+            </LinearLayout>
         </LinearLayout>
 
-        <Chronometer
-            android:id="@+id/fp_time"
-            style="@style/FpTime"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:includeFontPadding="false"
-            android:textColor="#FFFFFFFF"
-            android:textSize="38sp" />
-
-        <TextView
-            android:id="@+id/fp_phrase"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:text="@string/fp_phrase_study_idle"
-            android:textColor="#CCDCE6FF"
-            android:textSize="12sp" />
-
-        <ImageView
-            android:id="@+id/fp_bar"
-            android:layout_width="match_parent"
-            android:layout_height="20dp"
-            android:layout_marginTop="4dp"
-            android:importantForAccessibility="no"
-            android:scaleType="fitCenter" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
-
-            <ImageButton
-                android:id="@+id/fp_toggle"
-                android:layout_width="38dp"
-                android:layout_height="38dp"
-                android:background="@drawable/fp_btn_main"
-                android:contentDescription="@string/fp_start"
-                android:padding="9dp"
-                android:scaleType="fitCenter"
-                android:src="@drawable/fp_ic_play" />
-
-            <ImageButton
-                android:id="@+id/fp_reset"
-                android:layout_width="32dp"
-                android:layout_height="32dp"
-                android:layout_marginStart="8dp"
-                android:background="@drawable/fp_btn"
-                android:contentDescription="@string/fp_reset"
-                android:padding="8dp"
-                android:scaleType="fitCenter"
-                android:src="@drawable/fp_ic_prev" />
-
-            <ImageButton
-                android:id="@+id/fp_skip"
-                android:layout_width="32dp"
-                android:layout_height="32dp"
-                android:layout_marginStart="6dp"
-                android:background="@drawable/fp_btn"
-                android:contentDescription="@string/fp_skip"
-                android:padding="8dp"
-                android:scaleType="fitCenter"
-                android:src="@drawable/fp_ic_next" />
-
-            <ImageButton
-                android:id="@+id/fp_finish"
-                android:layout_width="32dp"
-                android:layout_height="32dp"
-                android:layout_marginStart="6dp"
-                android:background="@drawable/fp_btn"
-                android:contentDescription="@string/fp_finish"
-                android:padding="7dp"
-                android:scaleType="fitCenter"
-                android:src="@drawable/fp_ic_check" />
-        </LinearLayout>
+        <!-- Los animales: tocarlos abre la app -->
+        <FrameLayout
+            android:id="@+id/fp_open"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="40" />
     </LinearLayout>
 
-    <!-- Los animales en la fogata -->
-    <FrameLayout
-        android:layout_width="0dp"
-        android:layout_height="match_parent"
-        android:layout_marginStart="6dp"
-        android:layout_weight="1">
-
-        <ImageView
-            android:id="@+id/fp_art"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:background="@drawable/fp_art_round"
-            android:clipToOutline="true"
-            android:contentDescription="@string/fp_widget_large"
-            android:scaleType="centerCrop"
-            android:src="@drawable/fp_widget_amigos" />
-
-        <TextView
-            android:id="@+id/fp_bubble"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="top|center_horizontal"
-            android:layout_marginTop="8dp"
-            android:background="@drawable/fp_bubble"
-            android:maxLines="1"
-            android:paddingStart="10dp"
-            android:paddingTop="3dp"
-            android:paddingEnd="10dp"
-            android:paddingBottom="3dp"
-            android:text="@string/fp_bubble_study"
-            android:textColor="#FF1B2A4A"
-            android:textSize="11sp"
-            android:textStyle="bold" />
-    </FrameLayout>
-</LinearLayout>
+    <TextView
+        android:id="@+id/fp_bubble"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|end"
+        android:layout_marginTop="14dp"
+        android:layout_marginEnd="14dp"
+        android:background="@drawable/fp_bubble"
+        android:fontFamily="sans-serif-black"
+        android:maxLines="1"
+        android:paddingStart="8dp"
+        android:paddingTop="3dp"
+        android:paddingEnd="8dp"
+        android:paddingBottom="3dp"
+        android:text="@string/fp_bubble_study"
+        android:textColor="#FF0D2346"
+        android:textSize="9sp" />
+</FrameLayout>

@@ -1,6 +1,6 @@
 {
   "name": "frostpom",
-  "version": "4.7.0",
+  "version": "4.7.3",
   "private": true,
   "type": "module",
   "scripts": {
@@ -21,6 +21,7 @@
     "@capacitor/core": "8.6.0",
     "@capacitor/haptics": "8.0.2",
     "@capacitor/local-notifications": "8.3.1",
+    "@frostpom/timer": "file:native/frostpom-timer",
     "@revenuecat/purchases-capacitor": "14.1.0"
   },
   "devDependencies": {

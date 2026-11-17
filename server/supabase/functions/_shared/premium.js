@@ -193,7 +193,8 @@ export async function handleWebhook(req, deps) {
   const event = body && body.event;
   if (!event || typeof event !== 'object') return json({ error: 'no_event' }, 400);
   const meta = { id: String(event.id || ''), type: String(event.type || '?'), environment: String(event.environment || '') };
-  const users = usersOfEvent(event);
+  // El aviso de prueba de RevenueCat ("Send test event") trae un id inventado: solo se anota
+  const users = meta.type === 'TEST' ? [] : usersOfEvent(event);
   try {
     if (!users.length) {
       // Un aviso de prueba o de un id que no es de FrostPom: solo se anota

@@ -101,7 +101,8 @@ function renderCalendar(focusKey) {
     const joinR = on && col < 6 && studied(cells[i + 1]);
     return h('button', {
       type: 'button', 'data-key': k, tabindex: k === tabKey ? '0' : '-1', 'aria-pressed': String(sel),
-      class: `cal__day lv-${G.studyLevel(min)}${isToday ? ' is-today' : ''}${sel ? ' is-sel' : ''}${joinL ? ' join-l' : ''}${joinR ? ' join-r' : ''}`,
+      // (v4.7.3) is-goal: el día que cumpliste la meta del polo, el hielo reemplaza al círculo naranja
+      class: `cal__day lv-${G.studyLevel(min)}${isToday ? ' is-today' : ''}${sel ? ' is-sel' : ''}${joinL ? ' join-l' : ''}${joinR ? ' join-r' : ''}${min >= G.POLE_GOAL_MIN ? ' is-goal' : ''}`,
       'aria-label': `${U.formatDayLong(k)}${isToday ? tr(' (hoy)') : ''}: ${min ? U.formatMinutes(min) : tr('sin estudio')}${state.daily[k] && state.daily[k].frozen > 0 ? tr(' (racha revivida)') : ''}`,
       onclick: () => { calSelected = k; renderCalendar(k); },
     },

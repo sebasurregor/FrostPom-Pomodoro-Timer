@@ -4,7 +4,7 @@
  * teléfono o al navegador lo puede leer cualquiera. Ver docs/SEGURIDAD.md.
  */
 export const config = Object.freeze({
-  version: '4.7.0',
+  version: '4.7.3',
   // Dirección pública de la app. La app de Android abre aquí las normas, la privacidad y la
   // página para eliminar la cuenta (en el navegador del teléfono). Ver js/native.js.
   publicUrl: 'https://sebasurregor.github.io/FrostPom-Pomodoro-Timer/',
@@ -82,10 +82,10 @@ export const config = Object.freeze({
     // (v4.7.0) Cobro en la app de ANDROID con Google Play (con RevenueCat). Decisiones y paso a paso:
     // docs/GOOGLE-PLAY-BILLING.md. Mientras enabled sea false, en Android Premium sigue en modo prueba.
     play: Object.freeze({
-      enabled: false,
+      enabled: true, // (v4.7.1) encendido: falta solo pegar abajo tu clave pública goog_…
       // La clave PÚBLICA de RevenueCat para Android (empieza por goog_…). Puede ir en GitHub.
       // La clave SECRETA de RevenueCat (sk_…) NUNCA va aquí: va solo en los secretos de Supabase.
-      revenueCatKey: '',
+      revenueCatKey: 'goog_usnfxhcfEMnuKypsIlNaZNPosfo',
       entitlement: 'premium', // el "entitlement" de RevenueCat
       offering: '', // '' = la oferta marcada como "current" en RevenueCat (la "default")
     }),

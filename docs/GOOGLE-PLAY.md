@@ -86,7 +86,7 @@ npm run android:abrir
 ```
 
 - `npm install` descarga Capacitor (las versiones exactas que probé: 8.6).
-- `android:crear` copia la app a `www/`, crea la carpeta `android/`, pone los íconos de FrostPom y la versión de `package.json` (hoy 4.7.0, `versionCode 40700`), y conecta todo.
+- `android:crear` copia la app a `www/`, crea la carpeta `android/`, pone los íconos de FrostPom y la versión de `package.json` (hoy 4.7.1, `versionCode 40701`), y conecta todo.
 - (v4.5.3) También pone en `AndroidManifest.xml` el ID de tu app de **AdMob** (`config.ads.appId`). El complemento de anuncios lo necesita aunque los anuncios estén apagados; si el ID está vacío, usa el de prueba de Google y avisa. Para encender los anuncios: [`docs/ANUNCIOS.md`](ANUNCIOS.md).
 - `android:abrir` abre el proyecto en Android Studio.
 
@@ -183,7 +183,7 @@ Como tu cuenta personal es nueva, **Google no deja publicar** hasta que **al men
 ## Cada vez que cambies FrostPom
 
 1. Haz el cambio y pruébalo en la web, como siempre.
-2. Sube la versión en los **tres** lugares: `js/config.js` (`version`), `service-worker.js` (`VERSION`) y `package.json` (`version`). Por ejemplo, de 4.7.0 a 4.7.1.
+2. Sube la versión en los **tres** lugares: `js/config.js` (`version`), `service-worker.js` (`VERSION`) y `package.json` (`version`). Por ejemplo, de 4.7.1 a 4.7.2.
 3. Ejecuta:
    ```
    npm run android:actualizar

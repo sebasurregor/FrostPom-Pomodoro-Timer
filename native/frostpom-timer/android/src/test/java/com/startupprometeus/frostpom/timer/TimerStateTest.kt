@@ -1,6 +1,7 @@
 package com.startupprometeus.frostpom.timer
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -56,5 +57,33 @@ class TimerStateTest {
         assertEquals(TimerState.STUDY, done.doneMode)
         assertNull("con el bloque terminado no se salta: hay que abrir la app", done.skip())
         assertEquals(1f, idle.start(t0)!!.progressAt(t0 + 2_000_000), 0.0001f)
+    }
+
+    @Test
+    fun avisoCuandoLaAppTerminaEnSegundoPlano() {
+        // (v4.7.2) La app web, en segundo plano, llegó a cero y pasó al descanso antes que la alarma
+        val run = idle.start(t0)!!
+        val end = run.endAt
+        val nextBreak = run.finish(t0 + 600_000)!! // un descanso en reposo
+        assertTrue(TimerState.endedWhileAway(run, nextBreak, end + 300, false))
+        assertFalse("con la app a la vista, ella misma avisa", TimerState.endedWhileAway(run, nextBreak, end + 300, true))
+        assertFalse("antes de llegar a cero no hay aviso", TimerState.endedWhileAway(run, nextBreak, end - 60_000, false))
+        assertFalse("el mismo bloque, con la hora redondeada, no es un final", TimerState.endedWhileAway(run, run.copy(endAt = end + 1), end + 300, false))
+        assertFalse("si ya avisó la alarma (terminado), no se repite", TimerState.endedWhileAway(run.done(), nextBreak, end + 300, false))
+    }
+
+    @Test
+    fun volverAEmpezarSigueCorriendo() {
+        // (v4.7.3) ⏮ del reproductor y del widget: desde el principio y corriendo
+        val run = idle.start(t0)!!.copy(block = "bloque-1234")
+        val again = run.restart(t0 + 600_000)!!
+        assertEquals(TimerState.RUNNING, again.status)
+        assertEquals(t0 + 600_000 + 1_500_000, again.endAt)
+        assertEquals("", again.block)
+        assertTrue(again.canFinish)
+        val fromPause = run.pause(t0 + 60_000)!!.restart(t0 + 120_000)!!
+        assertEquals(TimerState.RUNNING, fromPause.status)
+        assertEquals(t0 + 120_000 + 1_500_000, fromPause.endAt)
+        assertNull("en reposo no hay nada que volver a empezar", idle.restart(t0))
     }
 }

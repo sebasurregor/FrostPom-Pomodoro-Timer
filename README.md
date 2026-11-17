@@ -1,4 +1,4 @@
-# FrostPom: Pomodoro Timer (v4.7.0)
+# FrostPom: Pomodoro Timer (v4.7.3)
 
 > Antes se llamaba **StudyTimer**. Publicada en **https://sebasurregor.github.io/FrostPom-Pomodoro-Timer/**
 
@@ -128,7 +128,10 @@ js/                     Lógica pura: sin DOM, se prueba en Node
     ads-ui.js           (v4.5.3) Los anuncios en la tienda, la racha, el descanso y Ajustes
     effects.js, emblems.js, companions.js, scenery.js   Sonidos, emblemas, arte y paisaje
 assets/                 Fuentes (licencia OFL, incluidas), íconos, arte y sonidos (assets/sounds/)
+logos/                  (v4.7.2) Tus logos (Navidad, normal, pico cerrado); no viajan en la app
 tools/                  preparar_sonidos.py: recorta, vuelve bucle e iguala el volumen de los sonidos
+                        iconos.py (v4.7.2): cambia el logo de toda la app (python tools/iconos.py normal)
+                        arte_widget.py (v4.7.2): el arte de los widgets y de la notificación de Android
 server/supabase/        Base de datos del ranking global y de las cuentas en línea + pruebas
   functions/            (v4.7.0) Edge Functions de Premium: rc-webhook y premium-sync (y pegar-en-supabase/)
 tests/                  Pruebas automáticas

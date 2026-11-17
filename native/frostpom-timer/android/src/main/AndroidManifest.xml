@@ -13,7 +13,7 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <application>
-        <!-- Los botones de la notificación y del widget, el aviso del final y la vuelta cada 15 min -->
+        <!-- Los botones de la notificación y del widget, el aviso del final y la vuelta cada 5 min -->
         <receiver
             android:name="com.startupprometeus.frostpom.timer.TimerActionReceiver"
             android:exported="false" />
@@ -25,6 +25,7 @@
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
             </intent-filter>
         </receiver>
 

@@ -1,5 +1,41 @@
 # Cambios de la v2 a la v3
 
+## v4.7.3: lo que salió de la prueba en el Galaxy, con tus decisiones
+
+**Antes de publicar:** vuelve a pegar tu clave de Turnstile (`captcha.siteKey`) y tu clave `goog_…` (`premium.play.revenueCatKey`) en `js/config.js`. Después, Claude Code en tu PC compila y prueba (mensaje en `native/frostpom-timer/LEEME.md`, sección "v4.7.3").
+
+**Tus decisiones (16 nov 2026, después del informe de Claude Code):** mantener el reproductor y acortar el hueco; ⏮ vuelve a empezar corriendo; para el aviso sin permiso, alarmas escalonadas y pedir el permiso al empezar.
+
+- **Calendario de Progreso:** el día en que cumpliste la meta del polo, **el hielo reemplaza al círculo naranja** (el número va encima del hielo y las gotas cuelgan abajo). Los demás días no cambian.
+- **Reproductor de la notificación:** si Android cierra la app para liberar memoria, vuelve en **2 min como mucho** (antes hasta 8). La actualización es cada 2 min y exacta cuando diste el permiso "Alarmas y recordatorios", sin despertar al teléfono.
+- **⏮ en el reproductor y en el widget vuelve a empezar el bloque y sigue corriendo**, como en un reproductor (antes lo dejaba en reposo y la notificación se iba). Su nombre ahora es "Volver a empezar". El botón "Reiniciar" de la app no cambia.
+- **Aviso del final sin el permiso de alarmas exactas:** Android podía atrasarlo hasta 18 min en un pomodoro de 25. Ahora hay "alarmas de acercamiento" (a la mitad de lo que falta, cada vez) y llega con ~1 min de retraso como mucho.
+- **El permiso "Alarmas y recordatorios" se pide al empezar el primer pomodoro** (antes, después del primero completo), una sola vez y con la explicación de siempre.
+- **Widgets:** se incluyen los dos arreglos que hizo Claude Code (la hora redondea como la app: 25:00, no 24:59; y en pausa o en reposo queda quieta, como texto fijo).
+- **Ícono de Android:** el logo ocupa un poco menos (68 de 108 dp) para que la forma redondeada de Samsung no corte la punta del gorro ni el pompón.
+- **Limpieza automática:** `npm run android:actualizar` borra los 9 archivos del widget viejo que se quedaban al descomprimir encima (uno de ellos dejaba la hora gris y delgada).
+- versionCode 40703.
+
+## v4.7.2: logo de Navidad, widgets y notificación nuevos, y el aviso del final arreglado
+
+**Antes de publicar:** vuelve a pegar tu clave de Turnstile (`captcha.siteKey`) y tu clave `goog_…` (`premium.play.revenueCatKey`) en `js/config.js`. Después, Claude Code en tu PC compila y prueba (mensaje en `native/frostpom-timer/LEEME.md`, sección "v4.7.2").
+
+- **Logo de temporada (Navidad)** en todas partes: la app de Android (ícono adaptable, redondo y pantalla de inicio), la web (pestaña, iPhone, "instalar app") y los archivos para las tiendas (`docs/google-play/icono-512.png`, `docs/microsoft-store/logo-300.png`). Tus tres logos quedan en `logos/`. **Para cambiarlo después:** `python tools/iconos.py normal` (o `navidad`, o `normal-pico-cerrado`) y sube la versión, como siempre.
+- **Widgets nuevos (4 × 2 y 2 × 2)** con el diseño del lienzo "Rediseño FrostPom": una sola tarjeta con los animales del ártico de fondo, la hora grande, la barra con tu compañero (blanco lo hecho, el color del modo lo que falta), lo hecho y el total, botones blancos y el globito. El pequeño: la hora, la barrita y el botón dorado (verde en el descanso). Siempre oscuros, como en el diseño. Si tu pantalla de inicio los hace bajitos, se esconden la frase y los números para que nada se corte.
+- **La notificación es un reproductor, como Spotify:** en la pantalla de bloqueo y en el panel rápido sale con los animales de fondo, el modo, la frase, la barra que avanza sola y ⏮ ⏸ ⏭ ✓. No suena nada: solo usa el aspecto de reproductor.
+- **Arreglado: el aviso del final no llegaba con el ahorro de batería.** La app, en segundo plano, a veces llegaba a cero y pasaba al descanso antes de que sonara la alarma del teléfono; eso cancelaba la alarma. Ahora, si pasa, el aviso sale igual.
+- **Después de reiniciar el teléfono:** además del aviso de encendido, el widget también trae de vuelta la notificación y el aviso del final; y el teléfono deja anotado en su registro (logcat, etiqueta `FrostTimer`) cada paso, para que Claude Code encuentre la causa si todavía falla.
+- La barra del widget avanza cada 5 min (antes 15), sin despertar al teléfono.
+- "Empezar en el PC y que el celular muestre la notificación sola" necesita avisos push: queda para más adelante, como decidiste.
+- versionCode 40702.
+
+## v4.7.1: el cobro con Google Play, encendido
+
+- `config.premium.play.enabled = true`. **Pega tu clave pública de RevenueCat (`goog_…`) en `revenueCatKey`** antes de `npm run android:actualizar`: sin ella, la app sigue en modo prueba (y la herramienta te avisa).
+- `rc-webhook`: el aviso de prueba de RevenueCat ("Send test event") solo se anota, sin preguntarle a RevenueCat (antes respondía 502).
+- **(Fase 5) La notificación en curso y el widget de Android:** `package.json` ya trae `"@frostpom/timer": "file:native/frostpom-timer"`. Con `npm install` y `npm run android:actualizar`, la app de Android los incluye. Como el Kotlin nunca se compiló con el SDK real, la primera compilación se hace con Claude Code en tu PC (mensaje en `native/frostpom-timer/LEEME.md`).
+- versionCode 40701.
+
 ## v4.7.0: Premium con Google Play (RevenueCat), con tus decisiones
 
 **Antes de publicar:**

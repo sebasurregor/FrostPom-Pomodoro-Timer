@@ -111,6 +111,13 @@ class Texts(private val ctx: Context, private val json: JSONObject?) {
         else -> pick("modes.break", R.string.fp_mode_break)
     }
 
+    /** El nombre corto del modo (widget de 2 × 2): "Enfoque", "Descanso"… (v4.7.2) */
+    fun modeShort(mode: String): String = when (mode) {
+        TimerState.STUDY -> pick("modesShort.study", R.string.fp_short_study)
+        TimerState.LONG -> pick("modesShort.long", R.string.fp_short_long)
+        else -> pick("modesShort.break", R.string.fp_short_break)
+    }
+
     /** La frase debajo de la hora. */
     fun phrase(st: TimerState): String = when {
         st.status == TimerState.DONE -> pick("done", R.string.fp_done)

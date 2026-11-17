@@ -3,18 +3,21 @@
 <resources>
     <string name="fp_widget_large">FrostPom timer</string>
     <string name="fp_widget_small">FrostPom mini</string>
-    <string name="fp_widget_large_desc">Your pomodoro with its buttons, and your buddies by the campfire</string>
-    <string name="fp_widget_small_desc">The time and a button to start or pause</string>
+    <string name="fp_widget_large_desc">Your pomodoro on the arctic scene, with its buttons</string>
+    <string name="fp_widget_small_desc">The time, the bar and a button to start or pause</string>
     <string name="fp_mode_study">Focus session</string>
     <string name="fp_mode_break">Break</string>
     <string name="fp_mode_long">Long break</string>
+    <string name="fp_short_study">Focus</string>
+    <string name="fp_short_break">Break</string>
+    <string name="fp_short_long">Long break</string>
     <string name="fp_paused">Paused</string>
     <string name="fp_start">Start</string>
     <string name="fp_pause">Pause</string>
     <string name="fp_resume">Resume</string>
     <string name="fp_skip">Skip</string>
     <string name="fp_finish">Finish and save</string>
-    <string name="fp_reset">Reset</string>
+    <string name="fp_reset">Start over</string>
     <string name="fp_phrase_study">Time to focus</string>
     <string name="fp_phrase_study_idle">Ready when you are</string>
     <string name="fp_phrase_break">Time to rest</string>

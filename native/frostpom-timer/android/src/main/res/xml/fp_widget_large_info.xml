@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- FrostPom — widget de 4 × 2. La hora baja sola; el dibujo se pone al día cuando cambia algo
-     y, con un pomodoro corriendo, cada 15 min (TimerAlarm). updatePeriodMillis es el mínimo de Android. -->
+     y, con un pomodoro corriendo, cada 5 min (TimerAlarm). updatePeriodMillis es el mínimo de Android. -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:description="@string/fp_widget_large_desc"
     android:initialLayout="@layout/fp_widget_large"

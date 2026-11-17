@@ -165,9 +165,9 @@ test('Premium en Android con cobro: lo decide el servidor, no premium.active', (
   assert.ok(!C.isPremium(st));
 });
 
-test('Premium con Google Play: viene apagado y sin claves secretas', () => {
+test('Premium con Google Play: sin claves secretas', () => {
   const play = config.premium.play;
-  assert.equal(play.enabled, false, 'el cobro viene apagado');
+  assert.equal(typeof play.enabled, 'boolean');
   assert.ok(!/^(sk_|atk_)/.test(play.revenueCatKey), 'la clave secreta de RevenueCat nunca va en la app');
   const src = readFileSync(new URL('../js/config.js', import.meta.url), 'utf8');
   assert.ok(!/['"]sk_[A-Za-z0-9]{8,}/.test(src), 'ninguna clave sk_ en config.js');

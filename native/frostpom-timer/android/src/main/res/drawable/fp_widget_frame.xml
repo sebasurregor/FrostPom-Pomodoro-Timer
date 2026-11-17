@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- El fondo de los widgets (debajo del dibujo): azul noche con las esquinas del sistema -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <corners android:radius="@dimen/fp_widget_radius" />
+    <solid android:color="#FF0D1A36" />
+</shape>

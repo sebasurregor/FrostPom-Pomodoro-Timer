@@ -1205,6 +1205,19 @@ html[data-theme="dark"] .streak-card__go { color: #7CC0FF; }
 .view--paper .cal__day.join-l::before { left: 0; right: 50%; }
 .view--paper .cal__day.join-r::after { left: 50%; right: 0; }
 .view--paper .cal__goal { position: absolute; z-index: 2; top: -5px; left: calc(50% + 0.55rem); line-height: 0; filter: drop-shadow(0 1px 1px rgba(13, 35, 70, 0.25)); }
+/* (v4.7.3) El día que cumpliste la meta del polo: el hielo (el dibujo del autor) en vez del círculo
+   naranja, con el número encima. El disco del dibujo mide 72 de sus 96 px (centro en 47,5 · 40), así
+   que la imagen va al 133 % del círculo y corrida para que el disco calce; las gotas cuelgan abajo. */
+.view--paper .cal__day.is-goal .cal__num {
+  background: transparent; color: #0D2346;
+  text-shadow: 0 0 2px rgba(255, 255, 255, 0.95), 0 0 4px rgba(255, 255, 255, 0.8);
+}
+.view--paper .cal__day.is-goal .cal__num::before {
+  content: ""; position: absolute; z-index: -1; pointer-events: none;
+  left: -16%; top: -5.6%; width: 133.3%; height: 133.3%;
+  background: url("../assets/icons/congelada.png") center / contain no-repeat;
+}
+.view--paper .cal__day.is-goal .cal__goal:not(.cal__goal--frozen) { display: none; }
 .view--paper .cal__detail { margin-top: 14px; padding: 10px 12px; border-radius: 12px; background: var(--card-soft); border: 0; color: var(--text); font-weight: 700; font-size: 0.9rem; }
 .view--paper .cal__detail:empty { display: none; }
 html[data-theme="dark"] .cal__day.is-future { border-color: rgba(255, 255, 255, 0.12); color: rgba(255, 255, 255, 0.3); }
@@ -1215,6 +1228,8 @@ html[data-theme="dark"] .view--paper .cal__day.lv-2 .cal__num {
 html[data-theme="dark"] .view--paper .cal__day.is-today .cal__num { color: var(--text); }
 /* (v4.5.2) Hoy sin estudio, en el tema oscuro: el número se veía blanco sobre el círculo claro */
 html[data-theme="dark"] .view--paper .cal__day.is-today.lv-0 .cal__num { background: #2A3A5C; color: var(--text); }
+/* (v4.7.3) Sobre el hielo el número va siempre azul oscuro (también hoy y en el tema oscuro) */
+html[data-theme="dark"] .view--paper .cal__day.is-goal .cal__num { color: #0D2346; }
 
 .act-meta { margin: -4px 0 6px; text-align: right; }
 

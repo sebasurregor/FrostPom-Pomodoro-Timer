@@ -15,7 +15,7 @@ Comprueba que:
   F. (v4.6) Con el complemento FrostTimer simulado (la notificación en curso y el widget): cada
      cambio del reloj le llega con sus datos; lo que se toca en la notificación o en el widget con
      la app cerrada se aplica al volver con su hora; el aviso del final ya no lo programa
-     LocalNotifications; el permiso de alarmas exactas se pide una vez, después del primer pomodoro.
+     LocalNotifications; el permiso de alarmas exactas se pide una vez, al empezar el primer pomodoro (v4.7.3).
 
 Uso (con la app servida: python -m http.server 8000):
     python tests/e2e_android.py http://localhost:8000/
@@ -354,6 +354,18 @@ with sync_playwright() as p:
     u = ups()[-1]
     check(u['status'] == 'running' and u['mode'] == 'study' and abs(u['endAt'] - (now + 25 * 60_000)) < 3000 and len(u['block']) >= 8,
           'al empezar, el teléfono recibe la hora del fin (la notificación cuenta sola) y el número del bloque')
+    check(ups()[-1]['texts']['reset'] == 'Volver a empezar' and ups()[-1]['texts']['modesShort']['study'] == 'Enfoque',
+          'el teléfono recibe los textos nuevos (⏮ "Volver a empezar", "ENFOQUE" del widget pequeño)')
+    # (v4.7.3) Al empezar el primer pomodoro: explica y pide (una vez) el permiso de alarmas exactas
+    for _ in range(10):
+        if dlg_open(pg) and title(pg) == '¿Te aviso justo a tiempo?':
+            break
+        pg.clock.run_for(500); pg.wait_for_timeout(100)
+    check(dlg_open(pg) and title(pg) == '¿Te aviso justo a tiempo?' and 'Alarmas y recordatorios' in pg.inner_text('#dlg'),
+          'al empezar el primer pomodoro explica y pide el permiso de alarmas exactas')
+    pg.click("#dlg button:has-text('Abrir ajustes')"); pg.wait_for_timeout(400)
+    check(calls(pg, 'FrostTimer', 'openExactAlarmSettings'), '"Abrir ajustes" abre la pantalla de Android de ese permiso')
+    check(pg.evaluate("localStorage.getItem('st2_exact_asked')") == '1', 'y queda anotado que ya se preguntó')
     n = len(ups())
     pg.clock.run_for(3000)
     check(len(ups()) == n, 'mientras corre no se le manda nada cada segundo (solo cuando algo cambia)')
@@ -396,22 +408,20 @@ with sync_playwright() as p:
     clock = [int(x) for x in pg.inner_text('#clock').split(':')]
     left_sec = clock[0] * 60 + clock[1]
     check(pg.get_attribute('#ring', 'data-status') == 'running' and 21 * 60 + 50 <= left_sec <= 22 * 60, f'"Empezar" desde el widget cuenta desde que se tocó (faltan {pg.inner_text("#clock")} de 25:00)')
-    # Primer pomodoro completo: se pide (una vez) el permiso de alarmas exactas
+    # Primer pomodoro completo: ya no se vuelve a preguntar por las alarmas exactas
     pg.clock.fast_forward('22:00'); pg.clock.run_for(3000)
-    close_dialogs_but = None
+    asked_again = False
     # (v4.5.2) Antes salen los premios y la vista de la racha (el primer pomodoro del día): se cierran
     for _ in range(14):
         if dlg_open(pg) and '¿Te aviso justo a tiempo?' in title(pg):
+            asked_again = True
             break
         if dlg_open(pg):
             pg.click('#dlg .dlg__actions button:last-child'); pg.wait_for_timeout(300)
         pg.clock.run_for(700); pg.wait_for_timeout(100)
-    pg.clock.run_for(500); pg.wait_for_timeout(300)
-    check(title(pg) == '¿Te aviso justo a tiempo?' and 'Alarmas y recordatorios' in pg.inner_text('#dlg'),
-          'después del primer pomodoro completo explica y pide el permiso de alarmas exactas')
-    pg.click("#dlg button:has-text('Abrir ajustes')"); pg.wait_for_timeout(400)
-    check(calls(pg, 'FrostTimer', 'openExactAlarmSettings'), '"Abrir ajustes" abre la pantalla de Android de ese permiso')
-    check(pg.evaluate("localStorage.getItem('st2_exact_asked')") == '1', 'y no se vuelve a preguntar')
+    pg.clock.run_for(5000); pg.wait_for_timeout(300)
+    asked_again = asked_again or (dlg_open(pg) and '¿Te aviso justo a tiempo?' in title(pg))
+    check(not asked_again, 'al completar el primer pomodoro no se vuelve a preguntar (ya se preguntó al empezar)')
     bad = [e for e in errs if 'Failed to load resource' not in e]
     check(not bad, 'sin errores con el complemento' + (': ' + ' | '.join(bad[:3]) if bad else ''))
     ctx.close()

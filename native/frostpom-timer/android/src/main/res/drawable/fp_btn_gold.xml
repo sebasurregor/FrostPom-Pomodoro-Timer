@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Botón redondo: ▶/⏸ del widget pequeño, estudio -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android" android:color="#26000000">
+    <item>
+        <shape android:shape="oval">
+            <solid android:color="#FFFFC531" />
+        </shape>
+    </item>
+</ripple>

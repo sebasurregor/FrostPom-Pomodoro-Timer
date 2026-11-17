@@ -1,42 +1,99 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- FrostPom — widget de 2 × 2: el modo, la hora y ▶/⏸. -->
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/fp_card"
+<!--
+  FrostPom (v4.7.2) — widget de 2 × 2: los animales de fondo; arriba ⌛ ENFOQUE, la hora grande y
+  la barrita; abajo a la derecha ✓ y el botón grande ▶/⏸ (dorado en estudio, verde en descanso).
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@android:id/background"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/fp_card_dark"
-    android:gravity="center"
-    android:orientation="vertical"
-    android:padding="10dp">
+    android:background="@drawable/fp_widget_frame"
+    android:clipToOutline="true">
 
-    <TextView
-        android:id="@+id/fp_mode"
+    <ImageView
+        android:id="@+id/fp_art"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:contentDescription="@string/fp_widget_small"
+        android:scaleType="centerCrop"
+        android:src="@drawable/fp_widget_art_small" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="14dp"
+        android:paddingTop="12dp"
+        android:paddingEnd="12dp">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:id="@+id/fp_mode_icon"
+                android:layout_width="10dp"
+                android:layout_height="10dp"
+                android:importantForAccessibility="no"
+                android:src="@drawable/fp_ic_hourglass" />
+
+            <TextView
+                android:id="@+id/fp_mode"
+                style="@style/FpMode"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="5dp"
+                android:text="@string/fp_short_study"
+                android:textAllCaps="true"
+                android:textSize="9sp" />
+        </LinearLayout>
+
+        <Chronometer
+            android:id="@+id/fp_time"
+            style="@style/FpTime"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:textSize="38sp" />
+
+        <ImageView
+            android:id="@+id/fp_bar"
+            android:layout_width="96dp"
+            android:layout_height="5dp"
+            android:layout_marginTop="6dp"
+            android:importantForAccessibility="no"
+            android:scaleType="fitXY" />
+    </LinearLayout>
+
+    <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:letterSpacing="0.1"
-        android:maxLines="1"
-        android:text="@string/fp_mode_study"
-        android:textColor="#CCDCE6FF"
-        android:textSize="10sp"
-        android:textStyle="bold" />
+        android:layout_gravity="bottom|end"
+        android:layout_margin="12dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
 
-    <Chronometer
-        android:id="@+id/fp_time"
-        style="@style/FpTime"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:includeFontPadding="false"
-        android:textColor="#FFFFFFFF"
-        android:textSize="32sp" />
+        <ImageButton
+            android:id="@+id/fp_finish"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:background="@drawable/fp_btn_white_soft"
+            android:contentDescription="@string/fp_finish"
+            android:padding="7dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/fp_ic_check_navy" />
 
-    <ImageButton
-        android:id="@+id/fp_toggle"
-        android:layout_width="42dp"
-        android:layout_height="42dp"
-        android:layout_marginTop="6dp"
-        android:background="@drawable/fp_btn_main"
-        android:contentDescription="@string/fp_start"
-        android:padding="10dp"
-        android:scaleType="fitCenter"
-        android:src="@drawable/fp_ic_play" />
-</LinearLayout>
+        <ImageButton
+            android:id="@+id/fp_toggle"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_marginStart="8dp"
+            android:background="@drawable/fp_btn_gold"
+            android:contentDescription="@string/fp_start"
+            android:padding="10dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/fp_ic_play" />
+    </LinearLayout>
+</FrameLayout>

@@ -2,7 +2,7 @@
 FrostPom — imágenes para la ficha de Google Play (v4.1; la mascota con nombre desde la v4.2).
 
 Genera en docs/google-play/:
-  - icono-512.png                       (512 × 512, el ícono cuadrado; Google le pone la forma)
+  - icono-512.png                       (lo escribe tools/iconos.py: 512 × 512, el ícono cuadrado; Google le pone la forma)
   - imagen-destacada-es.png / -en.png   (1024 × 500, "Feature graphic")
   - capturas-es/ y capturas-en/         (1080 × 1920, teléfono vertical)
 
@@ -92,7 +92,7 @@ TAGLINE = {'es': 'Estudia con pomodoros,<br>sube de rango y cuida el polo', 'en'
 
 def main():
     os.makedirs(OUT, exist_ok=True)
-    shutil.copyfile(os.path.join(ROOT, 'assets', 'icons', 'icon-maskable-512.png'), os.path.join(OUT, 'icono-512.png'))
+    # icono-512.png lo escribe tools/iconos.py (v4.7.2), con el logo de temporada
     with sync_playwright() as p:
         browser = p.chromium.launch(**({'executable_path': os.environ['CHROME_PATH']} if os.environ.get('CHROME_PATH') else {}))
         # Imagen destacada

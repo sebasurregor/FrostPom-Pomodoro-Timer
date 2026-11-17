@@ -10,3 +10,7 @@ keystore.properties
 *.aab
 *.apk
 android/app/release/
+
+# Complemento de Android: lo que genera Gradle al compilar
+native/frostpom-timer/android/build/
+native/frostpom-timer/android/.gradle/

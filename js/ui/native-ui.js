@@ -100,10 +100,11 @@ export function nativeReady() {
 function nativeTexts() {
   return {
     modes: { study: tr('Modo enfoque'), break: tr('Descanso'), long: tr('Descanso largo') },
+    modesShort: { study: tr('Enfoque'), break: tr('Descanso'), long: tr('Descanso largo') }, // (v4.7.2) widget de 2 × 2
     paused: tr('En pausa'),
     phrases: { study: tr('Hora de concentrarse'), studyIdle: tr('Listo cuando tú lo estés'), break: tr('Hora de descansar'), breakIdle: tr('Tu descanso te espera') },
     bubble: { study: tr('¡Estudiando juntos!'), break: tr('¡A descansar!') },
-    start: tr('Empezar'), pause: tr('Pausar'), resume: tr('Continuar'), skip: tr('Saltar'), finish: tr('Terminar y guardar'), reset: tr('Reiniciar'),
+    start: tr('Empezar'), pause: tr('Pausar'), resume: tr('Continuar'), skip: tr('Saltar'), finish: tr('Terminar y guardar'), reset: tr('Volver a empezar'), // (v4.7.3) ⏮ arranca de nuevo
     endStudy: { title: tr('¡Sesión completa!'), body: tr('Vuelve a FrostPom para guardar tu sesión y ganar tu XP.') },
     endBreak: { title: tr('Descanso terminado'), body: tr('Cuando quieras, empieza otra sesión.') },
     done: tr('Abre FrostPom para guardar tu sesión.'),
@@ -154,8 +155,9 @@ export async function applyNativeActions() {
 
 /**
  * (v4.6) Desde Android 14 el permiso de "Alarmas y recordatorios" viene apagado: sin él, el aviso
- * del final puede llegar unos minutos tarde. Se pide una sola vez, después del primer pomodoro
- * completo, con una explicación (nunca por sorpresa).
+ * del final puede llegar tarde. Se pide una sola vez, con una explicación (nunca por sorpresa):
+ * (v4.7.3) al empezar el primer pomodoro; si en ese momento había otra ventana abierta, después
+ * del primer pomodoro completo.
  */
 export async function maybeAskExactAlarms() {
   if (!N.isNative() || store.pref.get('exact_asked') || dlg.open) return;

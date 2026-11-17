@@ -49,8 +49,17 @@ class FrostTimerPlugin : Plugin() {
     fun update(call: PluginCall) {
         try {
             val ctx = context
+            val now = System.currentTimeMillis()
+            val prev = TimerStore.load(ctx)
             val next = TimerState.fromJson(call.data)
             val texts = call.getObject("texts")?.toString()
+            // (v4.7.2) Con la app en segundo plano (por ejemplo, con el ahorro de batería), a veces
+            // la app llega a cero y pasa al descanso ANTES de que suene la alarma del teléfono: la
+            // alarma se cancelaba y no llegaba ningún aviso. Ahora el aviso sale aquí.
+            if (TimerState.endedWhileAway(prev, next, now, inForeground)) {
+                Log.i(TAG, "update: el bloque terminó en segundo plano, aviso del final")
+                TimerNotification.showEnd(ctx, prev)
+            }
             if (TimerStore.hasPending(ctx)) {
                 // Hay botones tocados que la app todavía no aplicó: el reloj de aquí es el bueno.
                 // Se guardan solo los textos y las duraciones, y se le recuerda a la app.

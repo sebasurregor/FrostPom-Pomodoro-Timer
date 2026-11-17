@@ -71,6 +71,14 @@ data class TimerState(
         if (status != RUNNING && status != PAUSED) null
         else copy(status = IDLE, endAt = 0L, remainingMs = durationSec * 1000L, block = "", canFinish = false)
 
+    /**
+     * (v4.7.3) ⏮ en el reproductor y en el widget: el mismo bloque desde el principio, y sigue
+     * corriendo (como en un reproductor). El botón "Reiniciar" de la app sigue dejándolo en reposo.
+     */
+    fun restart(now: Long): TimerState? =
+        if (status != RUNNING && status != PAUSED) null
+        else copy(status = RUNNING, endAt = now + durationSec * 1000L, remainingMs = 0L, block = "", canFinish = mode == STUDY)
+
     /** "Terminar y guardar": solo estudio y con al menos 1 minuto hecho (como en la app). */
     fun finish(now: Long): TimerState? {
         if (mode != STUDY || (status != RUNNING && status != PAUSED) || elapsedAt(now) < MIN_SAVE_MS) return null
@@ -114,6 +122,18 @@ data class TimerState(
         private val COMPANION_RE = Regex("^[a-z-]{1,32}$")
 
         private fun sec(v: Int, fallback: Int): Int = if (v in MIN_SEC..MAX_SEC) v else fallback
+
+        /**
+         * (v4.7.2) ¿La app web dejó atrás un bloque que acababa de llegar a cero, sin estar a la
+         * vista? Entonces nadie avisó todavía: la alarma del teléfono no alcanzó a sonar (por
+         * ejemplo, con el ahorro de batería) y, al pasar al descanso, se cancelaba.
+         */
+        fun endedWhileAway(prev: TimerState, next: TimerState, now: Long, foreground: Boolean): Boolean {
+            if (foreground || prev.status != RUNNING) return false
+            if (prev.endAt > now + 1500L) return false // todavía no llegaba a cero
+            val sameBlock = next.status == RUNNING && next.mode == prev.mode && kotlin.math.abs(next.endAt - prev.endAt) < 2000L
+            return !sameBlock
+        }
 
         /**
          * Lee un estado (de la app web o de lo guardado), revisando cada campo: lo que no sirve

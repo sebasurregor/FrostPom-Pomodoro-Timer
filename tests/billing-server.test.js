@@ -164,6 +164,10 @@ test('rc-webhook: transferencias, avisos de prueba y fallas', async () => {
   assert.deepEqual(net.applied.at(-1), { p_user: '$RCAnonymousID:abc', p_state: {}, p_event: { id: 'evt-test', type: 'TEST', environment: '' } });
   assert.ok(!net.calls.some((c) => c.url.includes('RCAnonymousID')), 'por un id anónimo no se le pregunta a RevenueCat');
 
+  // El aviso de prueba de RevenueCat trae un id con forma de cuenta: igual solo se anota
+  const before = net.calls.length;
+  assert.equal((await P.handleWebhook(hook({ event: { id: 'evt-t2', type: 'TEST', app_user_id: PAU } }), deps)).status, 200);
+  assert.ok(!net.calls.slice(before).some((c) => c.url.includes('revenuecat')), 'el aviso de prueba no le pregunta a RevenueCat');
   assert.equal((await P.handleWebhook(hook({ nada: 1 }), deps)).status, 400);
   const down = fakeNet({ rcStatus: 503 });
   const r = await P.handleWebhook(hook({ event: { id: 'e', type: 'RENEWAL', app_user_id: PAU } }), { env: envOf(), fetch: down.fetch });

@@ -12,15 +12,16 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.drawable.Icon
 import android.os.Build
+import android.util.Log
 import kotlin.math.max
 
 /**
- * FrostPom (v4.6) — la notificación en curso ("como Spotify") y el aviso del final.
+ * FrostPom (v4.6; v4.7.2 estilo reproductor) — la notificación en curso y el aviso del final.
  *
- *  - En curso: el modo, la cuenta regresiva (el cronómetro de Android baja solo, sin que la app
- *    tenga que actualizarla cada segundo), tu compañero y los botones Pausar/Continuar, Saltar y
- *    Terminar y guardar. Desaparece sola al llegar a cero. Canal propio de importancia baja: no
- *    suena ni vibra cada vez que cambia.
+ *  - En curso (v4.7.2): un reproductor, como el de Spotify (TimerMedia): los animales del ártico,
+ *    el modo, la frase, la barra que avanza sola y ⏮ ⏸ ⏭ ✓. En Android 12 o anterior, la misma
+ *    notificación con la cuenta regresiva arriba. Desaparece sola al llegar a cero. Canal propio
+ *    de importancia baja: no suena ni vibra cada vez que cambia.
  *  - Aviso del final: el mismo canal "frostpom" que ya usa la app (importancia alta).
  *  - Sin servicio en primer plano (Google Play pide justificarlos y un temporizador no califica).
  */
@@ -30,6 +31,14 @@ object TimerNotification {
     const val ID_ONGOING = 4100
     const val ID_END = 4101
     private const val ACCENT = 0xFF2D68BC.toInt()
+    private const val NAVY = 0xFF0D2346.toInt()
+
+    /**
+     * (v4.7.2) true: la notificación es un reproductor (sesión de Android, la barra avanza sola).
+     * false: la misma notificación, sin sesión (sin barra; los botones nunca dependen de la app en
+     * memoria). Plan B si en algún teléfono los botones del reproductor dejaran de responder.
+     */
+    const val MEDIA_SESSION = true
     private var companionCache: Pair<String, Bitmap?>? = null
 
     private fun canNotify(ctx: Context): Boolean =
@@ -60,44 +69,56 @@ object TimerNotification {
             Notification.Builder(ctx).setPriority(if (low) Notification.PRIORITY_LOW else Notification.PRIORITY_HIGH)
         }
 
-    /** Muestra, cambia o quita la notificación en curso según el reloj. */
+    /**
+     * Muestra, cambia o quita la notificación en curso según el reloj (v4.7.2: estilo reproductor).
+     * Los botones van en este orden: ⏮ volver a empezar · ⏸/▶ · ⏭ saltar · ✓ terminar y guardar.
+     */
     fun show(ctx: Context, st: TimerState, now: Long) {
         val nm = ctx.getSystemService(NotificationManager::class.java) ?: return
         if (st.status != TimerState.RUNNING && st.status != TimerState.PAUSED) {
             nm.cancel(ID_ONGOING)
+            TimerMedia.release()
             return
         }
         if (!canNotify(ctx)) return
         val t = TimerStore.texts(ctx)
         ensureChannels(ctx, t)
+        val running = st.status == TimerState.RUNNING
         val b = builder(ctx, CHANNEL_TIMER, true)
             .setSmallIcon(smallIcon(ctx))
             .setContentTitle(t.mode(st.mode))
             .setContentIntent(openApp(ctx))
             .setOngoing(true)
             .setOnlyAlertOnce(true)
-            .setCategory(Notification.CATEGORY_PROGRESS)
+            .setCategory(Notification.CATEGORY_TRANSPORT)
             .setVisibility(Notification.VISIBILITY_PUBLIC)
-            .setColor(ACCENT)
-        companion(ctx, st.companion)?.let { b.setLargeIcon(it) }
-        if (st.status == TimerState.RUNNING) {
+            .setColor(NAVY)
+        TimerMedia.art(ctx)?.let { b.setLargeIcon(it) }
+        if (running) {
             b.setContentText(t.phrase(st))
                 .setShowWhen(true)
                 .setWhen(st.endAt)
                 .setUsesChronometer(true)
                 .setChronometerCountDown(true)
-            if (Build.VERSION.SDK_INT >= 26) b.setTimeoutAfter(max(1000L, st.endAt - now))
-            b.addAction(action(ctx, R.drawable.fp_ic_pause, t.pause, TimerActionReceiver.ACTION_TOGGLE))
+            if (Build.VERSION.SDK_INT >= 26) b.setTimeoutAfter(max(1000L, st.endAt - now + 60_000L))
         } else {
             b.setContentText(t.paused + " · " + clock(st.remainingMs))
                 .setShowWhen(false)
                 .setUsesChronometer(false)
-            b.addAction(action(ctx, R.drawable.fp_ic_play, t.resume, TimerActionReceiver.ACTION_TOGGLE))
         }
+        // Los botones de la notificación (Android 12 o anterior, y de respaldo si la sesión se cerró)
+        b.addAction(action(ctx, R.drawable.fp_ic_prev, t.reset, TimerActionReceiver.ACTION_RESET))
+        b.addAction(
+            if (running) action(ctx, R.drawable.fp_ic_pause, t.pause, TimerActionReceiver.ACTION_TOGGLE)
+            else action(ctx, R.drawable.fp_ic_play, t.resume, TimerActionReceiver.ACTION_TOGGLE),
+        )
         b.addAction(action(ctx, R.drawable.fp_ic_next, t.skip, TimerActionReceiver.ACTION_SKIP))
         if (st.canFinish && st.mode == TimerState.STUDY) {
             b.addAction(action(ctx, R.drawable.fp_ic_check, t.finish, TimerActionReceiver.ACTION_FINISH))
         }
+        val style = Notification.MediaStyle().setShowActionsInCompactView(0, 1, 2)
+        if (MEDIA_SESSION) TimerMedia.token(ctx, st, now, t)?.let { style.setMediaSession(it) }
+        b.setStyle(style)
         nm.notify(ID_ONGOING, b.build())
     }
 
@@ -121,7 +142,9 @@ object TimerNotification {
             b.setDefaults(Notification.DEFAULT_ALL)
         }
         nm.cancel(ID_ONGOING)
+        TimerMedia.release()
         nm.notify(ID_END, b.build())
+        Log.i("FrostTimer", "aviso del final: ${st.mode}")
     }
 
     // ------------------------------------------------------------------ piezas

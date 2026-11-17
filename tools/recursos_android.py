@@ -1,20 +1,18 @@
 """
-FrostPom — genera los íconos y la pantalla de inicio de la app de Android (v4.1).
+FrostPom — genera los íconos y la pantalla de inicio de la app de Android (v4.1; logo nuevo en v4.7.2).
 
-Sale de los íconos que ya tiene la app (assets/icons/icon-maskable-512.png e icon-512.png) y
+Sale del logo que dejó tools/iconos.py (logos/actual-lleno.png y logos/actual-redondeado.png) y
 escribe en android-recursos/res/ los mismos archivos que trae la plantilla de Capacitor, con los
 mismos nombres y tamaños. tools/app-android.mjs los copia al proyecto de Android.
 
-Uso (solo si cambias el ícono; los archivos ya vienen generados):
-    pip install pillow
-    python tools/recursos_android.py
+Uso: no lo corras solo; corre  python tools/iconos.py navidad  (o normal), que lo llama al final.
 """
 import os
 from PIL import Image, ImageDraw
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SRC_FULL = os.path.join(ROOT, 'assets', 'icons', 'icon-maskable-512.png')   # cuadrado lleno (sin transparencia)
-SRC_ROUND = os.path.join(ROOT, 'assets', 'icons', 'icon-512.png')           # con esquinas redondeadas
+SRC_FULL = os.path.join(ROOT, 'logos', 'actual-lleno.png')         # cuadrado lleno (sin esquinas blancas)
+SRC_ROUND = os.path.join(ROOT, 'logos', 'actual-redondeado.png')    # con esquinas redondeadas (transparentes)
 OUT = os.path.join(ROOT, 'android-recursos', 'res')
 BG = '#2d68bc'   # el mismo azul del manifiesto (background_color)
 
@@ -37,6 +35,52 @@ def save(img, *parts):
 
 def fit(img, size):
     return img.resize((size, size), Image.LANCZOS)
+
+
+def padded(full, size, art):
+    """El dibujo a 'art' de 'size', centrado, con sus bordes estirados hasta el borde y
+    difuminados: así ningún recorte deja ver una franja de otro color."""
+    import numpy as np
+    from PIL import ImageFilter
+    inner = round(size * art)
+    pad = (size - inner) // 2
+    a = np.asarray(fit(full.convert('RGB'), inner))
+    a = np.pad(a, ((pad, size - inner - pad), (pad, size - inner - pad), (0, 0)), mode='edge')
+    soft = Image.fromarray(a).filter(ImageFilter.GaussianBlur(max(1, size * 0.03)))
+    out = soft.convert('RGBA')
+    out.alpha_composite(fit(full, inner), (pad, pad))
+    return out
+
+
+# (v4.7.3) El logo ocupa 68 de los 108 dp (antes 74): la forma redondeada de Samsung recortaba la
+# punta del gorro y el pompón. Lo que queda alrededor es el mismo dibujo con los bordes estirados.
+ART_DP = 68
+
+
+def blurred(full, size):
+    """Capa de atrás del ícono adaptable: la misma imagen de adelante con los bordes estirados."""
+    return padded(full, size, ART_DP / 108)
+
+
+def framed(full, size, art):
+    return padded(full, size, art)
+
+
+def foreground(full, size):
+    """Capa de adelante del ícono adaptable (108 dp): el teléfono solo muestra los 72 dp del centro
+    (círculo, gota, cuadrado…), así que el logo va a ART_DP, centrado, sobre transparente."""
+    out = Image.new('RGBA', (size, size), (0, 0, 0, 0))
+    inner = round(size * ART_DP / 108)
+    out.alpha_composite(fit(full, inner), ((size - inner) // 2, (size - inner) // 2))
+    return out
+
+
+ADAPTIVE = (
+    '<?xml version="1.0" encoding="utf-8"?>\n'
+    '<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">\n'
+    '    <background android:drawable="@mipmap/ic_launcher_background"/>\n'
+    '    <foreground android:drawable="@mipmap/ic_launcher_foreground"/>\n'
+    '</adaptive-icon>\n')
 
 
 def circle(img):
@@ -88,9 +132,10 @@ def main():
     made = []
     for name, k in DENS.items():
         made.append(save(fit(rounded, round(48 * k)), f'mipmap-{name}', 'ic_launcher.png'))
-        made.append(save(circle(fit(full, round(48 * k))), f'mipmap-{name}', 'ic_launcher_round.png'))
-        # Ícono adaptable (Android 8+): el dibujo ocupa los 108 dp; cada teléfono le pone su forma
-        made.append(save(fit(full, round(108 * k)), f'mipmap-{name}', 'ic_launcher_foreground.png'))
+        made.append(save(circle(framed(full, round(48 * k), 0.9)), f'mipmap-{name}', 'ic_launcher_round.png'))
+        # Ícono adaptable (Android 8+): adelante el logo; atrás, el mismo logo borroso
+        made.append(save(foreground(full, round(108 * k)), f'mipmap-{name}', 'ic_launcher_foreground.png'))
+        made.append(save(blurred(full, round(108 * k)).convert('RGB'), f'mipmap-{name}', 'ic_launcher_background.png'))
         made.append(save(tomato_silhouette(round(24 * k)), f'drawable-{name}', 'ic_stat_frostpom.png'))
     for folder, (w, h) in SPLASH.items():
         made.append(save(splash(w, h, rounded), folder, 'splash.png'))
@@ -101,6 +146,12 @@ def main():
     with open(path, 'w', encoding='utf-8') as f:
         f.write(xml)
     made.append(path)
+    for name in ('ic_launcher.xml', 'ic_launcher_round.xml'):
+        path = os.path.join(OUT, 'mipmap-anydpi-v26', name)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, 'w', encoding='utf-8') as f:
+            f.write(ADAPTIVE)
+        made.append(path)
     print(f'{len(made)} archivos en {os.path.relpath(OUT, ROOT)}')
 
 

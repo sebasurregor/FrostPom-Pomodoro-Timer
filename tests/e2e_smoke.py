@@ -177,7 +177,7 @@ with sync_playwright() as p:
     check(pg.inner_text("#calTitle") == "Noviembre 2026", "el calendario abre en el mes actual")
     check(pg.evaluate("document.querySelectorAll('#calGrid .cal__day').length") == 30, "noviembre tiene 30 días")
     day = pg.query_selector('#calGrid .cal__day[data-key="2026-11-02"]')
-    check(day is not None and "50 min" in (day.get_attribute("aria-label") or "") and "lv-3" in (day.get_attribute("class") or "") and day.query_selector(".pic--congelada") is not None, "el día muestra 50 min, meta cumplida y su ícono congelado (v4.5.2)")
+    check(day is not None and "50 min" in (day.get_attribute("aria-label") or "") and "lv-3" in (day.get_attribute("class") or "") and day.query_selector(".pic--congelada") is not None and "is-goal" in (day.get_attribute("class") or ""), "el día muestra 50 min, meta cumplida y el hielo en vez del círculo naranja (v4.7.3)")
     pg.click('#calGrid .cal__day[data-key="2026-11-02"]'); pg.clock.run_for(100)
     check("Lunes 2 de noviembre: 50 min en 2 sesiones" in pg.inner_text("#calDetail"), "al tocar un día se ve cuánto estudiaste")
     check(pg.evaluate("document.getElementById('calNext').disabled && document.getElementById('calPrev').disabled"), "no se puede ir a meses sin datos ni al futuro")

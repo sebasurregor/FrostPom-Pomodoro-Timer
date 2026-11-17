@@ -1,99 +1,125 @@
-# FrostTimer: la notificación en curso y el widget de Android (fase 5, v4.6.0)
+# FrostTimer: la notificación tipo reproductor y los widgets de Android (v4.7.3)
 
-Este es el código **nativo** (Kotlin) de la fase 5. La parte web ya está lista en la app (v4.5.0) y
-se prende sola cuando la app de Android trae este complemento. **Todavía no está activado**: hay que
-compilarlo y probarlo en tu PC, porque en la nube de Claude no se pueden descargar Android ni Gradle.
-
-Mientras no lo actives, la app de Android funciona igual que la v4.4.1 (el aviso del final lo
-programa el complemento de notificaciones de Capacitor).
+Este es el código **nativo** (Kotlin) de la notificación en curso, los widgets y el aviso del
+final. La parte web está en `js/native.js` y `js/ui/native-ui.js`. Desde la v4.7.1 viene encendido
+en `package.json` (`"@frostpom/timer": "file:native/frostpom-timer"`). Se compila en tu PC con
+Claude Code, porque en la nube de Claude no se pueden descargar Android ni Gradle.
 
 ## Qué hace
 
-- **Notificación en curso ("como Spotify")**: el modo, la cuenta regresiva (el cronómetro de Android
-  baja solo), tu compañero y los botones **Pausar/Continuar**, **Saltar** y **Terminar y guardar**.
-  Desaparece al llegar a cero. Canal propio "Pomodoro en curso" (sin sonido ni vibración).
-- **Widget 4 × 2 y 2 × 2** con el diseño de tu mockup: ⌛ el modo, la hora grande (en Lilita One),
-  la frase, la barra con tu compañero, los botones ▶/⏸ ⏮ ⏭ ✓ y, a la derecha, los animales en la
-  fogata (`artico-amigos.webp`) con el globito "¡Estudiando juntos!". Claro u oscuro según la app.
-- **Aviso del final exacto** si diste el permiso "Alarmas y recordatorios" (la app lo pide **una
-  vez**, con explicación, después del primer pomodoro completo). Sin él, llega con unos minutos de
-  margen, como hoy. **No** usa `USE_EXACT_ALARM` ni servicios en primer plano.
-- **Botones con la app cerrada**: la copia del reloj del teléfono cambia al instante (notificación,
-  widget y aviso) y la acción queda anotada con su hora. Al abrir la app, la parte web la aplica a
-  esa hora (progreso, ranking y tus otros aparatos quedan bien).
-- **Al reiniciar el teléfono** vuelven la notificación y el aviso del final.
+- **Notificación en curso, estilo reproductor (como Spotify)**: en la pantalla de bloqueo y en el
+  panel rápido sale con los animales del ártico de fondo, el modo ("Modo enfoque"), la frase, la
+  barra que avanza sola y los botones ⏮ volver a empezar · ⏸/▶ · ⏭ saltar · ✓ terminar y guardar.
+  No suena nada: solo usa el aspecto de reproductor (una "sesión de reproducción" de Android).
+  En Android 12 o anterior es la misma notificación con la cuenta regresiva arriba.
+- **Widgets 4 × 2 y 2 × 2** con el diseño del lienzo "Rediseño FrostPom" (las imágenes están en
+  `diseno/`): una sola tarjeta con los animales de fondo, la hora grande (baja sola, cada segundo),
+  la barra con tu compañero (blanco lo hecho, el color del modo lo que falta), lo hecho · el total,
+  los botones blancos y el globito "¡Estudiando juntos!". El 2 × 2: la hora, la barrita, ✓ y el
+  botón dorado (verde en el descanso). Siempre oscuros. Si la pantalla de inicio los hace bajitos
+  (menos de 176 dp), se esconden la frase y los números de la barra.
+- **Aviso del final exacto** si diste el permiso "Alarmas y recordatorios" (la app lo pide una vez,
+  al empezar el primer pomodoro). Sin él, (v4.7.3) unas "alarmas de acercamiento" lo dejan con
+  ~1 min de retraso como mucho (antes, hasta 18 min). **No** usa `USE_EXACT_ALARM` ni servicios en
+  primer plano.
+- **(v4.7.3) ⏮ vuelve a empezar el bloque y sigue corriendo** (en la app web llega como "reiniciar"
+  + "empezar", a la misma hora).
+- **(v4.7.2) El aviso llega aunque la app termine el bloque en segundo plano** (antes, con el ahorro
+  de batería, la app pasaba al descanso antes de que sonara la alarma, y la alarma se cancelaba).
+- **Botones con la app cerrada**: la copia del reloj del teléfono cambia al instante y la acción
+  queda anotada con su hora; al abrir la app, la parte web la aplica a esa hora.
+- **Al reiniciar el teléfono** vuelven la notificación y el aviso del final (aviso de encendido y,
+  de respaldo, la actualización de los widgets). Cada paso queda en el registro del teléfono con la
+  etiqueta `FrostTimer` (`adb logcat -s FrostTimer`), sin datos personales.
+
+### Un límite que hay que probar
+
+La "sesión de reproducción" vive mientras la app está en memoria. Si Android la cierra para
+liberar memoria, Samsung lo esconde hasta la siguiente actualización (v4.7.3: cada 2 min, exacta
+con el permiso de alarmas; también al tocar un botón del widget, al sonar el aviso o al abrir la
+app). En la prueba de la 4.7.2 volvió y sus botones respondieron.
+Los botones del widget nunca dependen de eso. Si en tu celular los botones del reproductor dejan de
+responder, hay un plan B de una línea: `TimerNotification.MEDIA_SESSION = false` (la notificación
+sigue con sus botones, sin la barra que avanza sola). El autor decidió mantener el reproductor.
 
 ## Archivos
 
 ```
 native/frostpom-timer/
   package.json                       "@frostpom/timer" (complemento local de Capacitor)
+  diseno/                            el diseño aprobado (para comparar en el celular, .jpg)
   android/build.gradle               biblioteca de Android con Kotlin
   android/src/main/AndroidManifest.xml
   android/src/main/java/com/startupprometeus/frostpom/timer/
     FrostTimerPlugin.kt              lo que la app web le pide (update, getPendingActions…)
     TimerState.kt                    la copia del reloj y sus acciones (lógica pura)
     TimerStore.kt                    lo guardado en el teléfono y los textos
-    TimerEngine.kt                   decide: notificación, aviso, widget y cada 15 min
+    TimerEngine.kt                   decide: notificación, aviso, widget y cada 2 min
     TimerNotification.kt             la notificación en curso y el aviso del final
-    TimerAlarm.kt                    las alarmas (exacta si hay permiso)
+    TimerMedia.kt                    (v4.7.2) la sesión de reproductor y sus botones
+    TimerAlarm.kt                    las alarmas (exacta si hay permiso; si no, de acercamiento)
     TimerActionReceiver.kt           los botones, el aviso del final y el reinicio del teléfono
     FrostWidget.kt                   los widgets (4 × 2 y 2 × 2)
-  android/src/main/res/              diseños, íconos, textos (inglés y español), fuente y arte
+  android/src/main/res/              diseños, íconos, textos (inglés y español) y arte
   android/src/test/…/TimerStateTest.kt   pruebas de la lógica (sin emulador)
 ```
 
-La parte web que habla con él: `js/native.js` (sección v4.6) y `js/ui/native-ui.js`
-(`syncNativeTimer`, `applyNativeActions`, `maybeAskExactAlarms`). Sus pruebas con un complemento
-simulado están en `tests/e2e_android.py` (sección F).
+El arte de los widgets y de la notificación sale de `assets/scenes/artico-amigos.webp` con
+`python tools/arte_widget.py` (ya viene hecho).
 
-## Lo que ya se comprobó en la nube
+## Lo que ya se comprobó
 
-- El Kotlin **compila** (Kotlin 2.4) contra una versión mínima de las clases de Android y
-  Capacitor que usa: sin errores ni advertencias. No es el SDK real, así que en tu PC puede salir
-  algún detalle (por ejemplo, de versiones de Gradle).
-- Las 4 pruebas de `TimerStateTest.kt` pasan.
-- La parte web, con el complemento simulado: 15 comprobaciones nuevas en `tests/e2e_android.py`.
+- (v4.7.2, en tu PC) Compiló con el SDK real, pasaron las pruebas y se probó en el Galaxy (Android 16):
+  widgets, reproductor, botones y reinicio. Claude Code arregló dos detalles del widget (redondeo y
+  la hora quieta en pausa) que ya vienen incluidos en la 4.7.3.
+- (v4.7.3, en la nube) El Kotlin compila (Kotlin 2.2.20, clases de Android 14 y Capacitor mínimo) y
+  pasan las 6 pruebas de `TimerStateTest.kt` (nueva: ⏮ vuelve a empezar corriendo).
+- La parte web, con el complemento simulado: `tests/e2e_android.py`.
 
-## Cómo activarlo (con Claude Code en tu PC)
+## v4.7.3: compilar y probar con Claude Code en tu PC
 
 1. Descomprime la versión nueva encima de tu carpeta como siempre (sin borrar `.git`) y vuelve a
-   pegar tu clave del sitio de Turnstile en `js/config.js` (`captcha.siteKey`).
-2. Abre una terminal en la carpeta del proyecto y escribe `claude`.
+   pegar tus claves en `js/config.js` (`captcha.siteKey` y `premium.play.revenueCatKey`).
+2. Conecta el Galaxy por cable, abre la terminal en la carpeta del proyecto y escribe `claude`.
 3. Copia y pega este mensaje:
 
 ```
-Hola, Claude. Quiero activar la fase 5 de FrostPom: la notificación en curso y el widget de Android.
-El código nativo ya está escrito en native/frostpom-timer (lee native/frostpom-timer/LEEME.md y
-docs/ANDROID-NOTIFICACION-WIDGET.md). La parte web ya está lista y probada: no la cambies salvo que
-sea necesario para que funcione con el complemento real.
+Hola, Claude. Quiero compilar y probar FrostPom 4.7.3 en mi Galaxy (conectado por USB). Lee
+native/frostpom-timer/LEEME.md y la entrada v4.7.3 de docs/CAMBIOS-v3.md. Esta versión trae tus dos
+arreglos del widget de la 4.7.2 (redondeo y hora quieta), así que si mi carpeta ya los tenía, quédate
+con la versión del zip. Explícame cada paso en español sencillo.
 
-Haz esto, en orden, y explícame cada paso en español sencillo:
-1. Agrega "@frostpom/timer": "file:native/frostpom-timer" a "dependencies" de package.json y corre
-   npm install.
-2. Corre npm run android:actualizar (copia la app y sincroniza Capacitor) y compila con
-   cd android && .\gradlew assembleDebug (en Windows). Arregla los errores de compilación del
-   complemento SIN cambiar lo que hace (versiones de Gradle, de Kotlin o de AGP, importaciones,
-   nombres de la API de Android). El proyecto usa Capacitor 8.6, Java 21, minSdk 24 y targetSdk 36.
-3. Corre las pruebas del complemento: .\gradlew :frostpom-timer:testDebugUnitTest
-4. Revisa que en android/app/src/main/AndroidManifest.xml (ya unido) estén los permisos
-   SCHEDULE_EXACT_ALARM y RECEIVE_BOOT_COMPLETED, y que NO aparezcan USE_EXACT_ALARM ni
-   FOREGROUND_SERVICE.
-5. Si hay un emulador o mi celular conectado (adb devices), instala la app (.\gradlew installDebug)
-   y ayúdame a revisar la lista de pruebas de la sección 7 de docs/ANDROID-NOTIFICACION-WIDGET.md.
-6. Cuando todo funcione, sube la versión a 4.6.0 en js/config.js, service-worker.js y package.json,
-   agrega la entrada v4.6.0 en docs/CAMBIOS-v3.md y corre npm test.
+1. npm install y npm run android:actualizar (debe decir versionCode 40703, "cobro con Google Play
+   ENCENDIDO" y, si quedaban, "Borrado (ya no se usa)" de los archivos viejos del widget).
+2. cd android && .\gradlew assembleDebug, .\gradlew :frostpom-timer:testDebugUnitTest (6 pruebas) e
+   .\gradlew installDebug. Arregla errores de compilación SIN cambiar lo que hace.
+3. Ícono: ¿ya no se corta la punta del gorro ni el pompón con la forma de Samsung?
+4. Calendario de Progreso: un día con 45 min o más debe verse con el hielo en vez del círculo
+   naranja (el número encima, las gotas abajo), en tema claro y oscuro. Saca una captura.
+5. ⏮ en el reproductor y en el widget: el bloque vuelve a empezar (25:00) y sigue corriendo; la
+   notificación no desaparece. Abre la app: debe mostrar lo mismo.
+6. Reproductor después de adb shell am kill com.startupprometeus.frostpom: ¿vuelve en 2 min o menos?
+   (adb logcat -s FrostTimer: "acción: TICK" y "media: sesión nueva").
+7. Aviso sin el permiso: quita "Alarmas y recordatorios" (Ajustes > Apps > FrostPom), empieza un
+   pomodoro de 5 min, bloquea, y mira en el registro las líneas "acción: APPROACH" y cuánto tarda el
+   aviso después de la hora (debe ser ~1 min o menos). Revisa también adb shell dumpsys alarm | findstr
+   frostpom. Al terminar, vuelve a dar el permiso.
+8. Ahorro de batería (pendiente de la 4.7.2): enciéndelo, empieza un pomodoro de 5 min, sal de la
+   app y bloquea. En el registro, ¿sale "ended" o "update: el bloque terminó en segundo plano", y
+   llega el aviso? Prueba también adb shell dumpsys deviceidle force-idle.
+9. Si cambiaste algo, corre npm test y dime qué archivos cambiaste y por qué.
 
 Reglas: no hagas commits ni push (los hago yo con mi cuenta). No subas ni me pidas claves (.jks,
-contraseñas, la clave secreta de Supabase). No toques server/supabase/schema.sql.
+contraseñas, la clave secreta de Supabase o de RevenueCat). No toques server/supabase/schema.sql.
+Si necesitas que entre a la app, pídemelo: la contraseña la escribo yo. No pegues registros
+completos: solo las líneas de FrostTimer.
 ```
 
-4. Cuando Claude Code termine, prueba en tu celular con la lista de
-   `docs/ANDROID-NOTIFICACION-WIDGET.md` (sección 7) y después genera el `.aab` como siempre
-   (`docs/GOOGLE-PLAY.md`), con `versionCode 40600`.
+4. Cuando todo esté bien, genera el `.aab` firmado (versionCode 40703), súbelo a Prueba cerrada y
+   sube el ícono de Navidad en Play Console (`docs/google-play/icono-512.png`).
 
 ## En Google Play
 
-- No hay formularios nuevos: sin servicio en primer plano y sin `USE_EXACT_ALARM`.
-- Conviene agregar una captura del widget a la ficha.
-- La fuente Lilita One es de licencia libre (SIL OFL): su licencia va en `OFL-LilitaOne.txt`.
+- No hay formularios nuevos: sin servicio en primer plano y sin `USE_EXACT_ALARM`. La sesión de
+  reproductor no reproduce audio ni pide permisos.
+- Conviene agregar una captura de los widgets a la ficha.

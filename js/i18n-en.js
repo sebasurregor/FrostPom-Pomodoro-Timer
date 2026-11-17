@@ -31,6 +31,7 @@ export default Object.freeze({
   'Terminar y guardar': 'Finish and save',
   'Saltar': 'Skip',
   'Reiniciar': 'Reset',
+  'Volver a empezar': 'Start over', // (v4.7.3) ⏮ del reproductor y del widget de Android
   'Hoy llevas': 'Today:',
   'en': 'in',
   '0 sesiones': '0 sessions',

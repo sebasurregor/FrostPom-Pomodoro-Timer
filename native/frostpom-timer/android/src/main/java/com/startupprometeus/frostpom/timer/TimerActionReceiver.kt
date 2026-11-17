@@ -8,12 +8,13 @@ import android.util.Log
 
 /**
  * FrostPom (v4.6) — los botones de la notificación y del widget, el aviso del final y la
- * actualización cada 15 min. Funciona aunque la app esté cerrada (no se abre nada).
+ * actualización cada 2 min. Funciona aunque la app esté cerrada (no se abre nada).
  * No es "exported": solo FrostPom puede enviarle estas acciones.
  */
 class TimerActionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val now = System.currentTimeMillis()
+        Log.i("FrostTimer", "acción: ${intent.action?.substringAfterLast('.')}")
         try {
             when (intent.action) {
                 ACTION_TOGGLE -> TimerEngine.act(context, "toggle", now)
@@ -21,7 +22,7 @@ class TimerActionReceiver : BroadcastReceiver() {
                 ACTION_FINISH -> TimerEngine.act(context, "finish", now)
                 ACTION_RESET -> TimerEngine.act(context, "reset", now)
                 ACTION_END -> TimerEngine.ended(context, now)
-                ACTION_TICK -> TimerEngine.refresh(context, now)
+                ACTION_TICK, ACTION_APPROACH -> TimerEngine.refresh(context, now)
             }
         } catch (e: Exception) {
             Log.w("FrostTimer", "onReceive ${intent.action}", e)
@@ -36,6 +37,7 @@ class TimerActionReceiver : BroadcastReceiver() {
         const val ACTION_RESET = PREFIX + "RESET"
         const val ACTION_END = PREFIX + "END"
         const val ACTION_TICK = PREFIX + "TICK"
+        const val ACTION_APPROACH = PREFIX + "APPROACH" // (v4.7.3) acercar el aviso sin alarmas exactas
 
         private val CODES = mapOf(
             ACTION_TOGGLE to 4401,
@@ -44,6 +46,7 @@ class TimerActionReceiver : BroadcastReceiver() {
             ACTION_RESET to 4404,
             ACTION_END to 4405,
             ACTION_TICK to 4406,
+            ACTION_APPROACH to 4407,
         )
 
         /** El PendingIntent de cada acción (uno distinto por acción, inmutable). */
@@ -59,9 +62,15 @@ class TimerActionReceiver : BroadcastReceiver() {
  * Si el bloque terminó mientras el teléfono estaba apagado, llega el aviso.
  */
 class BootReceiver : BroadcastReceiver() {
+    companion object {
+        /** Algunos teléfonos (HTC, algunos Xiaomi) avisan del encendido "rápido" con este nombre. */
+        const val QUICKBOOT = "android.intent.action.QUICKBOOT_POWERON"
+    }
+
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action
-        if (action != Intent.ACTION_BOOT_COMPLETED && action != Intent.ACTION_MY_PACKAGE_REPLACED) return
+        if (action != Intent.ACTION_BOOT_COMPLETED && action != Intent.ACTION_MY_PACKAGE_REPLACED && action != QUICKBOOT) return
+        Log.i("FrostTimer", "boot: $action")
         try {
             TimerEngine.refresh(context)
         } catch (e: Exception) {

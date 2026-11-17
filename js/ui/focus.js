@@ -82,7 +82,9 @@ export function startOrToggle(opts) {
       FX.buzz(25);
       buddySays();
     }
-    askOnFirstSession(); // app de Android: pide permiso para avisarte del final (una sola vez)
+    // App de Android: pide permiso para avisarte del final (una sola vez) y, (v4.7.3) desde el
+    // primer pomodoro, explica y pide el de alarmas exactas (sin él, el aviso puede llegar tarde)
+    askOnFirstSession().then(() => setTimeout(maybeAskExactAlarms, 1500)).catch(() => {});
     if (session.state.mode === 'study') {
       // Ranking global: el servidor anota la hora. (v4.5) Su número viaja con el reloj en vivo.
       const block = session.state.block;
@@ -214,7 +216,7 @@ function celebrate(rec, res) {
     FX.buzz([60, 40, 60]);
     const next = state.settings.autoBreak ? 'Ahora toca descansar.' : 'Empieza tu descanso cuando quieras.';
     notify('¡Sesión completa!', res.reward.xp ? `${t('Ganaste {n} XP.', { n: res.reward.xp })} ${tr(next)}` : next);
-    setTimeout(maybeAskExactAlarms, 4000); // (v4.6) Android: aviso puntual del final (se pregunta una vez)
+    setTimeout(maybeAskExactAlarms, 4000); // (v4.6) Android: aviso puntual del final (si no se pudo preguntar al empezar)
   } else if (!res.reward.tooShort) {
     toast(t('Sesión guardada: {time}.', { time: U.formatMinutes(rec.actualSec / 60) }));
   }
