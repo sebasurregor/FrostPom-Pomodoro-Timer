@@ -1,5 +1,48 @@
 # Cambios de la v2 a la v3
 
+## v4.8.1: anuncios encendidos (en modo de prueba) y palabras prohibidas propias en el ranking
+
+**Antes de publicar:** vuelve a pegar tu clave de Turnstile y tu clave `goog_…` en `js/config.js`, y `npm run android:actualizar` (debe decir **"AdMob: tu ID de app"** y el **[OK]** de la parte nativa).
+
+- **Anuncios encendidos con tu cuenta de AdMob** (17 nov 2026): el ID de la app y las unidades "Ver anuncios" (bonificado) y "Descanso" (intersticial) están en `config.ads`. Van con **`testing: true`**: en el celular salen los anuncios de prueba de Google ("Test Ad"), que no pagan ni ponen en riesgo tu cuenta. Para publicar con anuncios reales: `testing: false` (`docs/ANUNCIOS.md`, 5.4).
+- **`docs/app-ads/app-ads.txt`** con tu línea de AdMob: súbelo a la raíz de `sebasurregor.github.io`.
+- **Servidor (opcional, solo si quieres prohibir palabras tuyas):** `schema.sql` agrega `private.block_word('palabra')`, `private.unblock_word('palabra')` y la tabla `private.extra_blocked_names`. Prohibir una palabra esconde al instante los nombres guardados que la tienen. Copia de seguridad y después corre el `schema.sql` (no borra datos).
+- **Política de privacidad, normas de la comunidad y eliminar la cuenta:** ahora muestran **tu logo** arriba (el de la temporada, `assets/icons/icon-192.png`) y el ícono de la pestaña se actualiza aunque el navegador tuviera guardado el viejo. Además, el resumen de la política ya no dice "La app no tiene anuncios": explica los anuncios y las compras de la app de Android.
+- versionCode 40801.
+
+## v4.8.0: "¿Necesitas más gemas?", paquetes de gemas y el arreglo de widgets y reproductor
+
+**Antes de publicar:** vuelve a pegar tu clave de Turnstile (`captcha.siteKey`) y tu clave `goog_…` (`premium.play.revenueCatKey`) en `js/config.js`. Después, `npm install` y `npm run android:actualizar`, que ahora **debe terminar con el [OK] de la parte nativa** (si sale [X], no generes el `.aab`).
+
+**Tus decisiones (17 nov 2026):** la 4.7.4 de Prueba interna salió sin widgets ni reproductor; 4 paquetes de gemas (US$ 0,99 / 4,99 / 9,99 / 19,99); primero crear AdMob y después encender los anuncios.
+
+- **"¿Necesitas más gemas?"** Al tocar la gema (arriba, al lado del rango, o en la tienda de la mascota) se abre una ventana con la gema y el brillo de cuando desbloqueas un personaje, tu saldo y tres opciones:
+  - **Ver un anuncio: +10 gemas** (con "Quedan N hoy"). Solo aparece cuando los anuncios están encendidos y listos; es el mismo límite de 5 al día de la tienda.
+  - **Estudiar un pomodoro:** te lleva a Enfocar y hace brillar el botón de empezar.
+  - **Comprar gemas:** los 4 paquetes, del más pequeño al más grande, con el precio de Google Play en tu moneda: **60** (US$ 0,99), **330** (+30 de regalo, US$ 4,99), **700** (+100, US$ 9,99) y **1.500** (+300, US$ 19,99). El que da más gemas por cada peso lleva **"Mejor precio"**.
+- **Cómo se compra:** solo en la **app de Android**, con **cuenta en línea** (13+) y el cobro encendido. En la web y en Windows el botón aparece apagado ("Solo en la app de Android."); para menores de 13 no aparece. Si la cuenta es de este equipo, la app te invita a conectarla.
+- **Cada compra suma sus gemas UNA sola vez** (se anota el número de la compra de Google en tu progreso, que viaja con tu cuenta). Si la app se cierra al pagar o el pago queda pendiente, las gemas llegan solas al volver a abrir la app. Al terminar sale "¡Gracias por apoyar FrostPom!" con confeti.
+- **Widgets y reproductor:** como no aparecían ni en la lista de widgets del celular, lo más probable es que la parte nativa (`@frostpom/timer`) no entró al `.aab`. Ahora `npm run android:actualizar` **lo revisa al final** (`tools/revisar-android.mjs`) y se detiene con un error claro si falta; además, R8 guarda esa parte completa. Diagnóstico paso a paso en `native/frostpom-timer/LEEME.md`, sección "v4.8.0".
+- **Textos de las tiendas y privacidad:** la ficha de Google Play ya no dice que las gemas "no se compran con dinero"; la política de privacidad explica los paquetes (17 nov 2026). **Súbela con `git push` antes de publicar.**
+- **Lo que haces en Play Console y RevenueCat** (crear los 4 productos únicos): `docs/GOOGLE-PLAY-BILLING.md`, sección 5b.
+- Pruebas nuevas: `tests/gem-shop.test.js` y `tests/e2e_gemas.py`.
+- versionCode 40800.
+
+## v4.7.4: código optimizado con R8 (aviso "Optimización de código DEX" de Google Play)
+
+**Antes de publicar:** vuelve a pegar tu clave de Turnstile (`captcha.siteKey`) y tu clave `goog_…` (`premium.play.revenueCatKey`) en `js/config.js`.
+
+Play Console avisó (17 nov 2026, con la 4.7.3): "La optimización de código DEX está por debajo de nuestro umbral · Ofuscación (2 %)". Google pide al menos 25 % antes de **febrero de 2027**; si no, puede bajar la visibilidad de la app. Pasaba porque la carpeta `android/` se creó con una plantilla de Capacitor que trae R8 apagado (`minifyEnabled false`).
+
+- **`npm run android:actualizar` enciende R8 en la versión para la tienda** (`minifyEnabled true` y `proguard-android-optimize.txt` en `android/app/build.gradle`) y agrega las reglas de FrostPom a `android/app/proguard-rules.pro` (el puente de JavaScript y los números de línea para los errores). R8 achica, optimiza y ofusca el código Java/Kotlin. La web no cambia.
+- Las versiones de prueba (`installDebug`, Run ▶ de Android Studio) **no** cambian: R8 solo corre al generar el `.aab` firmado.
+- De paso se va el aviso del **archivo de desofuscación**: el `.aab` ya lleva el `mapping.txt` y los errores en Play se leen con nombres reales.
+- No se activa `shrinkResources` (borrar recursos sin usar): las notificaciones buscan su ícono por nombre y podría borrarlo; además, no cuenta para este aviso.
+- Capacitor 8.6, RevenueCat y AdMob traen sus propias reglas para R8, así que no hace falta "proteger" librerías enteras (eso bajaría el porcentaje otra vez).
+- **Plan B**, si algo deja de funcionar solo en la versión de la tienda: en PowerShell, `$env:FROSTPOM_R8="0"; npm run android:actualizar`, generas el `.aab` otra vez y me cuentas qué falló.
+- **Cómo probarla:** súbela primero a **Prueba interna** (sin revisión, llega en minutos), pruébala desde Play y después **promociónala** a Prueba cerrada. Lista en `native/frostpom-timer/LEEME.md`, sección "v4.7.4".
+- versionCode 40704.
+
 ## v4.7.3: lo que salió de la prueba en el Galaxy, con tus decisiones
 
 **Antes de publicar:** vuelve a pegar tu clave de Turnstile (`captcha.siteKey`) y tu clave `goog_…` (`premium.play.revenueCatKey`) en `js/config.js`. Después, Claude Code en tu PC compila y prueba (mensaje en `native/frostpom-timer/LEEME.md`, sección "v4.7.3").

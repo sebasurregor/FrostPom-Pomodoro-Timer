@@ -12,6 +12,7 @@ import * as G from './game.js';
 import * as C from './catalog.js';
 import * as S from './season.js';
 import * as P from './pet.js';
+import * as GS from './gem-shop.js';
 
 export const MAX_SESSIONS = 500;
 
@@ -405,6 +406,29 @@ export function adGems(state, amount) {
   const events = [];
   addGems(state, n, events, 'ad');
   return done(events);
+}
+
+/**
+ * (v4.8.0) Gemas compradas con Google Play (js/gem-shop.js). Cada compra (tx de Google) se suma
+ * UNA sola vez: queda anotada en progress.gemOrders. Devuelve { ok, gems } con lo que se sumó.
+ */
+export function creditGemOrders(state, orders) {
+  const p = state.progress;
+  const list = GS.sanitizeOrders(p.gemOrders);
+  const seen = new Set(list.map((o) => o.tx));
+  let total = 0;
+  for (const o of Array.isArray(orders) ? orders : []) {
+    const [clean] = GS.sanitizeOrders([o]);
+    if (!clean || seen.has(clean.tx)) continue;
+    seen.add(clean.tx);
+    list.push({ ...clean, at: clean.at || new Date().toISOString() });
+    total += clean.gems;
+  }
+  if (!total) return refused({ reason: 'none' });
+  p.gemOrders = list.slice(-GS.MAX_ORDERS);
+  const events = [];
+  addGems(state, total, events, 'purchase');
+  return done(events, { gems: total });
 }
 
 /** (v4.2) Ponle nombre a la mascota de ahora ('' lo quita). */

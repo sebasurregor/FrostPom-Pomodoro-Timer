@@ -1,4 +1,4 @@
-# FrostPom: Pomodoro Timer (v4.7.3)
+# FrostPom: Pomodoro Timer (v4.8.1)
 
 > Antes se llamaba **StudyTimer**. Publicada en **https://sebasurregor.github.io/FrostPom-Pomodoro-Timer/**
 
@@ -49,7 +49,7 @@ Diseño: paisaje polar simple (montañas en #2d68bc, #749eda y #93c0ed) con ping
 - **Rangos:** Bronce, Plata, Oro, Platino, Diamante y Maestro (cada uno con III, II, I), y Leyenda con estrellas.
 - **Temporadas:** cada 3 meses (ene–mar, abr–jun, jul–sep, oct–dic) empieza una temporada nueva. Tu rango vuelve a Bronce III, ganas gemas según el rango que alcanzaste (de 10 a 100) y queda una medalla en tu perfil. Logros, compañeros, temas, gemas, racha y calendario se conservan; el historial detallado de sesiones viejas se borra. La duración se cambia en `js/config.js → season.months`.
 - **Guardado automático:** cada minuto se guarda al instante y el total de cada día queda en el calendario. Ya no hay copias manuales.
-- **Gemas:** salen de misiones, logros, subidas de rango, el premio de cada temporada y el regalo de bienvenida de Premium (1000, una sola vez). Hoy **no hay compras con dinero real** (Premium está en modo prueba gratis).
+- **Gemas:** salen de misiones, logros, subidas de rango, el premio de cada temporada, el regalo de bienvenida de Premium (1000, una sola vez) y los anuncios con recompensa (Android). Al tocar la gema se abre **"¿Necesitas más gemas?"**: ver un anuncio, estudiar un pomodoro o (v4.8.0) **comprar un paquete** con Google Play (60, 330, 700 o 1.500 gemas; solo en la app de Android, con cuenta en línea de 13+). Paso a paso: `docs/GOOGLE-PLAY-BILLING.md`, sección 5b.
 - **Salud del polo:** cada día que estudias al menos 45 min el paisaje se mantiene limpio. Cuentan hoy y los últimos 3 días, y al empezar el polo arranca casi limpio.
 - **Compañeros de edición limitada:** 5 personajes (Pingüino, Zorro Ártico, Oso Polar, Oso Marino y Tiburón Martillo). Cada uno se desbloquea con un logro (o uno de ellos como regalo de Premium) y te acompaña en el temporizador, el HUD y el ranking.
 - **Pingüino animado:** te saluda al empezar y al completar una sesión, se enamora cuando subes de rango o reclamas una misión, y camina por el paisaje. Si no tienes otro compañero equipado, se queda contigo junto al temporizador.

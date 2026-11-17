@@ -303,7 +303,8 @@ async function connect(uid) {
       try {
         // (Los métodos con "callback" de Capacitor reciben primero las opciones y después la función.)
         await box.api.addCustomerInfoUpdateListener({}, (info, err) => {
-          if (!err && info && rcUser && typeof onDeviceInfo === 'function') onDeviceInfo(info);
+          if (err || !info || !rcUser) return;
+          for (const fn of infoListeners) { try { fn(info); } catch { /* que uno no frene a los demás */ } }
         });
       } catch { /* sin avisos: se revisa al abrir */ }
     } else if (rcUser !== uid) {
@@ -322,9 +323,12 @@ async function connect(uid) {
   }
 }
 
-let onDeviceInfo = null;
-/** Lo que avise RevenueCat (una renovación o un cambio mientras la app está abierta). */
-export function onCustomerInfo(fn) { onDeviceInfo = fn; }
+let infoListeners = [];
+/**
+ * Lo que avise RevenueCat (una renovación, un cambio o, v4.8.0, una compra de gemas que se
+ * confirmó) mientras la app está abierta. Premium y las gemas escuchan cada uno lo suyo.
+ */
+export function onCustomerInfo(fn) { if (typeof fn === 'function' && !infoListeners.includes(fn)) infoListeners.push(fn); }
 
 /** Guarda lo que dijo Google en el teléfono (justo después de comprar o restaurar). */
 export function keepDevice(uid, info) {
@@ -389,8 +393,47 @@ export async function restore(uid) {
   return { ok: entry.premium, entry, reason: entry.premium ? '' : 'none' };
 }
 
+// ---------------------------------------------------------------------
+// (v4.8.0) Paquetes de gemas: productos de una sola compra (js/gem-shop.js)
+// ---------------------------------------------------------------------
+/** Los productos con su precio de Google: { ok: true, products } o { ok: false, reason }. */
+export async function storeProducts(uid, ids) {
+  const box = await connect(uid);
+  if (!box) return { ok: false, reason: 'unavailable' };
+  try {
+    const r = await box.api.getProducts({ productIdentifiers: ids, type: 'NON_SUBSCRIPTION' });
+    return { ok: true, products: r && Array.isArray(r.products) ? r.products : [] };
+  } catch (e) {
+    return { ok: false, reason: failReason(e) === 'offline' ? 'offline' : 'unavailable' };
+  }
+}
+
+/** Compra un producto: { ok: true, transaction, customerInfo } o { ok: false, reason }. */
+export async function buyProduct(uid, product) {
+  const box = await connect(uid);
+  if (!box) return { ok: false, reason: 'unavailable' };
+  try {
+    const res = await box.api.purchaseStoreProduct({ product });
+    return { ok: true, transaction: (res && res.transaction) || null, customerInfo: (res && res.customerInfo) || null };
+  } catch (e) {
+    return { ok: false, reason: failReason(e) };
+  }
+}
+
+/** Lo que sabe RevenueCat de esta cuenta (para sumar gemas que quedaron sin sumar), o null. */
+export async function customerInfo(uid) {
+  const box = await connect(uid);
+  if (!box) return null;
+  try {
+    const r = await box.api.getCustomerInfo();
+    return (r && r.customerInfo) || null;
+  } catch {
+    return null;
+  }
+}
+
 /** La página de Google Play para administrar la suscripción. */
 export const manageLink = (entry) => manageUrl(entry, lastManage);
 
 /** Para las pruebas. */
-export function _reset() { rc = null; rcUser = ''; lastManage = ''; connecting = null; onDeviceInfo = null; storage = null; memo = { raw: undefined, entry: null }; }
+export function _reset() { rc = null; rcUser = ''; lastManage = ''; connecting = null; infoListeners = []; storage = null; memo = { raw: undefined, entry: null }; }

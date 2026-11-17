@@ -232,9 +232,53 @@ select * from private.account_check('correo@ejemplo.com');
    - **Clasificación de contenido:** repite el cuestionario y responde **Sí** a compras digitales.
 2. Promueve la versión de Prueba cerrada a **Producción** cuando la lista del paso 8 esté completa.
 
+## 5b. Paquetes de gemas (v4.8.0)
+
+### Lo que decidiste (17 de noviembre de 2026)
+
+Cuatro paquetes de **una sola compra** que se pueden comprar las veces que se quiera (de más pequeño a más grande):
+
+| ID del producto (Play Console) | Gemas | De regalo (ya incluidas) | Precio |
+| --- | --- | --- | --- |
+| **`gemas_60`** | 60 | — | **US$ 0,99** |
+| **`gemas_330`** | 330 | +30 | **US$ 4,99** |
+| **`gemas_700`** | 700 | +100 | **US$ 9,99** |
+| **`gemas_1500`** | 1.500 | +300 | **US$ 19,99** |
+
+Están en `config.premium.play.gemPacks` (`js/config.js`). Si algún día cambias las gemas de un paquete, cambia ese número allí; el precio **solo** se cambia en Play Console (la app muestra el que manda Google, en la moneda de cada persona).
+
+### Cómo funciona
+
+- Al tocar la **gema** (arriba, al lado del rango, o en la tienda de la mascota) se abre **"¿Necesitas más gemas?"**, con la gema y el brillo de cuando desbloqueas un personaje, y tres opciones:
+  1. **Ver un anuncio: +10 gemas** (hasta 5 al día). Solo aparece si los anuncios están encendidos y listos (AdMob, `docs/ANUNCIOS.md`).
+  2. **Estudiar un pomodoro**: te lleva a Enfocar y resalta el botón de empezar.
+  3. **Comprar gemas**: abre los 4 paquetes. El de mejor precio por gema lleva la etiqueta **"Mejor precio"**.
+- **Comprar gemas** solo funciona en la **app de Android**, con una **cuenta en línea** (13+) y con el cobro encendido (`premium.play.enabled` y la clave `goog_…`). En la web y en Windows el botón sale apagado ("Solo en la app de Android."). Para menores de 13 no aparece.
+- El cobro lo hace **Google**. RevenueCat lo confirma y "consume" la compra (por eso se puede volver a comprar). La app suma las gemas **una sola vez por compra**: anota el número de la compra de Google en tu progreso (`progress.gemOrders`), que viaja con tu cuenta a tus otros aparatos. Si dos aparatos llegaran a sumar la misma compra, al unirlos se cuenta una vez (`js/merge.js`).
+- Si la app se cierra justo después de pagar, o el pago queda **pendiente** (por ejemplo, en efectivo), las gemas llegan **la próxima vez que abras la app**: RevenueCat guarda la lista de compras de la cuenta y la app suma las que falten.
+- **Nada cambia en Supabase.** El webhook de RevenueCat también avisa de estas compras, pero solo vuelve a revisar Premium (los paquetes no tienen el entitlement `premium`, así que no dan ni quitan Premium).
+
+### Lo que tienes que hacer tú
+
+**Antes:** tener hecho el paso 5 (RevenueCat conectado). Si todavía no lo hiciste, los paquetes esperan junto con Premium.
+
+1. **Play Console → tu app → Monetizar con Play → Productos → Productos únicos → Crear producto único**, cuatro veces (una por fila de la tabla de arriba):
+   - **ID del producto:** `gemas_60` (luego `gemas_330`, `gemas_700`, `gemas_1500`). **No se puede cambiar ni volver a usar**, ni aunque lo borres.
+   - **Nombre:** por ejemplo "60 gemas", "330 gemas", "700 gemas", "1.500 gemas".
+   - **Descripción:** por ejemplo "Gemas para la tienda de tu mascota en FrostPom." (sin promesas que no cumpla la app).
+   - **Siguiente → Opción de compra:** ID `compra`, tipo **Comprar** (*Buy*). La primera opción de compra queda marcada sola como compatible con versiones anteriores: déjala así.
+   - **Precios:** "Establecer precios" → **edición masiva** → todos los países → el precio en **USD** de la tabla → Aplicar. Revisa el de Colombia (puedes redondearlo).
+   - **Activar.** Revisa que la opción de compra también diga **Activa** (si queda en borrador, Google no la entrega a la app).
+2. **RevenueCat → Product catalog → Products → + New** (o **Import**), en la app de Play Store: agrega los cuatro, con el mismo ID (`gemas_60`, …).
+   - Si te pregunta el tipo, elige **Consumible** (*Consumable*). Si eliges "No consumible", solo se podrían comprar una vez.
+   - **No** los adjuntes al entitlement `premium` ni a la oferta `default`: la app los pide por su ID.
+3. **Prueba** con tu correo de probador de licencias (paso 8): compra el de 60 con la "tarjeta de prueba que siempre aprueba" y revisa que lleguen las 60 gemas y la ventana de "¡Gracias!". Después prueba la "tarjeta que aprueba después de unos minutos": la app dice que el pago está pendiente y, cuando Google lo aprueba, las gemas llegan al volver a abrir la app.
+4. **Seguridad de los datos:** no hay nada nuevo que marcar. "Historial de compras" ya está (paso 9); solo cuenta también los paquetes.
+5. **Ficha de Play Store:** la ficha ya no dice que las gemas "no se compran con dinero" (`docs/google-play/FICHA.md`). Copia el texto nuevo cuando publiques. Google marca sola que la app "ofrece compras dentro de la aplicación".
+
 ## 6. Costos
 
-- **Google** se queda con el **15 %** de las suscripciones.
+- **Google** se queda con el **15 %** de las suscripciones. De los **paquetes de gemas** también se queda una comisión (15 % en el nivel para desarrolladores pequeños, si estás inscrito; revisa "Tarifas de servicio" en la ayuda de Play Console).
 - **RevenueCat:** gratis hasta US$ 2.500 al mes de ingresos que pasen por RevenueCat; después, un porcentaje pequeño.
 - **Supabase:** dentro del plan gratis (dos funciones pequeñas y una tabla).
 
@@ -247,6 +291,8 @@ select * from private.account_check('correo@ejemplo.com');
 | RevenueCat dice 401 al enviar el webhook | La clave de `Authorization` no coincide con `RC_WEBHOOK_AUTH`, o "Verify JWT" está encendido. |
 | El webhook responde 502 | `RC_SECRET_KEY` falta o no es una clave secreta **V1** de RevenueCat. |
 | `npm run android:actualizar` se detiene por la clave | Pegaste la clave secreta (`sk_…`) en la app. Bórrala, **créala de nuevo en RevenueCat** (la vieja ya no es secreta si llegó a GitHub) y pon la pública (`goog_…`). |
+| "Comprar gemas" dice que no pudo traer los paquetes | Los cuatro productos únicos (y su opción de compra) deben estar **activos** en Play Console, la app instalada desde Play con un correo de probador, y los productos agregados en RevenueCat. Las credenciales de Google pueden tardar hasta 36 h. |
+| Pagué gemas y no llegaron | Cierra y abre la app (se revisan las compras que falten). Si el pago está "pendiente" en Google, llegan cuando se apruebe. En `chrome://inspect` busca `[FrostPom] gemas`. En Play Console → **Pedidos** puedes ver el pedido (el número `GPA.…`). |
 | Quiero apagar el cobro ya | `enabled: false` en `js/config.js` y publica. Quien ya pagó sigue con su suscripción en Google Play: cancélalas o reembólsalas desde Play Console → Pedidos. |
 
 ## 8. Lo que queda para después

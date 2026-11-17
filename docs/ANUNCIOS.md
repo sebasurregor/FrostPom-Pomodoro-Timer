@@ -1,13 +1,13 @@
 # Anuncios en FrostPom (v4.5.3)
 
-> **Estado:** programados en la v4.5.3, pero **apagados** (`config.ads.enabled = false`) hasta que tu cuenta de AdMob esté lista. Las decisiones son las que tomaste el 16 de noviembre de 2026 (sección 1). El paso a paso para encenderlos está en la sección 5.
+> **Estado (v4.8.1, 17 nov 2026):** **encendidos** con tu cuenta de AdMob, en **modo de prueba** (`testing: true`: salen los anuncios "Test Ad" de Google, sin pagos y sin riesgo). Tus ID ya están en `js/config.js` y tu línea de `app-ads.txt` en `docs/app-ads/app-ads.txt`. Falta: subir `app-ads.txt` a la raíz de tu sitio (5.1, punto 6), probar (5.3) y, para publicar, `testing: false` (5.4). Las decisiones son las del 16 de noviembre de 2026 (sección 1).
 
 ## 1. Lo que decidiste
 
 | Pregunta | Tu respuesta | Cómo quedó |
 | --- | --- | --- |
 | ¿Cuántos anuncios para revivir la mascota? | **3** | "Revivir con anuncios (0 de 3)". El avance se guarda, aunque cierres la app. |
-| ¿Gemas por anuncio y por día? | **+10 gemas, 5 por día** | "Ver un anuncio: +10 gemas", en la tienda. |
+| ¿Gemas por anuncio y por día? | **+10 gemas, 5 por día** | "Ver un anuncio: +10 gemas", en la tienda y (v4.8.0) en "¿Necesitas más gemas?" (al tocar la gema). |
 | ¿Anuncio cada 4 pomodoros? | **Sí, y también a los 90 minutos** | Al empezar el descanso, cuando desde el último anuncio pasen **4 pomodoros o 90 minutos de estudio, lo que llegue primero** (ver la explicación abajo). |
 | ¿Premium puede ver anuncios por gemas? | **Sí** | Premium nunca ve el de pantalla completa, pero puede ganar gemas si quiere. |
 | ¿La mascota se muere más rápido? | **No** | Sigue en 72 horas con la barriguita en cero. |
@@ -82,6 +82,7 @@ La racha (de la v4.5.2) se revive con **1 anuncio por cada día que faltó** ("V
 6. **app-ads.txt:** AdMob te da una línea como `google.com, pub-1234567890123456, DIRECT, f08c47fec0942fa0`.
    - Tiene que quedar en `https://sebasurregor.github.io/app-ads.txt`, en la **raíz** del sitio, no dentro de `FrostPom-Pomodoro-Timer/`.
    - Para eso, crea en GitHub un repositorio llamado **`sebasurregor.github.io`**, súbele un archivo `app-ads.txt` con esa línea y activa GitHub Pages en él.
+   - (v4.8.1) Tu archivo ya está listo en `docs/app-ads/app-ads.txt`: súbelo tal cual a ese repositorio. Revisa que `https://sebasurregor.github.io/app-ads.txt` muestre la línea en el navegador; AdMob puede tardar hasta 24 h en verificarlo.
    - En la ficha de Google Play, el "sitio web" debe ser `https://sebasurregor.github.io`.
 
 ### 5.2 Ponerlo en FrostPom
@@ -104,6 +105,7 @@ Estos ID **no son secretos**: pueden ir en GitHub.
 2. `npm run android:actualizar`. Debe decir `AdMob: tu ID de app`.
 3. Abre Android Studio y corre la app en tu celular. Con `testing: true`, los anuncios dicen **"Test Ad"**. Prueba esto:
    - Una cuenta de 13+ ve "Ver un anuncio: +10 gemas" en la tienda.
+   - (v4.8.0) Al tocar la gema (arriba o en la tienda), "¿Necesitas más gemas?" muestra también "Ver un anuncio: +10 gemas · Quedan 5 hoy". Al verlo completo, suben las gemas y baja el contador (es el mismo límite de 5 al día que el de la tienda).
    - Una cuenta de menor de 13 no ve nada.
    - Después de 4 pomodoros sale el anuncio, y el descanso empieza al cerrarlo. Para no esperar 2 horas, puedes cambiar un momento `everyPomodoros: 1`.
 

@@ -13,7 +13,7 @@ Textos listos para copiar en Partner Center (**Store listings → Español**). R
 Elige cuánto quieres estudiar (25 + 5, 50 + 10 o tu propio ritmo) y concéntrate mientras tu compañero te acompaña junto al reloj. Cada minuto que estudias mantiene limpio tu polo: si lo dejas, llegan el esmog y la basura, y cuando vuelves a estudiar, todo vuelve a brillar.
 
 • Sube de rango, de Bronce a Leyenda, en temporadas de tres meses.
-• Cumple misiones diarias y gana gemas solo estudiando: no se compran con dinero.
+• Cumple misiones diarias y gana gemas estudiando.
 • El pingüino te acompaña desde el primer día; desbloquea compañeros de edición limitada: oso polar, zorro ártico, oso marino y tiburón martillo.
 • Entra desde cualquier equipo con tu correo y tu contraseña: tu progreso viaja contigo.
 • Ranking global: compite con estudiantes de todo el mundo por los minutos de estudio de la semana (puedes salir cuando quieras).
@@ -88,7 +88,7 @@ Pega **una** de las dos versiones (la de inglés es más fácil para el equipo d
 >
 > Ranking global: los mayores de 13 aparecen con su nombre de usuario, su país y sus minutos. Para probarlo, empieza un pomodoro, espera 2 minutos, pulsa "Terminar y guardar" y abre Ranking. Se puede salir en Ajustes → Bienestar y ranking (y borrar los minutos). La cuenta se elimina en Ajustes → Tu cuenta → Eliminar mi cuenta, que también borra la cuenta en línea.
 >
-> "Premium" está en modo prueba gratuito: el botón dice "Probar Premium gratis" y no hay ningún cobro ni compra dentro de la app. Al activarlo, la app regala 1000 gemas (moneda del juego, sin valor en dinero) y deja elegir una mascota.
+> "Premium" está en modo prueba gratuito: el botón dice "Probar Premium gratis" y no hay ningún cobro ni compra dentro de la app. Al activarlo, la app regala 1000 gemas (moneda del juego, sin valor en dinero) y deja elegir una mascota. (v4.8.0) Al tocar la gema se abre "¿Necesitas más gemas?": en Windows, "Comprar gemas" aparece desactivado ("Solo en la app de Android.") y no hay ninguna compra.
 >
 > La app funciona sin conexión. Política de privacidad: https://sebasurregor.github.io/FrostPom-Pomodoro-Timer/privacidad.html
 
@@ -98,7 +98,7 @@ Pega **una** de las dos versiones (la de inglés es más fácil para el equipo d
 >
 > Global leaderboard: users aged 13 and up appear with their username, country and minutes. To test it, start a pomodoro, wait 2 minutes, press "Finish and save" and open Leaderboard. Users can leave in Settings → Wellbeing and leaderboard (and delete their minutes). The account can be deleted in Settings → Your account → Delete my account, which also deletes the online account.
 >
-> "Premium" is in a free trial mode: the button says "Try Premium for free" and there are no charges or in-app purchases. When activated, the app gives 1000 gems (in-game currency with no money value) and lets the user pick a pet.
+> "Premium" is in a free trial mode: the button says "Try Premium for free" and there are no charges or in-app purchases. When activated, the app gives 1000 gems (in-game currency with no money value) and lets the user pick a pet. (v4.8.0) Tapping the gem opens "Need more gems?": on Windows, "Buy gems" is disabled ("Only in the Android app.") and there are no purchases.
 >
 > The app works offline. Privacy policy: https://sebasurregor.github.io/FrostPom-Pomodoro-Timer/privacidad.html
 
@@ -129,7 +129,7 @@ Study with penguins! FrostPom is a pomodoro timer that turns your study hours in
 Pick how long you want to study (25 + 5, 50 + 10 or your own pace) and focus while your buddy keeps you company next to the timer. Every minute you study keeps your pole clean: if you stop, smog and trash roll in, and when you study again, everything shines.
 
 • Rank up from Bronze to Legend in three-month seasons.
-• Complete daily missions and earn gems only by studying: they can't be bought with money.
+• Complete daily missions and earn gems by studying.
 • Your penguin is with you from day one; unlock limited-edition buddies: polar bear, arctic fox, fur seal and hammerhead shark.
 • Sign in from any device with your email and password: your progress travels with you.
 • Global leaderboard: compete with students around the world for this week's study minutes (you can leave anytime).

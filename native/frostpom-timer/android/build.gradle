@@ -28,7 +28,7 @@ android {
         minSdkVersion project.hasProperty('minSdkVersion') ? rootProject.ext.minSdkVersion : 24
         targetSdkVersion project.hasProperty('targetSdkVersion') ? rootProject.ext.targetSdkVersion : 36
         versionCode 1
-        versionName "4.7.3"
+        versionName "4.8.1"
     }
     buildTypes {
         release {

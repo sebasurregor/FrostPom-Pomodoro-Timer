@@ -13,6 +13,7 @@ import { isValidNick, checkUsernameFormat, isCountry, AVATARS } from './identity
 import { MAX_SESSIONS, applyRecord } from './engine.js';
 import { isSeasonId, MAX_ARCHIVE } from './season.js';
 import { isPetId, checkPetName, migrateFromV3 } from './pet.js';
+import * as GS from './gem-shop.js';
 
 export const KEY = 'st2_state';
 export const TIMER_KEY = 'st2_timer';
@@ -67,6 +68,7 @@ export function defaultState() {
     account: null, // { username, hash, salt, iter, remember?, email?, emailLinked?, birth?, online?, cloudPending? } — la contraseña nunca se guarda, solo su hash
     progress: {
       xp: 0, gems: 0, achievements: U.dict(), claimed: U.dict(), owned: ['clasico'], gifted: [],
+      gemOrders: [], // (v4.8.0) compras de gemas ya sumadas: [{ tx, product, gems, at }] (gem-shop.js)
       bestStreak: 0, combo: 0, bestCombo: 0, longestSessionSec: 0, cycle: 0, breakEarned: false, customized: false,
       totals: { studySec: 0, creditedSec: 0, sessions: 0, partials: 0, breaks: 0, missionsClaimed: 0, fed: 0, revived: 0 },
       season: '', // temporada a la que pertenecen xp y rango ("2026-10"); ver season.js
@@ -204,6 +206,7 @@ export function validateState(raw) {
   const dp = out.progress;
   dp.xp = int(pr.xp, 0, BIG, 0);
   dp.gems = int(pr.gems, 0, BIG, 0);
+  dp.gemOrders = GS.sanitizeOrders(pr.gemOrders); // (v4.8.0)
   for (const [id, when] of Object.entries(obj(pr.achievements))) {
     if (G.ACHIEVEMENT_BY_ID[id] && isISO(when)) dp.achievements[id] = when;
   }
@@ -397,6 +400,10 @@ export function createStore(backendOverride, sessionOverride) {
       set(name, value) {
         if (frozen) return;
         try { backend.setItem(PREFIX + name, String(value)); } catch { /* sin almacenamiento */ }
+      },
+      remove(name) {
+        if (frozen) return;
+        try { backend.removeItem(PREFIX + name); } catch { /* sin almacenamiento */ }
       },
     },
     /** Lo mismo, pero solo mientras la pestaña esté abierta (sessionStorage). */

@@ -34,7 +34,7 @@ Pomodoro con pingüinos: estudia, sube de rango y mantén limpio tu polo.
 Elige cuánto quieres estudiar (25 + 5, 50 + 10 o tu propio ritmo) y concéntrate mientras tu compañero te acompaña junto al reloj. Cada minuto que estudias mantiene limpio tu polo: si lo dejas, llegan el esmog y la basura, y cuando vuelves a estudiar, todo vuelve a brillar.
 
 • Sube de rango, de Bronce a Leyenda, en temporadas de tres meses.
-• Cumple misiones diarias y gana gemas solo estudiando: no se compran con dinero.
+• Cumple misiones diarias y gana gemas estudiando; si quieres más, hay paquetes de gemas opcionales.
 • El pingüino te acompaña desde el primer día; desbloquea compañeros de edición limitada: oso polar, zorro ártico, oso marino y tiburón martillo.
 • Te avisa cuando termina cada bloque, aunque salgas de la app.
 • Entra desde cualquier equipo con tu correo y tu contraseña: tu progreso viaja contigo (también en la web y en Windows).
@@ -74,7 +74,7 @@ Study with penguins! FrostPom is a pomodoro timer that turns your study hours in
 Pick how long you want to study (25 + 5, 50 + 10 or your own pace) and focus while your buddy keeps you company next to the timer. Every minute you study keeps your pole clean: if you stop, smog and trash roll in, and when you study again, everything shines.
 
 • Rank up from Bronze to Legend in three-month seasons.
-• Complete daily missions and earn gems only by studying: they can't be bought with money.
+• Complete daily missions and earn gems by studying; if you want more, there are optional gem packs.
 • Your penguin is with you from day one; unlock limited-edition buddies: polar bear, arctic fox, fur seal and hammerhead shark.
 • Get notified when each block ends, even if you leave the app.
 • Sign in from any device with your email and password: your progress travels with you (also on the web and on Windows).
@@ -139,7 +139,7 @@ Categoría: la que más se parezca a **educación o utilidad / productividad** (
 - Violencia, sexo, lenguaje vulgar, drogas, apuestas: **No**.
 - ¿Los usuarios interactúan o comparten contenido? **Sí, de forma limitada**: un ranking muestra el nombre de usuario, el país, el animal y los minutos de estudio. No hay chat, mensajes ni fotos. Los nombres pasan por un filtro, se pueden reportar y ocultar, y cualquiera puede salir del ranking.
 - ¿Comparte la ubicación? **No**.
-- ¿Compras digitales? **(v4.7.0) Sí, desde que publiques la versión con el cobro encendido** (`config.premium.play.enabled = true`): la suscripción Premium se compra con Google Play. Las gemas siguen sin venderse. Mientras el cobro esté apagado, la respuesta es **No**. Cuando lo enciendas, repite el cuestionario.
+- ¿Compras digitales? **(v4.7.0) Sí, desde que publiques la versión con el cobro encendido** (`config.premium.play.enabled = true`): la suscripción Premium y (v4.8.0) los paquetes de gemas se compran con Google Play. Mientras el cobro esté apagado, la respuesta es **No**. Cuando lo enciendas, repite el cuestionario.
 
 ### Público objetivo (Target audience)
 
@@ -166,7 +166,7 @@ En cualquier caso responde **"No"** a "¿Podría atraer de forma no intencional 
 | Actividad en la app → **Otras acciones** (los nombres que reportas) | Sí | Seguridad, prevención de fraude y cumplimiento | Sí |
 | Actividad en la app → **Otro contenido generado por el usuario** (v4.2: el nombre que le pones a tu mascota; viaja con tu progreso y no lo ve nadie más) | Sí | Funcionalidad de la app | Sí |
 | Fotos, contactos, salud | **No** | | |
-| (v4.7.0) Información financiera → **Historial de compras** (la suscripción Premium: plan, fechas y estado; **nunca** la tarjeta) | Sí, **solo con el cobro encendido** | Funcionalidad de la app | Sí (solo quien se suscribe) |
+| (v4.7.0) Información financiera → **Historial de compras** (la suscripción Premium y, desde la v4.8.0, los paquetes de gemas: producto, fechas, estado y número de compra; **nunca** la tarjeta) | Sí, **solo con el cobro encendido** | Funcionalidad de la app | Sí (solo quien compra) |
 
 **(v4.5.3) Lo que agrega Google AdMob** (según la [guía de Google para el formulario](https://developers.google.com/admob/android/play-data-disclosure?hl=en)). Márcalo como **recogido y compartido**, cifrado, para **Publicidad o marketing**, **Estadísticas** y **Prevención de fraudes, seguridad y cumplimiento**:
 

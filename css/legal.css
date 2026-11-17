@@ -8,6 +8,9 @@ body { margin: 0; background: #E2EEFB; color: #0D2346; font-family: "Nunito", sy
 h1, h2 { font-family: "Lilita One", "Nunito", sans-serif; font-weight: 400; line-height: 1.15; }
 h1 { font-size: clamp(1.8rem, 4vw, 2.3rem); margin: 8px 0 4px; }
 h2 { font-size: 1.3rem; margin: 28px 0 6px; }
+/* (v4.8.1) El logo de FrostPom arriba de cada página */
+.legal__brand { display: inline-flex; align-items: center; gap: 12px; text-decoration: none; color: #0D2346; font-family: "Lilita One", "Nunito", sans-serif; font-weight: 400; font-size: 1.6rem; margin-bottom: 6px; }
+.legal__brand img { width: 64px; height: 64px; border-radius: 16px; box-shadow: 0 3px 0 #0D2346; }
 .legal__date { color: #4D6384; font-weight: 700; margin-top: 0; }
 .legal__summary { padding: 14px 16px; border-radius: 14px; background: #DDF7EC; border: 2px solid #0B5D44; }
 .legal__back a, a { color: #1E4F96; font-weight: 800; }

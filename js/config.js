@@ -4,7 +4,7 @@
  * teléfono o al navegador lo puede leer cualquiera. Ver docs/SEGURIDAD.md.
  */
 export const config = Object.freeze({
-  version: '4.7.3',
+  version: '4.8.1',
   // Dirección pública de la app. La app de Android abre aquí las normas, la privacidad y la
   // página para eliminar la cuenta (en el navegador del teléfono). Ver js/native.js.
   publicUrl: 'https://sebasurregor.github.io/FrostPom-Pomodoro-Timer/',
@@ -35,14 +35,14 @@ export const config = Object.freeze({
     // (nunca para menores de 13 ni para edad desconocida). Decisiones y paso a paso: docs/ANUNCIOS.md
     // false = apagado: la app no inicia AdMob ni muestra nada. Enciéndelo cuando tu cuenta de AdMob
     // esté lista y hayas puesto los ID de abajo.
-    enabled: false,
+    enabled: true, // (v4.8.1) encendido con tu cuenta de AdMob (17 nov 2026)
     // true = anuncios de PRUEBA de Google (para probar en tu celular sin riesgo; nunca toques los
     // de verdad). Ponlo en false solo para publicar, con los ID de verdad.
     testing: true,
     // Los ID de AdMob (son públicos, no secretos). El de la app lleva "~"; las unidades, "/".
-    appId: '', // ca-app-pub-XXXXXXXXXXXXXXXX~YYYYYYYYYY (tools/app-android.mjs lo pone en Android)
-    rewardedId: '', // unidad de tipo "Recompensa" (ganar gemas, revivir la mascota o la racha)
-    interstitialId: '', // unidad de tipo "Intersticial" (al empezar el descanso)
+    appId: 'ca-app-pub-6440860677235047~2817802157', // ca-app-pub-XXXXXXXXXXXXXXXX~YYYYYYYYYY (tools/app-android.mjs lo pone en Android)
+    rewardedId: 'ca-app-pub-6440860677235047/6885039675', // unidad de tipo "Recompensa" (ganar gemas, revivir la mascota o la racha)
+    interstitialId: 'ca-app-pub-6440860677235047/9226638699', // unidad de tipo "Intersticial" (al empezar el descanso)
     gemsPerAd: 10, // gemas por anuncio
     gemAdsPerDay: 5, // anuncios para ganar gemas, por día
     petReviveAds: 3, // anuncios para revivir a la mascota
@@ -88,6 +88,17 @@ export const config = Object.freeze({
       revenueCatKey: 'goog_usnfxhcfEMnuKypsIlNaZNPosfo',
       entitlement: 'premium', // el "entitlement" de RevenueCat
       offering: '', // '' = la oferta marcada como "current" en RevenueCat (la "default")
+      // (v4.8.0) Paquetes de gemas: productos de UNA sola compra en Google Play (Play Console →
+      // Productos integrados). id = el ID del producto en Play Console (idéntico); gems = las que
+      // da en total; bonus = cuántas de esas son de regalo. El PRECIO lo pones en Play Console
+      // (aquí no), y la app muestra el de Google en la moneda de cada persona. Paso a paso:
+      // docs/GOOGLE-PLAY-BILLING.md, sección "Paquetes de gemas".
+      gemPacks: Object.freeze([
+        Object.freeze({ id: 'gemas_60', gems: 60, bonus: 0 }), // US$ 0,99
+        Object.freeze({ id: 'gemas_330', gems: 330, bonus: 30 }), // US$ 4,99
+        Object.freeze({ id: 'gemas_700', gems: 700, bonus: 100 }), // US$ 9,99
+        Object.freeze({ id: 'gemas_1500', gems: 1500, bonus: 300 }), // US$ 19,99
+      ]),
     }),
   }),
 });

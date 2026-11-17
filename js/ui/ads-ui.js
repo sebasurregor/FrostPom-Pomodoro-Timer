@@ -84,15 +84,24 @@ function deathId() {
   return `${petId}:${(rec && rec.dead) || P.petStatus(state, petId).diedAt || ''}`;
 }
 
-async function watchForGems() {
-  if (!ADS.canReward('gems')) return;
-  const r = await rewarded($('#adGemsBtn'));
+/**
+ * (v4.8.0) Un anuncio para ganar gemas, desde cualquier botón (la tienda o "¿Necesitas más
+ * gemas?"). Devuelve true si se vio completo y se sumaron las gemas.
+ */
+export async function watchGemAd(btn) {
+  if (!ADS.canReward('gems')) return false;
+  const r = await rewarded(btn);
   if (r.ok) {
     ADS.noteGemAd();
     mutate((s) => E.adGems(s, ADS.gemsPerAd()));
     toast(t('¡Gracias! Ganaste {n} gemas.', { n: ADS.gemsPerAd() }), 'good', { icon: '💎' });
   } else if (r.reason !== 'busy') toast(failText(r.reason), 'info');
   renderAfter();
+  return r.ok;
+}
+
+async function watchForGems() {
+  await watchGemAd($('#adGemsBtn'));
 }
 
 async function watchToRevive() {

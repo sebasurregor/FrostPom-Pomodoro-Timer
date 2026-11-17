@@ -2220,3 +2220,100 @@ html[data-theme="dark"] :is(.custom, .mission.is-ready, .tray-food.is-fav) { bac
   /* --- Perfil: tarjeta, foto, estadísticas y compañeros --- */
   .gift-pet[aria-checked="true"], .plan[aria-checked="true"] { outline: 3px solid Highlight; }
 }
+
+/* =====================================================================
+   (v4.8.0) "¿Necesitas más gemas?" (js/ui/gems-ui.js): la gema grande con el brillo de cuando
+   desbloqueas un compañero, y tres caminos (anuncio, estudiar, comprar) y los paquetes.
+   ===================================================================== */
+.tray-gems[role="button"] { cursor: pointer; }
+.tray-gems[role="button"]:hover { filter: brightness(1.05); }
+.tray-gems[role="button"]:focus-visible { outline: 3px solid #4C8DF6; outline-offset: 2px; }
+
+.dlg--gems .dlg__box { width: min(440px, calc(100vw - 24px)); }
+.dlg--gems .dlg__actions { margin-top: var(--sp-3); }
+.gemhero { gap: var(--sp-2); padding-top: 4px; }
+.gemhero .rankup__rays { top: -70px; width: 380px; height: 380px; margin-left: -190px; }
+.gemhero__stage { position: relative; display: grid; place-items: center; }
+.gemart { display: block; filter: drop-shadow(0 0 18px rgba(127, 230, 255, 0.75)) drop-shadow(0 8px 0 rgba(6, 18, 40, 0.35)); animation: gem-float 3.2s ease-in-out infinite; }
+@keyframes gem-float { 50% { transform: translateY(-6px) rotate(-2deg); } }
+.gemhero__spark {
+  position: absolute; width: 16px; height: 16px; pointer-events: none;
+  background: radial-gradient(circle, #fff 0 18%, transparent 20%), conic-gradient(from 45deg, transparent 0 20%, #fff 22% 28%, transparent 30% 45%, #fff 47% 53%, transparent 55% 70%, #fff 72% 78%, transparent 80%);
+  clip-path: polygon(50% 0, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0 50%, 40% 40%);
+  animation: gem-twinkle 2.4s ease-in-out infinite;
+}
+.gemhero__spark--a { top: 6%; right: 4%; }
+.gemhero__spark--b { bottom: 14%; left: 0; width: 12px; height: 12px; animation-delay: 0.8s; }
+.gemhero__spark--c { top: 34%; left: -8%; width: 10px; height: 10px; animation-delay: 1.5s; }
+@keyframes gem-twinkle { 0%, 100% { opacity: 0; transform: scale(0.4); } 45% { opacity: 1; transform: scale(1) rotate(20deg); } }
+.gemhero__title { margin: 0; }
+.gemhero__line { position: relative; margin: 0; font-weight: 800; color: #BFF3FF; text-shadow: 0 2px 0 var(--ink); animation: rise 0.5s 0.6s both; }
+.gemhero__note { position: relative; margin: var(--sp-3) 0 0; font-size: 0.9rem; font-weight: 700; color: #E7E9EF; text-align: center; }
+
+.gemopts { position: relative; display: grid; gap: 10px; margin-top: var(--sp-4); animation: rise 0.5s 0.7s both; }
+.gemopt {
+  display: grid; grid-template-columns: 44px 1fr auto; align-items: center; gap: 12px;
+  width: 100%; padding: 12px 14px; text-align: left;
+  font: inherit; color: var(--ink); background: var(--paper);
+  border: var(--line); border-radius: var(--r-md);
+  box-shadow: 0 5px 0 #9FB4D1, inset 0 -4px 0 rgba(13, 35, 70, 0.1);
+  cursor: pointer; transition: transform 0.06s ease, box-shadow 0.06s ease, filter 0.15s ease;
+}
+.gemopt:hover:not(:disabled) { filter: brightness(1.04); }
+.gemopt:active:not(:disabled) { transform: translateY(4px); box-shadow: 0 1px 0 #9FB4D1, inset 0 -2px 0 rgba(13, 35, 70, 0.1); }
+.gemopt:focus-visible { outline: 3px solid #4C8DF6; outline-offset: 3px; }
+.gemopt:disabled { opacity: 0.6; cursor: not-allowed; filter: grayscale(0.35); }
+.gemopt__icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; background: #DDF5FF; font-size: 1.6rem; line-height: 1; }
+.gemopt--study .gemopt__icon { background: #E3FBEF; }
+.gemopt--buy .gemopt__icon { background: #FFF2C9; }
+.gemopt__text { display: grid; gap: 2px; min-width: 0; }
+.gemopt__text b { font-family: var(--font-display); font-weight: 400; font-size: 1.08rem; line-height: 1.15; }
+.gemopt__text small { font-size: 0.85rem; font-weight: 700; color: #4A5B78; }
+.gemopt__badge { display: inline-flex; align-items: center; gap: 4px; font-family: var(--font-display); font-size: 1.05rem; color: #0E7FA0; }
+.gemopt--buy .gemopt__badge, .gemopt--study .gemopt__badge { color: #4A5B78; font-size: 1.3rem; }
+html[data-theme="dark"] .gemopt { color: var(--text); background: var(--paper); box-shadow: 0 5px 0 #0B1428, inset 0 -4px 0 rgba(0, 0, 0, 0.2); }
+html[data-theme="dark"] .gemopt__text small { color: #A9B8D3; }
+html[data-theme="dark"] .gemopt__icon { background: #20345A; }
+html[data-theme="dark"] .gemopt--study .gemopt__icon { background: #17402F; }
+html[data-theme="dark"] .gemopt--buy .gemopt__icon { background: #4A3A12; }
+html[data-theme="dark"] .gemopt__badge { color: #7FE6FF; }
+
+.gempacks { position: relative; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: var(--sp-4); animation: rise 0.5s 0.6s both; }
+.gempack {
+  position: relative; display: grid; justify-items: center; align-content: start; gap: 6px;
+  padding: 16px 10px 12px; font: inherit; color: var(--ink); background: var(--paper);
+  border: var(--line); border-radius: var(--r-lg);
+  box-shadow: 0 5px 0 #9FB4D1, inset 0 -4px 0 rgba(13, 35, 70, 0.1);
+  cursor: pointer; transition: transform 0.06s ease, box-shadow 0.06s ease, filter 0.15s ease;
+}
+.gempack:hover { filter: brightness(1.04); }
+.gempack:active { transform: translateY(4px); box-shadow: 0 1px 0 #9FB4D1, inset 0 -2px 0 rgba(13, 35, 70, 0.1); }
+.gempack:focus-visible { outline: 3px solid #4C8DF6; outline-offset: 3px; }
+.gempack.is-best { background: linear-gradient(180deg, #FFF7DA, var(--paper) 55%); border-color: #E0A100; box-shadow: 0 5px 0 #C08A00, inset 0 -4px 0 rgba(13, 35, 70, 0.1); }
+.gempack__tag {
+  position: absolute; top: -12px; left: 50%; transform: translateX(-50%); white-space: nowrap;
+  padding: 2px 10px; border-radius: var(--r-pill); border: 2px solid var(--ink);
+  font-family: var(--font-display); font-size: 0.8rem; color: var(--ink); background: var(--gold);
+}
+.gempack__art { display: grid; place-items: center; height: 62px; }
+.gempack__art .gemart { animation: none; filter: drop-shadow(0 0 8px rgba(127, 230, 255, 0.6)) drop-shadow(0 4px 0 rgba(6, 18, 40, 0.25)); }
+.gempack__text { display: grid; justify-items: center; gap: 2px; }
+.gempack__n { font-family: var(--font-display); font-weight: 400; font-size: 1.2rem; line-height: 1.1; }
+.gempack__bonus { font-size: 0.8rem; font-weight: 800; color: #0E7FA0; }
+.gempack__price {
+  margin-top: 4px; min-width: 70%; padding: 6px 10px; border-radius: var(--r-pill); border: 2px solid var(--ink);
+  font-family: var(--font-display); font-size: 1.02rem; color: var(--ink); background: var(--mint); text-align: center;
+}
+html[data-theme="dark"] .gempack { color: var(--text); background: var(--paper); box-shadow: 0 5px 0 #0B1428, inset 0 -4px 0 rgba(0, 0, 0, 0.2); }
+html[data-theme="dark"] .gempack.is-best { background: linear-gradient(180deg, #3A3015, var(--paper) 60%); box-shadow: 0 5px 0 #6B4E00, inset 0 -4px 0 rgba(0, 0, 0, 0.2); }
+html[data-theme="dark"] .gempack__bonus { color: #7FE6FF; }
+
+/* "Estudiar un pomodoro": el botón de empezar salta un poco para que lo encuentres */
+#mainBtn.is-nudge { animation: main-nudge 0.65s ease-in-out 3; }
+@keyframes main-nudge { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-7px) scale(1.02); } 70% { transform: translateY(2px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .gemart, .gemhero__spark, #mainBtn.is-nudge { animation: none; }
+}
+.dlg--gems .dlg__back { z-index: 3; color: #E7E9EF; }
+.dlg--gems .dlg__back:hover { background: rgba(255, 255, 255, 0.12); color: #fff; }

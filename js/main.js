@@ -15,6 +15,7 @@ import { state, store, session, prefs, configure, reloadFromStore, mutate, today
 import { play } from './ui/celebrations.js';
 import { checkStreak } from './ui/streak.js';
 import { bindAds, bootAds } from './ui/ads-ui.js';
+import { bindGems, bootGems } from './ui/gems-ui.js'; // (v4.8.0) "¿Necesitas más gemas?" y los paquetes de gemas
 import { renderHUD, renderPole, updatePhase, bindHUD } from './ui/hud.js';
 import { startChatter } from './ui/scenery.js';
 import { renderPremium, maybePaywall, bindPremium, syncStorePremium, initPlayPremium, bootPlayPremium } from './ui/premium.js';
@@ -247,7 +248,7 @@ function boot() {
   updatePhase();
   setInterval(() => { updatePhase(); checkNewDay(); checkSeason(); checkPet(); }, 60 * 1000);
   startChatter(() => session.running && session.state.mode === 'study');
-  for (const bind of [bindPremium, bindSound, bindReminders, bindFocus, bindProgress, bindActivity, bindProfile, bindRanking, bindSettings, bindFeeding, bindAds, bindGlobal]) bind();
+  for (const bind of [bindPremium, bindSound, bindReminders, bindFocus, bindProgress, bindActivity, bindProfile, bindRanking, bindSettings, bindFeeding, bindAds, bindGems, bindGlobal]) bind();
   initPip(); // (v4.4.1) "Siempre encima" (solo donde el navegador lo permite)
   renderAll();
   route(false);
@@ -266,7 +267,7 @@ function boot() {
     // el progreso de la nube: quizá estudiaste en otro aparato)
     // (v4.7.0) Primero se pregunta al servidor por tu Premium pagado (así nadie con Premium ve el
     // anuncio del descanso), después los anuncios.
-    bootPlayPremium().catch(() => {}).then(() => bootAds()).catch(() => false).then(() => checkStreak({ running: session.running })).catch(() => {});
+    bootPlayPremium().catch(() => {}).then(() => bootGems()).catch(() => {}).then(() => bootAds()).catch(() => false).then(() => checkStreak({ running: session.running })).catch(() => {});
   });
   syncStorePremium(); // con cobro real: Premium sigue a la suscripción de Microsoft Store
   hintReducedMotion();

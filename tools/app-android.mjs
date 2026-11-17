@@ -10,6 +10,8 @@
  *     cierra al abrirse. Si está vacío, pone el ID de PRUEBA de Google y avisa (no publiques así).
  *  4. (v4.7.0) Revisa la clave de RevenueCat (config.premium.play): debe ser la PÚBLICA de Android
  *     (goog_…). Si alguien pegó la secreta (sk_…), se detiene: esa clave nunca puede ir en la app.
+ *  5. (v4.7.4) Enciende R8 (achica, optimiza y ofusca el código) en la versión para la tienda y
+ *     agrega las reglas de FrostPom a android/app/proguard-rules.pro. Google Play lo pide.
  *  0. (v4.7.3) Borra los archivos que una versión nueva ya no trae. Al descomprimir encima, los
  *     viejos se quedan, y uno (values-v26/styles.xml) dejaba la hora del widget gris y delgada.
  *
@@ -105,4 +107,53 @@ if (rcKey && !rcKey.startsWith('goog_')) console.warn('[!] config.premium.play.r
 if (play.enabled && !rcKey) console.warn('[!] El cobro con Google Play está encendido pero falta config.premium.play.revenueCatKey: Premium seguirá en modo prueba.');
 const billing = play.enabled && rcKey ? 'cobro con Google Play ENCENDIDO' : 'Premium en modo prueba (sin cobro)';
 
-console.log(`[OK] Íconos copiados. Versión de la app: ${version} (versionCode ${code}). AdMob: ${appId ? 'tu ID de app' : 'ID de prueba'}${ads.enabled ? '' : ' (anuncios apagados en config.ads)'}. ${billing}.`);
+// 5. (v4.7.4) R8 en la versión para la tienda: achica, optimiza y ofusca el código Java/Kotlin.
+//    Google Play lo pide ("La optimización de código DEX está por debajo de nuestro umbral":
+//    ofuscación 2 %, mínimo 25 %, antes de febrero de 2027). Además, el .aab ya lleva el
+//    mapping.txt, así que se va el aviso del "archivo de desofuscación".
+//    Solo toca la versión "release" (la que se firma para Play); las de prueba quedan igual.
+//    No se activa shrinkResources: las notificaciones buscan su ícono por nombre y podría borrarlo.
+//    Plan B si algo falla en la versión de la tienda: FROSTPOM_R8=0 npm run android:actualizar
+//    (en PowerShell: $env:FROSTPOM_R8="0"; npm run android:actualizar) y avísale a Claude.
+const r8 = process.env.FROSTPOM_R8 !== '0';
+const releaseRe = /(\brelease\s*\{)([^{}]*)(\})/;
+let r8Note = '';
+const rel = releaseRe.exec(gradle);
+if (!rel) {
+  r8Note = ' [!] R8: no encontré "release { … }" en android/app/build.gradle (ver docs/CAMBIOS-v3.md, v4.7.4).';
+} else {
+  let body = rel[2];
+  if (/minifyEnabled\s+(true|false)/.test(body)) body = body.replace(/minifyEnabled\s+(true|false)/, `minifyEnabled ${r8}`);
+  else body = body.replace(/^(\s*?\n)?([ \t]*)/, `$1$2minifyEnabled ${r8}\n$2`);
+  body = body.replace(/getDefaultProguardFile\(\s*'proguard-android\.txt'\s*\)/, "getDefaultProguardFile('proguard-android-optimize.txt')");
+  if (!/proguardFiles/.test(body)) body = body.replace(/\s*$/, `\n            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'\n        `);
+  const patched = gradle.replace(releaseRe, `$1${body}$3`);
+  if (patched !== gradle) {
+    gradle = patched;
+    writeFileSync(gradlePath, gradle);
+  }
+  r8Note = r8 ? ' R8 (código optimizado) ENCENDIDO en la versión para la tienda.' : ' [!] R8 APAGADO (FROSTPOM_R8=0).';
+}
+// Las reglas de FrostPom para R8 (las de Capacitor, RevenueCat y AdMob vienen con cada librería)
+const rulesPath = join(APP, 'proguard-rules.pro');
+const RULES_START = '# --- FrostPom (tools/app-android.mjs, v4.7.4) ---';
+const RULES_END = '# --- fin FrostPom ---';
+const RULES = `${RULES_START}
+# El puente entre la web y Android (Capacitor) se llama por su nombre desde JavaScript.
+-keepclassmembers class * {
+    @android.webkit.JavascriptInterface <methods>;
+}
+# (v4.8.0) El complemento propio (notificación, widgets y alarmas): es pequeño y lo usa Android
+# por su nombre (widgets, avisos, botones), así que va completo, sin cambiarle nombres.
+-keep class com.startupprometeus.frostpom.timer.** { *; }
+# Errores de Play legibles: guarda los números de línea (Play los traduce con el mapping.txt).
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
+${RULES_END}
+`;
+let rules = existsSync(rulesPath) ? readFileSync(rulesPath, 'utf8') : '';
+const rulesRe = new RegExp(`${RULES_START.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[\\s\\S]*?${RULES_END}\\n?`);
+const newRules = rulesRe.test(rules) ? rules.replace(rulesRe, RULES) : `${rules.replace(/\s*$/, '')}${rules.trim() ? '\n\n' : ''}${RULES}`;
+if (newRules !== rules) writeFileSync(rulesPath, newRules);
+
+console.log(`[OK] Íconos copiados. Versión de la app: ${version} (versionCode ${code}). AdMob: ${appId ? 'tu ID de app' : 'ID de prueba'}${ads.enabled ? '' : ' (anuncios apagados en config.ads)'}. ${billing}.${r8Note}`);

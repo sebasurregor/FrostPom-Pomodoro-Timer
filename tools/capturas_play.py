@@ -83,7 +83,7 @@ p { margin: 22px 0 0; font-size: 34px; line-height: 1.18; font-weight: 900; text
 <span class="star" style="left:520px;top:30px"></span><span class="star" style="left:760px;top:60px"></span>
 <span class="star" style="left:940px;top:28px"></span><span class="star" style="left:860px;top:150px"></span>
 <div class="hill2"></div><div class="hill1"></div><div class="snow"></div>
-<img class="icon" src="/assets/icons/icon-maskable-512.png" alt="">
+<img class="icon" src="/logos/actual-lleno.png" alt="">
 <div class="txt"><h1>FrostPom</h1><p>TAGLINE</p></div>
 </div></body></html>"""
 

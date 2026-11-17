@@ -1165,4 +1165,39 @@ begin
   assert not exists (select 1 from private.billing_events where app_user_id = 'b4700000-0000-0000-0000-000000000001'), 'FALLO: los avisos quedaron después de borrar la cuenta';
   raise notice 'OK  Premium: descargar tus datos lo incluye y borrar la cuenta lo borra';
 end $$;
+
+-- (v4.8.1) Palabras prohibidas que agrega el dueño de la app
+do $$
+declare uid uuid; n int;
+begin
+  select user_id into uid from private.profiles where not hidden and username !~* 'pingu' limit 1;
+  assert private.check_username('Pinguzote') = 'Pinguzote', 'FALLO: Pinguzote debía valer antes de prohibir';
+  n := private.block_word('PINGÜ');
+  assert exists (select 1 from private.extra_blocked_names where word = 'pingu'), 'FALLO: la palabra no se guardó en forma plana';
+  begin
+    perform private.check_username('Pinguzote');
+    assert false, 'FALLO: un nombre con la palabra prohibida pasó';
+  exception when sqlstate '22023' then null;
+  end;
+  begin
+    perform private.check_username('p1ngu_99');
+    assert false, 'FALLO: p1ngu (con 1) pasó';
+  exception when sqlstate '22023' then null;
+  end;
+  assert private.unblock_word('pingu') = 1, 'FALLO: no se quitó la palabra';
+  assert private.check_username('Pinguzote') = 'Pinguzote', 'FALLO: tras quitarla, el nombre debía valer otra vez';
+  raise notice 'OK  Nombres: block_word prohíbe una palabra nueva (también con 1 por i) y unblock_word la quita';
+end $$;
+do $$
+declare n int;
+begin
+  insert into auth.users (id, is_anonymous) values ('b4810000-0000-0000-0000-000000000001', true) on conflict do nothing;
+  insert into private.profiles (user_id, username) values ('b4810000-0000-0000-0000-000000000001', 'Tontolin.7');
+  n := private.block_word('tontolin');
+  assert n >= 1, 'FALLO: no escondió el nombre ya guardado';
+  assert (select hidden and auto_hidden from private.profiles where user_id = 'b4810000-0000-0000-0000-000000000001'), 'FALLO: el nombre guardado no quedó oculto por filtro';
+  perform private.unblock_word('tontolin');
+  delete from private.profiles where user_id = 'b4810000-0000-0000-0000-000000000001';
+  raise notice 'OK  Nombres: al prohibir una palabra, los nombres ya guardados con ella se esconden solos';
+end $$;
 \echo 'Todas las pruebas del servidor pasaron.'

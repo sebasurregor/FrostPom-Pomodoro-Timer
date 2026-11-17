@@ -171,17 +171,30 @@ language sql immutable set search_path = '' as $$
            '(.)\1+', '\1', 'g')
 $$;
 
+-- (v4.8.1) Palabras prohibidas que agrega el dueño de la app desde el SQL Editor (además de la
+-- lista fija de arriba). Se guardan en su forma plana (sin tildes, solo letras):
+--   select private.block_word('palabra');      select private.unblock_word('palabra');
+--   select * from private.extra_blocked_names;
+create table if not exists private.extra_blocked_names (
+  word      text primary key check (word ~ '^[a-z]{3,40}$'),
+  added_at  timestamptz not null default now()
+);
+revoke all on private.extra_blocked_names from public;
+
 -- (v4.5.1) ¿El filtro rechaza este nombre? (isBlockedName en la app)
+-- (v4.8.1) También revisa private.extra_blocked_names (por eso ya no es "immutable").
 create or replace function private.name_blocked(v text) returns boolean
-language sql immutable set search_path = '' as $$
+language sql stable set search_path = '' as $$
   select exists (select 1 from unnest(private.name_forms(v)) f(n), unnest(private.blocked_patterns()) b(p) where f.n ~ b.p)
       or exists (select 1 from unnest(private.name_forms(v)) f(n), unnest(private.blocked_sounds()) b(w)
                   where strpos(private.sound_name(f.n), b.w) > 0)
+      or exists (select 1 from unnest(private.name_forms(v)) f(n), private.extra_blocked_names x
+                  where strpos(f.n, x.word) > 0)
 $$;
 
 -- Revisa el nombre de usuario (mismas reglas que checkUsername en la app). Devuelve el nombre limpio.
 create or replace function private.check_username(p text) returns text
-language plpgsql immutable set search_path = '' as $$
+language plpgsql stable set search_path = '' as $$
 declare
   v text := btrim(coalesce(p, ''));
 begin
@@ -915,6 +928,39 @@ begin
   end if;
   return n;
 end $$;
+
+-- (v4.8.1) Prohibir una palabra nueva en los nombres. Devuelve cuántos nombres YA guardados la
+-- tienen: esos se esconden solos (como los del filtro) y la app le pide a esa persona otro nombre.
+create or replace function private.block_word(p_word text)
+returns int
+language plpgsql security definer set search_path = '' as $$
+declare
+  w text := private.plain_name(p_word);
+  n int;
+begin
+  if char_length(w) < 3 or char_length(w) > 40 then
+    raise exception 'La palabra debe tener entre 3 y 40 letras (sin contar números ni signos).';
+  end if;
+  insert into private.extra_blocked_names (word) values (w) on conflict (word) do nothing;
+  update private.profiles set hidden = true, auto_hidden = true
+   where not hidden and private.name_blocked(username);
+  get diagnostics n = row_count;
+  return n;
+end $$;
+
+-- (v4.8.1) Quitar una palabra de la lista. Los nombres que se escondieron por ella NO vuelven solos:
+-- revísalos con private.review_names() y muéstralos con private.hide_name('nombre', false).
+create or replace function private.unblock_word(p_word text)
+returns int
+language plpgsql security definer set search_path = '' as $$
+declare
+  n int;
+begin
+  delete from private.extra_blocked_names where word = private.plain_name(p_word);
+  get diagnostics n = row_count;
+  return n;
+end $$;
+revoke all on function private.block_word(text), private.unblock_word(text) from public;
 
 -- (v4.5.1) Los nombres YA guardados que el filtro nuevo no permite (para ocultarlos o revisarlos):
 --   select * from private.review_names();

@@ -104,12 +104,13 @@ def device(browser, fake, native=True, ads=True, admob=True, locale='es-CO', clo
     ctx = browser.new_context(viewport={'width': 412, 'height': 900}, locale=locale, service_workers='block')
     ctx.route(f'{SUPA}/**', fake.handle)
     ctx.route_web_socket(re.compile(r'^wss://[^/]*supabase\.co/realtime/'), fake.ws_connect)
-    if ads:
-        def cfg(route):
-            resp = route.fetch()
-            body = re.sub(r'(ads: Object\.freeze\(\{[\s\S]*?enabled: )false', r'\1true', resp.text(), count=1)
-            route.fulfill(response=resp, body=body)
-        ctx.route('**/js/config.js', cfg)
+    # (v4.8.1) Los zips ya salen con los anuncios encendidos (en modo de prueba): ads=False los apaga
+    def cfg(route):
+        resp = route.fetch()
+        want, other = ('true', 'false') if ads else ('false', 'true')
+        body = re.sub(r'(ads: Object\.freeze\(\{[\s\S]*?enabled: )' + other, r'\g<1>' + want, resp.text(), count=1)
+        route.fulfill(response=resp, body=body)
+    ctx.route('**/js/config.js', cfg)
     if native:
         ctx.add_init_script(FAKE_CAP)
         if admob:
@@ -248,7 +249,7 @@ with sync_playwright() as p:
     boot(pg)
     register(pg, 'off_ads', '2000-05', 'off@example.com')
     close_dialogs(pg); boot(pg)
-    check(not calls(pg), 'con config.ads.enabled = false (como salen los zips), la app no inicia AdMob')
+    check(not calls(pg), 'con config.ads.enabled = false (el interruptor para apagarlos), la app no inicia AdMob')
     ctx.close()
 
     # ---------- C. 13+: consentimiento, gemas, pantalla completa y Premium ----------

@@ -1,4 +1,4 @@
-# FrostTimer: la notificación tipo reproductor y los widgets de Android (v4.7.3)
+# FrostTimer: la notificación tipo reproductor y los widgets de Android (v4.8.1)
 
 Este es el código **nativo** (Kotlin) de la notificación en curso, los widgets y el aviso del
 final. La parte web está en `js/native.js` y `js/ui/native-ui.js`. Desde la v4.7.1 viene encendido
@@ -117,6 +117,94 @@ completos: solo las líneas de FrostTimer.
 
 4. Cuando todo esté bien, genera el `.aab` firmado (versionCode 40703), súbelo a Prueba cerrada y
    sube el ícono de Navidad en Play Console (`docs/google-play/icono-512.png`).
+
+## v4.7.4: probar la versión con R8 (la de la tienda)
+
+R8 solo corre al generar el `.aab` firmado, así que esta prueba se hace con la versión que baja de
+Google Play, no con Run ▶.
+
+1. Descomprime, pega tus claves en `js/config.js`, `npm install` y `npm run android:actualizar`.
+   Debe decir **versionCode 40704** y **"R8 (código optimizado) ENCENDIDO en la versión para la tienda"**.
+2. Android Studio → **Build → Generate Signed App Bundle / APK → Android App Bundle → release**
+   (tarda un poco más que antes: es R8 trabajando).
+3. Play Console → **Pruebas → Prueba interna** → Crear versión → sube el `.aab`. En **Verificadores**,
+   agrega tu correo y copia el **enlace para unirse**. La prueba interna no pasa por revisión.
+4. En el Galaxy, **desinstala** la FrostPom que instaló Claude Code (está firmada distinto y Play no
+   puede actualizarla), abre el enlace, acepta y instálala desde Play Store.
+5. Revisa (lo que R8 podría romper es lo nativo):
+   - la app abre normal (sin pantalla blanca) y entras con tu cuenta;
+   - empiezas, pausas y terminas un pomodoro; sale el reproductor y responden ⏮ ⏸ ⏭ ✓;
+   - los widgets 4 × 2 y 2 × 2 y sus botones;
+   - el aviso del final (con la app cerrada) y los sonidos;
+   - la pantalla de Premium muestra los precios de Google Play (RevenueCat);
+   - el anuncio del descanso (si los anuncios están encendidos) y abrir la página de privacidad.
+6. Si todo está bien: Prueba interna → la versión 40704 → **Promocionar versión → Prueba cerrada**
+   (no hay que volver a subir nada).
+7. Si algo falla: Play Console → **Android vitals → Fallos y ANR** muestra el error con nombres
+   reales (gracias al mapping.txt). Mándale a Claude la captura y, mientras, usa el plan B
+   (`$env:FROSTPOM_R8="0"; npm run android:actualizar` y genera el `.aab` otra vez).
+
+## v4.8.0: si faltan los widgets o el reproductor
+
+En la 4.7.4 bajada de Prueba interna **no aparecían los widgets** en la lista del celular y el
+**reproductor no salía** aunque el permiso de notificaciones estaba dado. La lista de widgets sale
+del manifiesto de la app, y Android (y R8) nunca quitan lo que el manifiesto nombra; así que, si los
+widgets no están ni en la lista, lo más probable es que **esta pieza (@frostpom/timer) no entró al
+`.aab`**. Pasa cuando `npx cap sync` no la encuentra en `node_modules` (por ejemplo, si
+`npm install` falló o se corrió en otra carpeta), y antes nada avisaba.
+
+Lo que cambió en la 4.8.0:
+
+- `npm run android:actualizar` termina con `tools/revisar-android.mjs`: si la pieza no quedó en el
+  proyecto de Android, **se detiene con un error rojo [X]** y dice cómo arreglarlo. Si todo está
+  bien, dice **"[OK] La parte nativa de FrostPom… está en el proyecto de Android."**
+- R8 tiene una regla extra que guarda todo `com.startupprometeus.frostpom.timer` tal cual (por si
+  acaso).
+
+Pasos (a mano, en PowerShell, en la carpeta del proyecto):
+
+1. `npm install` y luego `npm run android:actualizar`. En lo que imprime, busca la línea
+   **"Found N Capacitor plugins for android"**: en la lista de abajo debe estar
+   **`@frostpom/timer`**. Al final debe salir el **[OK]**.
+2. Si sale **[X]**:
+   - Revisa que exista la carpeta: `dir node_modules\@frostpom` (debe mostrar `timer`).
+   - Si Windows dice "Filename too long", borra `native\frostpom-timer\android\build` y repite
+     `npm install`.
+   - Repite `npm run android:actualizar` hasta ver el [OK]. **No generes el `.aab` antes.**
+3. Genera el `.aab` firmado (versionCode **40800**), súbelo a **Prueba interna** e instálalo desde
+   Play Store (desinstala antes la versión instalada desde Android Studio, si la hay).
+4. Prueba: la lista de widgets del celular (mantén presionado el inicio → Widgets → FrostPom) y el
+   reproductor (empieza un pomodoro y sal de la app).
+5. Si **aun así** falta algo, conecta el celular por USB (con depuración USB) y corre:
+
+```
+adb shell dumpsys package com.startupprometeus.frostpom | findstr /i "FrostWidget TimerActionReceiver"
+adb shell dumpsys appwidget | findstr /i frostpom
+findstr /i frostpom android\capacitor.settings.gradle android\app\capacitor.build.gradle android\app\src\main\assets\capacitor.plugins.json
+adb logcat -c
+adb logcat -s Capacitor FrostTimer
+```
+
+   (con el último abierto, abre FrostPom y empieza un pomodoro; Ctrl + C para parar). Mándale a
+   Claude lo que salga: lo importante es si aparece `FrostWidget` en el primero y
+   `Registering plugin instance: FrostTimer` en el último. No hace falta ningún dato tuyo.
+6. Plan B mientras tanto: `$env:FROSTPOM_R8="0"; npm run android:actualizar` y genera el `.aab`
+   otra vez (sale sin R8; Play solo vuelve a mostrar el aviso de optimización).
+
+Si prefieres que lo revise Claude Code en tu PC, pégale esto:
+
+```
+En este proyecto (FrostPom, Capacitor 8), la versión de la tienda salió sin los widgets ni la
+notificación tipo reproductor del plugin local @frostpom/timer (native/frostpom-timer). Revisa,
+sin cambiar código todavía: 1) que node_modules/@frostpom/timer exista y apunte a
+native/frostpom-timer; 2) que "npm run android:actualizar" liste @frostpom/timer en "Found …
+Capacitor plugins for android" y termine con [OK]; 3) que android/capacitor.settings.gradle,
+android/app/capacitor.build.gradle y android/app/src/main/assets/capacitor.plugins.json
+mencionen frostpom-timer / FrostTimerPlugin; 4) genera el bundle release (gradlew bundleRelease,
+SIN firmar con mi llave: no me pidas contraseñas) y revisa con bundletool o apkanalyzer que el
+manifiesto del módulo base tenga los receivers FrostWidget y TimerActionReceiver. Dime qué
+encontraste antes de arreglar nada. No hagas commits.
+```
 
 ## En Google Play
 

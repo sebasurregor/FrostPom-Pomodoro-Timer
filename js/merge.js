@@ -30,6 +30,7 @@
 import * as U from './util.js';
 import { MAX_SESSIONS } from './engine.js';
 import { MAX_ARCHIVE, isSeasonId } from './season.js';
+import * as GS from './gem-shop.js';
 
 const clone = (v) => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)));
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -128,7 +129,10 @@ export function mergeStates(base, mine, theirs, { mineAt = 0, theirsAt = 0 } = {
 
   // ---------------------------------------------------------------- números que se suman
   const sum = (b, m, t) => num(b) + (num(m) - num(b)) + (num(t) - num(b));
-  p.gems = Math.max(0, sum(pB.gems, pM.gems, pT.gems) - dupReward);
+  // (v4.8.0) Las compras de gemas se unen; si los dos aparatos sumaron la misma, se resta una vez
+  const orders = GS.mergeOrders(pB.gemOrders, pM.gemOrders, pT.gemOrders);
+  p.gemOrders = orders.orders;
+  p.gems = Math.max(0, sum(pB.gems, pM.gems, pT.gems) - dupReward - orders.dup);
   const tB = obj(pB.totals);
   const tM = obj(pM.totals);
   const tT = obj(pT.totals);

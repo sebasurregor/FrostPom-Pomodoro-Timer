@@ -1602,10 +1602,15 @@ test('anuncios (v4.5.3): gemas por anuncio y revivir a la mascota viendo anuncio
   assert.deepEqual(r.events, [{ type: 'revived', petId, gems: 0 }]);
 });
 
-test('anuncios (v4.5.3): apagados por defecto y con los ID de prueba de Google', async () => {
+test('anuncios (v4.8.1): encendidos con la cuenta de AdMob del autor, en modo de PRUEBA', async () => {
   const { config } = await import('../js/config.js');
-  assert.equal(config.ads.enabled, false, 'los zips salen con los anuncios apagados');
-  assert.equal(config.ads.testing, true);
+  assert.equal(config.ads.enabled, true, '(v4.8.1) encendidos con los ID de AdMob del autor');
+  assert.equal(config.ads.testing, true, 'los zips salen en modo de prueba: nunca anuncios reales hasta que el autor lo decida');
+  assert.match(config.ads.appId, /^ca-app-pub-\d{16}~\d{10}$/);
+  assert.match(config.ads.rewardedId, /^ca-app-pub-\d{16}\/\d{10}$/);
+  assert.match(config.ads.interstitialId, /^ca-app-pub-\d{16}\/\d{10}$/);
+  const txt = readFileSync(new URL('../docs/app-ads/app-ads.txt', import.meta.url), 'utf8').trim();
+  assert.equal(txt, `google.com, ${config.ads.appId.match(/ca-app-(pub-\d{16})~/)[1]}, DIRECT, f08c47fec0942fa0`, 'app-ads.txt con el mismo número de editor');
   const ADS = await import('../js/ads.js');
   assert.equal(ADS.enabled(), false); // en Node no hay app de Android
   assert.equal(ADS.TEST_IDS.app, 'ca-app-pub-3940256099942544~3347511713');

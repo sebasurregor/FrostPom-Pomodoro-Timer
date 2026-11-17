@@ -7,7 +7,7 @@
  *  - Solo se guarda en caché lo de este mismo sitio y respuestas correctas. Nunca respuestas de APIs
  *    ni de otros dominios (podrían contener datos personales).
  */
-const VERSION = '4.7.3';
+const VERSION = '4.8.1';
 const CACHE = `frostpom-${VERSION}`;
 const PRECACHE = [
   './',
@@ -53,7 +53,9 @@ const PRECACHE = [
   './js/ads.js', // (v4.5.3) los anuncios de AdMob (solo en la app de Android): docs/ANUNCIOS.md
   './js/ad-rules.js',
   './js/play-billing.js', // (v4.7.0) Premium con Google Play (solo en la app de Android): docs/GOOGLE-PLAY-BILLING.md
+  './js/gem-shop.js', // (v4.8.0) paquetes de gemas con Google Play
   './js/ui/ads-ui.js',
+  './js/ui/gems-ui.js', // (v4.8.0) "¿Necesitas más gemas?"
   './js/ui/streak.js', // (v4.5.2) la racha: el fuego que se enciende, crece y se congela
   './js/session.js',
   './js/engine.js',
@@ -213,7 +215,8 @@ self.addEventListener('fetch', (event) => {
           caches.open(CACHE).then((c) => c.put(req, copy));
         }
         return res;
-      });
+      // (v4.8.1) Sin conexión, "icon-192.png?v=4.8.1" usa la copia guardada de "icon-192.png"
+      }).catch(async () => (await caches.match(req, { ignoreSearch: true })) || Response.error());
     }),
   );
 });

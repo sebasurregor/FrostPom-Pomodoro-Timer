@@ -200,7 +200,7 @@ En Partner Center → tu app → **Start your submission**. Los textos están en
 |---|---|
 | Código (HTML, CSS, JS, imágenes) | Sube la versión en `js/config.js` y en `service-worker.js` (`VERSION`), y haz `git push`. Les llega sola a los usuarios: **no** hace falta paquete nuevo. |
 | Capturas, descripción o idiomas de la ficha | Partner Center → **Update** → *Store listings* → **Submit to the Store**. |
-| `manifest.webmanifest` (nombre, ícono, atajos) | Paquete nuevo en PWABuilder con número mayor (`1.0.1`, `1.0.2`…) y súbelo en **Update** → *Packages*. |
+| `manifest.webmanifest` (nombre, ícono, atajos) | Paquete nuevo en PWABuilder con número mayor y súbelo en **Update** → *Packages*. **Ojo (v4.7.3):** sube **las dos** versiones: *App version* y *Classic package version* (la clásica, menor que la otra pero mayor que cualquiera que ya subiste). Por ejemplo `1.1.0` y `1.0.9`. Si se repite un número, Partner Center dice "must be uniquely identified by their full names". Antes de subir, borra de *Packages* los paquetes viejos y toca **Save**. |
 | Encender el ranking global | Sigue `docs/RANKING-GLOBAL.md` (ya lo hiciste en la v3.9.1). |
 | Cambios en el servidor (`server/supabase/schema.sql`) | Córrelo en el **SQL Editor** de Supabase **antes** de hacer `git push`. Se puede correr las veces que quieras. |
 | Encender el cobro de Premium | Sigue `docs/COBRO-PREMIUM.md`. |
