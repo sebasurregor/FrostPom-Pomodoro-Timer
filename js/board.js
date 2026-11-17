@@ -254,6 +254,23 @@ export async function setVisible(show) {
   }
 }
 
+/**
+ * (v4.8.2) ¿Cómo está TU nombre en el ranking? { username, status } con status 'ok', 'optout',
+ * 'blocked' (palabra prohibida), 'hidden' (reportes o moderación) o 'none'. null si no se pudo saber
+ * (sin internet, sin sesión, o el servidor todavía no tiene la función: falta correr schema.sql).
+ */
+export async function myStatus() {
+  if (!enabled() || !load().joined || !load().refresh) return null;
+  try {
+    const rows = await call('my_board_status', {});
+    const r = Array.isArray(rows) ? rows[0] : rows;
+    const ok = ['ok', 'optout', 'blocked', 'hidden', 'none'];
+    return r && ok.includes(r.status) ? { username: typeof r.username === 'string' ? r.username : '', status: r.status } : null;
+  } catch {
+    return null;
+  }
+}
+
 /** ¿Está libre este nombre en el ranking? true / false, o null si no se pudo saber. */
 export async function nameAvailable(username) {
   if (!enabled()) return null;

@@ -14,6 +14,7 @@
 import * as ADS from '../ads.js';
 import * as E from '../engine.js';
 import * as P from '../pet.js';
+import * as NATIVE from '../native.js';
 import { $ } from './dom.js';
 import { toast } from './feedback.js';
 import { state, mutate, isPremium } from './context.js';
@@ -21,7 +22,7 @@ import { t, tr } from '../i18n.js';
 
 /** Al abrir la app (con la cuenta lista): consentimiento y AdMob. Espera como mucho `ms`. */
 export async function bootAds(ms = 4000) {
-  if (!ADS.enabled()) return false;
+  if (!ADS.enabled()) { renderDiag(); return false; }
   const ok = await Promise.race([ADS.start(state.account), new Promise((r) => setTimeout(() => r(false), ms))]);
   renderAds();
   // Si terminó de iniciarse después de la espera, se vuelve a pintar entonces
@@ -178,8 +179,37 @@ export async function afterStudy(rec) {
 export function renderAds() {
   const row = $('#adPrivacyRow');
   if (row) row.hidden = !ADS.privacyOptions();
+  renderDiag();
   const st = P.petStatus(state, P.currentPetId(state));
   renderTrayAds(st);
+}
+
+/**
+ * (v4.8.2) Ajustes → Acerca de → "Diagnóstico" (solo en la app de Android): si la app trae el
+ * reproductor y los widgets, cómo están los anuncios y si trae Google Play. Sin datos personales:
+ * sirve para saber, sin cables ni adb, por qué algo no aparece.
+ */
+export async function renderDiag() {
+  const row = $('#diagRow');
+  if (!row || !NATIVE.isAndroid()) return;
+  const has = await NATIVE.pluginReport().catch(() => null);
+  if (!has) return;
+  const st = ADS.status();
+  const ads = {
+    ok: st.testing ? tr('listos (de prueba)') : tr('listos'),
+    off: tr('apagados en config.js'),
+    age: tr('no para esta cuenta (menor de 13)'),
+    noplugin: tr('la app se compiló sin AdMob'),
+    consent: tr('Google no dio permiso (consentimiento)'),
+    error: `${tr('error al iniciar')}${st.msg ? `: ${st.msg}` : ''}`,
+    pending: tr('iniciando…'),
+    web: '—',
+  }[st.why] || st.why;
+  const mark = (ok) => (ok ? '✓' : '✗');
+  $('#diagText').textContent = t('Diagnóstico: reproductor y widgets {timer} · anuncios: {ads} · Google Play {billing}', {
+    timer: mark(has.timer), ads, billing: mark(has.billing),
+  });
+  row.hidden = false;
 }
 
 export function bindAds() {

@@ -1,6 +1,6 @@
 {
   "name": "@frostpom/timer",
-  "version": "4.8.1",
+  "version": "4.8.2",
   "description": "FrostPom: la notificación en curso, el widget y el aviso exacto del final en Android (complemento local de Capacitor).",
   "private": true,
   "license": "UNLICENSED",

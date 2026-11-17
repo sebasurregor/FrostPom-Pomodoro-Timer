@@ -1,5 +1,18 @@
 # Cambios de la v2 a la v3
 
+## v4.8.2: nombres escondidos en el ranking (opción a) y diagnóstico en Ajustes
+
+**Antes de publicar:** vuelve a pegar tus claves en `js/config.js`. **Hay un cambio de servidor:** copia de seguridad y corre el `server/supabase/schema.sql` nuevo (botón verde "Run and enable RLS"); no borra datos.
+
+**Tu decisión (17 nov 2026):** opción **a**: si escondieron tu nombre y eliges uno nuevo, vuelves a aparecer de una vez.
+
+- **Si tu nombre está escondido, la app te avisa al abrirse:**
+  - Por **reportes o moderación** (`hide_name`): "Tu nombre está oculto en el ranking", con **"Ahora no"** (como mucho una vez al día). Con un nombre **nuevo** vuelves a aparecer y tus reportes viejos se borran. Con el mismo, sigues escondido.
+  - Por una **palabra prohibida** (la lista fija o tus `block_word`): "Elige un nombre nuevo", obligatorio, como antes. Ahora también para las palabras que agregues tú.
+  - Nueva función del servidor `public.my_board_status()` (solo dice tu estado, nunca quién te reportó). Si todavía no corriste el schema, la app sigue como antes.
+- **Ajustes → Acerca de → "Diagnóstico"** (solo en la app de Android): dice si la app trae el **reproductor y los widgets** (✓/✗), cómo están los **anuncios** (listos de prueba, apagados en config.js, la app se compiló sin AdMob, sin permiso de Google, error…) y si trae **Google Play**. Así se sabe por qué algo no aparece sin cables ni adb.
+- versionCode 40802.
+
 ## v4.8.1: anuncios encendidos (en modo de prueba) y palabras prohibidas propias en el ranking
 
 **Antes de publicar:** vuelve a pegar tu clave de Turnstile y tu clave `goog_…` en `js/config.js`, y `npm run android:actualizar` (debe decir **"AdMob: tu ID de app"** y el **[OK]** de la parte nativa).

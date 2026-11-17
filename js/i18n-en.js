@@ -1161,4 +1161,16 @@ export default Object.freeze({
   '¡Gracias por tu compra! Tus gemas llegarán en un momento.': 'Thanks for your purchase! Your gems will arrive in a moment.',
   '¡Gracias por apoyar FrostPom!': 'Thanks for supporting FrostPom!',
   'Llegaron {n} gemas de tu compra en Google Play. ¡Gracias!': '{n} gems from your Google Play purchase just arrived. Thank you!',
+  // (v4.8.2) Nombre oculto en el ranking y diagnóstico de Ajustes → Acerca de
+  'Tu nombre está oculto en el ranking': 'Your name is hidden on the leaderboard',
+  'Varias personas reportaron el nombre {name}, así que por ahora no aparece en el ranking global. Elige otro para volver a aparecer: tu cuenta, tu progreso y tus minutos siguen igual.': 'Several people reported the name {name}, so for now it doesn’t appear on the global leaderboard. Pick another one to show up again: your account, progress and minutes stay the same.',
+  'Diagnóstico: reproductor y widgets {timer} · anuncios: {ads} · Google Play {billing}': 'Diagnostics: player and widgets {timer} · ads: {ads} · Google Play {billing}',
+  'listos (de prueba)': 'ready (test)',
+  'listos': 'ready',
+  'apagados en config.js': 'off in config.js',
+  'no para esta cuenta (menor de 13)': 'not for this account (under 13)',
+  'la app se compiló sin AdMob': 'the app was built without AdMob',
+  'Google no dio permiso (consentimiento)': 'Google didn’t allow it (consent)',
+  'error al iniciar': 'error starting',
+  'iniciando…': 'starting…',
 });

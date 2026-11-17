@@ -388,6 +388,12 @@ begin
   if exists (select 1 from private.profiles pr where lower(pr.username) = lower(v) and pr.user_id <> uid) then
     raise exception 'name_taken' using errcode = '23505';
   end if;
+  -- (v4.8.2) Decisión del autor (17 nov 2026, opción a): si el nombre estaba escondido (por el filtro,
+  -- por 3 reportes o por moderación) y la persona elige uno NUEVO, vuelve a aparecer. Los reportes
+  -- eran del nombre anterior, así que al cambiarlo se borran. Con el mismo nombre, nada cambia.
+  if exists (select 1 from private.profiles pr where pr.user_id = uid and lower(pr.username) <> lower(v)) then
+    delete from private.reports r where r.target_id = uid;
+  end if;
   begin
     insert into private.profiles as pr (user_id, username, country, avatar, time_zone, show_on_board)
     values (uid, v, c, a, tz, coalesce(p_show, true))
@@ -395,12 +401,38 @@ begin
       set username = excluded.username, country = excluded.country, avatar = excluded.avatar,
           time_zone = excluded.time_zone, show_on_board = excluded.show_on_board, last_active = now(),
           -- (v4.5.1) Si lo había escondido el filtro de nombres, con el nombre nuevo vuelve a aparecer
-          hidden = case when pr.auto_hidden then false else pr.hidden end,
+          -- (v4.8.2) …y también si lo habían escondido los reportes o la moderación (opción a)
+          hidden = case when pr.auto_hidden or lower(pr.username) <> lower(excluded.username) then false else pr.hidden end,
           auto_hidden = false;
   exception when unique_violation then
     raise exception 'name_taken' using errcode = '23505';
   end;
   return query select pr.username, pr.show_on_board from private.profiles pr where pr.user_id = uid;
+end $$;
+
+-- (v4.8.2) ¿Cómo está TU nombre en el ranking? La app lo pregunta al abrirse para pedirte otro
+-- nombre si el tuyo está escondido. Solo dice el motivo general, nunca quién te reportó.
+--   'ok'      aparece                     'optout'  elegiste no aparecer
+--   'blocked' tiene una palabra prohibida  'hidden'  lo escondieron los reportes o la moderación
+--   'none'    todavía no estás en el ranking
+create or replace function public.my_board_status()
+returns table (username text, status text)
+language plpgsql stable security definer set search_path = '' as $$
+#variable_conflict use_column
+declare
+  uid uuid := private.require_user();
+  p   private.profiles%rowtype;
+begin
+  select * into p from private.profiles pr where pr.user_id = uid;
+  if not found then
+    return query select null::text, 'none'::text;
+    return;
+  end if;
+  return query select p.username,
+    case when p.auto_hidden or private.name_blocked(p.username) then 'blocked'
+         when p.hidden then 'hidden'
+         when not p.show_on_board then 'optout'
+         else 'ok' end;
 end $$;
 
 -- Aparecer o no en el ranking (Ajustes → "Aparecer en el ranking")
@@ -1334,6 +1366,7 @@ revoke execute on function public.get_timer() from public;
 revoke execute on function public.set_timer(jsonb, timestamptz, text) from public;
 revoke execute on function public.claim_block(text, text) from public;
 revoke execute on function public.account_status() from public;
+revoke execute on function public.my_board_status() from public;
 revoke execute on function public.get_entitlements() from public;
 revoke execute on function public.billing_apply(text, jsonb, jsonb) from public;
 revoke execute on function public.billing_sync_gate(uuid) from public;
@@ -1353,6 +1386,9 @@ begin
     execute 'grant execute on function public.get_timer(), public.set_timer(jsonb, timestamptz, text), public.claim_block(text, text) to authenticated';
     execute 'revoke execute on function public.account_status() from anon';
     execute 'grant execute on function public.account_status() to authenticated';
+    -- (v4.8.2) El estado de tu nombre en el ranking
+    execute 'revoke execute on function public.my_board_status() from anon';
+    execute 'grant execute on function public.my_board_status() to authenticated';
     -- (v4.7.0) Premium: leerlo, cualquiera con sesión; escribirlo, SOLO las Edge Functions
     execute 'revoke execute on function public.get_entitlements() from anon';
     execute 'grant execute on function public.get_entitlements() to authenticated';

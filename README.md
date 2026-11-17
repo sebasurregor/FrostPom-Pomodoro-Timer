@@ -1,4 +1,4 @@
-# FrostPom: Pomodoro Timer (v4.8.1)
+# FrostPom: Pomodoro Timer (v4.8.2)
 
 > Antes se llamaba **StudyTimer**. Publicada en **https://sebasurregor.github.io/FrostPom-Pomodoro-Timer/**
 

@@ -876,7 +876,7 @@ reset role;
 do $$
 begin
   assert (select not hidden and not auto_hidden from private.profiles where user_id = 'e4510000-0000-0000-0000-000000000001'), 'FALLO: al cambiar el nombre no volvió a aparecer';
-  -- Lo que esconde el dueño (o los reportes) NO se destapa al cambiar el nombre
+  -- (v4.8.2, opción a del autor) Lo que esconde el dueño (o los reportes) TAMBIÉN vuelve con un nombre nuevo
   update private.profiles set hidden = true, auto_hidden = false where user_id = 'e4510000-0000-0000-0000-000000000002';
 end $$;
 set role authenticated;
@@ -885,8 +885,8 @@ do $$ begin perform public.set_profile('Pingu_Lector2'); end $$;
 reset role;
 do $$
 begin
-  assert (select hidden from private.profiles where user_id = 'e4510000-0000-0000-0000-000000000002'), 'FALLO: cambiar el nombre destapó un nombre escondido por moderación';
-  raise notice 'OK  al elegir un nombre permitido vuelve a aparecer (lo escondido por moderación sigue escondido)';
+  assert (select not hidden from private.profiles where user_id = 'e4510000-0000-0000-0000-000000000002'), 'FALLO: con un nombre nuevo, lo escondido por moderación debía volver (opción a)';
+  raise notice 'OK  al elegir un nombre permitido vuelve a aparecer (v4.8.2: también lo escondido por moderación)';
 end $$;
 
 -- account_status: lo que el servidor sabe de TU cuenta (progreso, nombre y minutos del ranking)
@@ -1200,4 +1200,69 @@ begin
   delete from private.profiles where user_id = 'b4810000-0000-0000-0000-000000000001';
   raise notice 'OK  Nombres: al prohibir una palabra, los nombres ya guardados con ella se esconden solos';
 end $$;
+
+-- (v4.8.2) El estado de tu nombre y la opción a del autor: con un nombre NUEVO vuelves a aparecer
+reset role;
+insert into auth.users (id, is_anonymous) values
+  ('b4820000-0000-0000-0000-000000000001', false), ('b4820000-0000-0000-0000-000000000002', false),
+  ('b4820000-0000-0000-0000-000000000003', false);
+set role authenticated;
+set request.jwt.claim.sub = 'b4820000-0000-0000-0000-000000000001';
+do $$
+declare r record;
+begin
+  select * into r from public.my_board_status();
+  assert r.status = 'none', format('FALLO: sin perfil debía decir none: %s', r.status);
+  perform public.set_profile('lucho.escondido');
+  select * into r from public.my_board_status();
+  assert r.status = 'ok' and r.username = 'lucho.escondido', format('FALLO: debía decir ok: %s', r.status);
+  perform public.set_board_visibility(false);
+  assert (select status from public.my_board_status()) = 'optout', 'FALLO: debía decir optout';
+  perform public.set_board_visibility(true);
+end $$;
+reset role;
+insert into private.reports (reporter_id, target_id, reason) values
+  ('b4820000-0000-0000-0000-000000000002', 'b4820000-0000-0000-0000-000000000001', 'ofensivo'),
+  ('b4820000-0000-0000-0000-000000000003', 'b4820000-0000-0000-0000-000000000001', 'otro');
+select private.hide_name('lucho.escondido');
+set role authenticated;
+set request.jwt.claim.sub = 'b4820000-0000-0000-0000-000000000001';
+do $$
+begin
+  assert (select status from public.my_board_status()) = 'hidden', 'FALLO: escondido por moderación debía decir hidden';
+  perform public.set_profile('lucho.escondido', 'CO');   -- el MISMO nombre: sigue escondido
+  assert (select status from public.my_board_status()) = 'hidden', 'FALLO: con el mismo nombre no debía volver a aparecer';
+  perform public.set_profile('lucho.nuevo');             -- un nombre NUEVO: vuelve (opción a)
+  assert (select status from public.my_board_status()) = 'ok', 'FALLO: con un nombre nuevo debía volver a aparecer';
+end $$;
+reset role;
+do $$
+begin
+  assert not exists (select 1 from private.reports where target_id = 'b4820000-0000-0000-0000-000000000001'), 'FALLO: quedaron los reportes del nombre viejo';
+  raise notice 'OK  Nombres: my_board_status dice none/ok/optout/hidden y un nombre NUEVO vuelve a aparecer sin los reportes viejos';
+end $$;
+-- Una palabra prohibida después: 'blocked' (y la app pide otro nombre)
+do $$ begin perform private.block_word('luchonuevo'); end $$;
+set role authenticated;
+set request.jwt.claim.sub = 'b4820000-0000-0000-0000-000000000001';
+do $$
+begin
+  assert (select status from public.my_board_status()) = 'blocked', 'FALLO: con una palabra prohibida debía decir blocked';
+  perform public.set_profile('lucho.bueno');
+  assert (select status from public.my_board_status()) = 'ok', 'FALLO: con otro nombre debía volver';
+end $$;
+reset role;
+do $$ begin perform private.unblock_word('luchonuevo'); raise notice 'OK  Nombres: una palabra prohibida después dice blocked y con otro nombre vuelve'; end $$;
+set role anon;
+set request.jwt.claim.sub = '';
+do $$
+begin
+  begin
+    perform public.my_board_status();
+    raise exception 'FALLO: un visitante sin sesión pudo preguntar';
+  exception when insufficient_privilege then null;
+  end;
+  raise notice 'OK  Nombres: sin sesión no se puede preguntar el estado';
+end $$;
+reset role;
 \echo 'Todas las pruebas del servidor pasaron.'

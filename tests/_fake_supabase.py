@@ -250,8 +250,20 @@ class FakeSupabase:
             if any(p['username'].lower() == name.lower() and k != uid for k, p in self.profiles.items()):
                 return ok({'code': '23505', 'message': 'name_taken'}, 409)
             prev = self.profiles.get(uid, {})
+            same = prev.get('username', '').lower() == name.lower()
             self.profiles[uid] = {'username': name, 'country': body.get('p_country'), 'avatar': body.get('p_avatar') or '🐧', 'show': body.get('p_show', True), 'xp': prev.get('xp', 0)}
+            # (v4.8.2) Opción a del autor: con el MISMO nombre sigue escondido; con uno nuevo vuelve y se borran sus reportes
+            if same and prev.get('hidden'):
+                self.profiles[uid]['hidden'] = True
+            if prev and not same:
+                self.reports = [r for r in self.reports if r[1] != uid]
             return ok([{'username': name, 'show_on_board': self.profiles[uid]['show']}])
+        if fn == 'my_board_status':  # (v4.8.2) 'blocked' lo simula la prueba con profiles[uid]['blocked']
+            prof = self.profiles.get(uid)
+            if not prof:
+                return ok([{'username': None, 'status': 'none'}])
+            st = 'blocked' if prof.get('blocked') else 'hidden' if prof.get('hidden') else 'optout' if not prof['show'] else 'ok'
+            return ok([{'username': prof['username'], 'status': st}])
         if fn == 'report_name':  # (v4.1) mismas reglas que server/supabase/schema.sql
             if body.get('p_reason') not in ('ofensivo', 'suplantacion', 'datos', 'otro'):
                 return ok({'code': '22023', 'message': 'Motivo no válido'}, 400)

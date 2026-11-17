@@ -1,4 +1,4 @@
-# FrostTimer: la notificación tipo reproductor y los widgets de Android (v4.8.1)
+# FrostTimer: la notificación tipo reproductor y los widgets de Android (v4.8.2)
 
 Este es el código **nativo** (Kotlin) de la notificación en curso, los widgets y el aviso del
 final. La parte web está en `js/native.js` y `js/ui/native-ui.js`. Desde la v4.7.1 viene encendido
@@ -160,6 +160,10 @@ Lo que cambió en la 4.8.0:
   bien, dice **"[OK] La parte nativa de FrostPom… está en el proyecto de Android."**
 - R8 tiene una regla extra que guarda todo `com.startupprometeus.frostpom.timer` tal cual (por si
   acaso).
+
+**(v4.8.2) Lo más fácil para saberlo, sin cables:** en el celular, **Ajustes → Acerca de** (al
+final) dice **"Diagnóstico: reproductor y widgets ✓/✗ · anuncios: … · Google Play ✓/✗"**. Si dice
+✗ en "reproductor y widgets", esta pieza no entró a la app que instalaste: sigue los pasos de abajo.
 
 Pasos (a mano, en PowerShell, en la carpeta del proyecto):
 

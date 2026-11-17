@@ -147,6 +147,25 @@ Si una palabra se repite mucho, agrégala a la lista `BLOCKED` de `js/identity.j
 - **`oculto_por_filtro = true`** quiere decir que los escondió el filtro (no un reporte). Cuando esa persona abre la app, se le pide un nombre nuevo y vuelve a aparecer.
 - **Si alguno es inocente** (el filtro se equivocó), muéstralo con `select private.hide_name('nombre', false);`.
 
+**(v4.8.1) Prohibir una palabra tuya** sin tocar el código (además de la lista fija):
+
+```sql
+select private.block_word('palabra');      -- prohibirla (esconde al instante los nombres que la tienen)
+select * from private.extra_blocked_names; -- ver tu lista
+select private.unblock_word('palabra');    -- quitarla (los escondidos no vuelven solos)
+```
+
+Funciona por partes del nombre y sin tildes ni mayúsculas ("PINGÜ" atrapa "p1ngu_99"). Cuidado con palabras cortas: "ana" bloquearía "Mariana".
+
+**(v4.8.2) Qué ve la persona cuando su nombre está escondido** (tu decisión del 17 nov 2026, opción a):
+
+| Por qué se escondió | Al abrir la app | Cuando elige otro nombre |
+| --- | --- | --- |
+| Palabra de la lista fija o de `block_word` | "Elige un nombre nuevo" (obligatorio) | Vuelve a aparecer |
+| 3 reportes o `hide_name` | "Tu nombre está oculto en el ranking", con "Ahora no" (como mucho una vez al día) | Vuelve a aparecer y **se borran sus reportes viejos** (eran del nombre anterior) |
+
+Con el **mismo** nombre sigue escondido. Si el nombre nuevo también es malo, lo volverán a reportar (o lo escondes tú). La app lo pregunta con `public.my_board_status()`; si tu servidor todavía no la tiene (falta correr el `schema.sql` de la v4.8.2), la app sigue como antes, sin avisar.
+
 ---
 
 ## Paso 6b. Un nombre quedó atrapado en otra sesión (v4.3)

@@ -63,6 +63,12 @@ export async function adMob() {
   return p && p.AdMob ? { api: p.AdMob } : null;
 }
 
+/** (v4.8.2) Qué complementos trae esta app (para el diagnóstico de Ajustes → Acerca de). */
+export async function pluginReport() {
+  const p = await plugins();
+  return { timer: !!(p && p.FrostTimer), admob: !!(p && p.AdMob), billing: !!(p && p.Purchases) };
+}
+
 /** (v4.7.0) El complemento de RevenueCat como { api }, o null (mismo motivo que adMob()). */
 export async function purchases() {
   const p = await plugins();

@@ -38,6 +38,8 @@ let who = null; // la audiencia de la cuenta con la que se inició (ad-rules.aud
 let started = false;
 let starting = null;
 let privacyRequired = false;
+let why = ''; // (v4.8.2) por qué no se iniciaron (para el diagnóstico de Ajustes → Acerca de)
+let whyMsg = '';
 
 /** ¿Esta versión de la app puede mostrar anuncios? (config encendida y app de Android) */
 export const enabled = () => !!cfg().enabled && NATIVE.isAndroid();
@@ -58,15 +60,16 @@ export function start(account) {
   if (started) return Promise.resolve(true);
   if (starting) return starting;
   const aud = R.audience(account);
-  if (!enabled() || !aud) return Promise.resolve(false);
+  if (!enabled() || !aud) { why = !enabled() ? '' : 'age'; return Promise.resolve(false); }
+  why = 'pending';
   starting = (async () => {
     const box = await NATIVE.adMob(); // { api } (ver native.js: el complemento no se puede "esperar" solo)
     plugin = box ? box.api : null;
-    if (!plugin) return false;
+    if (!plugin) { why = 'noplugin'; return false; }
     let info = await plugin.requestConsentInfo({ tagForUnderAgeOfConsent: aud.under16 });
     if (info && info.isConsentFormAvailable && info.status === 'REQUIRED') info = await plugin.showConsentForm();
     privacyRequired = !!info && info.privacyOptionsRequirementStatus === 'REQUIRED';
-    if (!info || !info.canRequestAds) return false;
+    if (!info || !info.canRequestAds) { why = 'consent'; return false; }
     await plugin.initialize({
       tagForChildDirectedTreatment: false, // la app nunca inicia AdMob para menores de 13
       tagForUnderAgeOfConsent: aud.under16,
@@ -74,12 +77,25 @@ export function start(account) {
     });
     who = aud;
     started = true;
+    why = 'ok';
     return true;
   })().catch((e) => {
     console.info('[FrostPom] AdMob no se pudo iniciar:', (e && e.message) || e);
+    why = 'error';
+    whyMsg = String((e && (e.message || e.code)) || e || '').slice(0, 80);
     return false;
   }).finally(() => { starting = null; });
   return starting;
+}
+
+/**
+ * (v4.8.2) Por qué hay o no hay anuncios: 'off' (apagados en config), 'web', 'age' (la cuenta no
+ * puede verlos), 'noplugin' (la app se compiló sin AdMob), 'consent', 'error', 'pending' u 'ok'.
+ */
+export function status() {
+  if (!cfg().enabled) return { why: 'off', testing: !!cfg().testing, msg: '' };
+  if (!NATIVE.isAndroid()) return { why: 'web', testing: !!cfg().testing, msg: '' };
+  return { why: ready() ? 'ok' : (why || 'pending'), testing: !!cfg().testing, msg: whyMsg };
 }
 
 /** ¿Hay que mostrar "Opciones de privacidad de los anuncios" en Ajustes? (Europa y similares) */
@@ -225,4 +241,4 @@ export async function showInterstitial() {
 }
 
 /** Para las pruebas: olvidar todo lo de esta sesión. */
-export function _reset() { plugin = null; who = null; started = false; starting = null; rewardPrep = null; interPrep = null; privacyRequired = false; }
+export function _reset() { plugin = null; who = null; started = false; starting = null; rewardPrep = null; interPrep = null; privacyRequired = false; why = ''; whyMsg = ''; }

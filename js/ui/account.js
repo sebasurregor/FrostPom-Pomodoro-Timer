@@ -325,16 +325,30 @@ export async function createAccountFlow({ required = false } = {}) {
  * con un nombre que dejaba de pasar el filtro se habría perdido al abrir la app).
  */
 export async function renameIfBlocked() {
-  if (!state.account || checkUsername(state.account.username).ok) return;
+  if (!state.account) return;
+  // (v4.8.2) Además del filtro de la app, se le pregunta al servidor: puede que tu nombre tenga una
+  // palabra que el dueño prohibió después, o que lo hayan escondido los reportes o la moderación.
+  let why = checkUsername(state.account.username).ok ? '' : 'blocked';
+  if (!why) {
+    const st = await BOARD.myStatus();
+    if (st && st.status === 'blocked') why = 'blocked';
+    else if (st && st.status === 'hidden' && !askedHiddenToday()) why = 'hidden';
+  }
+  if (!why) return;
   const old = state.account.username;
   const f = accountFields({ withPassword: false, initialName: '' });
   let rec = null;
+  const text = why === 'hidden'
+    ? t('Varias personas reportaron el nombre {name}, así que por ahora no aparece en el ranking global. Elige otro para volver a aparecer: tu cuenta, tu progreso y tus minutos siguen igual.', { name: old })
+    : t('Actualizamos las normas de la comunidad y el nombre {name} ya no está permitido. Elige otro: tu cuenta, tu progreso y tus minutos siguen igual.', { name: old });
+  if (why === 'hidden') markHiddenAsked();
   await openDialog({
     className: 'dlg--onb',
-    dismissable: false,
-    title: 'Elige un nombre nuevo',
-    body: [h('p', { class: 'dlg__text', text: t('Actualizamos las normas de la comunidad y el nombre {name} ya no está permitido. Elige otro: tu cuenta, tu progreso y tus minutos siguen igual.', { name: old }) }), ...f.nodes],
-    actions: [{ label: 'Guardar', value: 'ok', variant: 'btn--gold', primary: true, validate: async () => {
+    // Un nombre prohibido hay que cambiarlo sí o sí; uno reportado, la persona decide (sigue estudiando igual)
+    dismissable: why === 'hidden',
+    title: why === 'hidden' ? 'Tu nombre está oculto en el ranking' : 'Elige un nombre nuevo',
+    body: [h('p', { class: 'dlg__text', text }), ...f.nodes],
+    actions: [...(why === 'hidden' ? [{ label: 'Ahora no', value: 'later' }] : []), { label: 'Guardar', value: 'ok', variant: 'btn--gold', primary: true, validate: async () => {
       rec = await f.validate();
       if (!rec) return false;
       if (BOARD.enabled() && BOARD.isJoined()) {
@@ -354,6 +368,12 @@ export async function renameIfBlocked() {
     toast(t('Listo: ahora eres {name}.', { name: rec.username }), 'good');
   }
 }
+
+// (v4.8.2) "Tu nombre está oculto": como mucho una vez al día (con "Ahora no" no se insiste más hoy)
+const HIDDEN_KEY = 'name_hidden_asked';
+const today = () => new Date().toISOString().slice(0, 10);
+function askedHiddenToday() { try { return store.pref.get(HIDDEN_KEY) === today(); } catch { return false; } }
+function markHiddenAsked() { try { store.pref.set(HIDDEN_KEY, today()); } catch { /* nada */ } }
 
 export async function renameFlow() {
   const f = accountFields({ withPassword: false, initialName: state.profile.nick });
