@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  FrostPom (v4.9.1) — copias de seguridad en Android 12 o más nuevo (tools/app-android.mjs).
+  - Copia en la nube (Google Drive): APAGADA. Ahí iría la sesión de la cuenta en línea.
+  - Pasar al celular nuevo (cable o wifi, al configurarlo): SÍ. Así quien no tiene cuenta en línea
+    (por ejemplo, menores de 13) no pierde su progreso al cambiar de celular.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" path="." />
+        <exclude domain="file" path="." />
+        <exclude domain="database" path="." />
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="external" path="." />
+        <exclude domain="device_root" path="." />
+        <exclude domain="device_file" path="." />
+        <exclude domain="device_database" path="." />
+        <exclude domain="device_sharedpref" path="." />
+    </cloud-backup>
+    <!-- Sin <device-transfer>: al pasar al celular nuevo se copia todo, como siempre. -->
+</data-extraction-rules>
