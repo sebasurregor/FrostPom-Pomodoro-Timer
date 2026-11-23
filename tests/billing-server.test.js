@@ -39,7 +39,7 @@ test('premium (servidor): cada estado de la suscripción', () => {
   assert.deepEqual(P.stateFromSubscriber(null, { now: NOW }), { ...P.NONE }, 'una respuesta rara no da Premium');
 
   const trial = stateOf({ period: 'trial', exp: NOW + 7 * D, product: 'frostpom_premium:anual', sandbox: true });
-  assert.deepEqual(trial, { premium: true, status: 'trial', store: 'play_store', product: 'frostpom_premium:anual', period_type: 'trial', expires_at: iso(NOW + 7 * D), will_renew: true, billing_issue: false, sandbox: true });
+  assert.deepEqual(trial, { premium: true, status: 'trial', store: 'play_store', product: 'frostpom_premium:anual', period_type: 'trial', expires_at: iso(NOW + 7 * D), will_renew: true, billing_issue: false, sandbox: true, gems_purchased: 0 });
 
   const active = stateOf({});
   assert.equal(active.status, 'active');
@@ -236,4 +236,27 @@ test('premium (servidor): los archivos para pegar en Supabase están al día', (
     assert.equal(file, pasteFile(name), `corre: node tools/edge-pegar.mjs (${name})`);
     assert.ok(!/sk_|sb_secret_[a-z0-9]{6}|eyJhbGci/i.test(file.replace(/sk_…|sb_secret_…/g, '')), 'ninguna clave dentro del código');
   }
+});
+
+test('(v4.9.1) gemas compradas: el servidor las cuenta desde RevenueCat (para no recortarlas al guardar)', async () => {
+  // Los paquetes del servidor son los mismos de la app (config.premium.play.gemPacks)
+  const { config } = await import('../js/config.js');
+  assert.deepEqual(P.GEM_PACKS, Object.fromEntries(config.premium.play.gemPacks.map((p) => [p.id, p.gems])),
+    'si cambias un paquete en js/config.js, cámbialo también en GEM_PACKS (premium.js)');
+  // Cada compra cuenta (también con la opción de compra ":…" de Google); lo que no es un paquete, no
+  const sub = { non_subscriptions: {
+    gemas_60: [{ id: 'a' }, { id: 'b' }],
+    'gemas_1500:compra': [{ id: 'c' }],
+    frostpom_premium_vida: [{ id: 'd' }],
+    gemas_inventado: [{ id: 'e' }],
+  } };
+  assert.equal(P.gemsPurchased(sub), 60 * 2 + 1500);
+  assert.equal(P.gemsPurchased(null), 0);
+  assert.equal(P.gemsPurchased({ non_subscriptions: { gemas_60: 'raro' } }), 0);
+  // Va en el estado que se guarda, con y sin Premium
+  assert.equal(P.stateFromSubscriber({ subscriber: { entitlements: {}, ...sub } }, { now: NOW }).gems_purchased, 1620);
+  const withPremium = subscriber();
+  withPremium.subscriber.non_subscriptions = { gemas_330: [{ id: 'x' }] };
+  assert.equal(P.stateFromSubscriber(withPremium, { now: NOW }).gems_purchased, 330);
+  assert.equal(P.NONE.gems_purchased, 0);
 });

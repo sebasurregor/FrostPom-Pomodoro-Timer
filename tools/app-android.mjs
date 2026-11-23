@@ -113,6 +113,21 @@ if (!manifest.includes(deepLink)) {
   }
   manifest = withLink;
 }
+// (v4.9.1) Copias de seguridad: SOLO al pasar al celular nuevo, nunca a la nube (Google Drive), donde
+// iría la sesión de la cuenta en línea. Las reglas están en android-recursos/res/xml/ (el paso 1 las copia).
+const BACKUP_ATTRS = [
+  ['android:allowBackup', 'true'],
+  ['android:fullBackupContent', '@xml/backup_rules'], // Android 11 o más viejo
+  ['android:dataExtractionRules', '@xml/data_extraction_rules'], // Android 12 o más nuevo
+];
+manifest = manifest.replace(/<application\b[^>]*>/, (tag) => BACKUP_ATTRS.reduce((t, [name, value]) => {
+  const re = new RegExp(`${name}="[^"]*"`);
+  return re.test(t) ? t.replace(re, `${name}="${value}"`) : t.replace('<application', `<application\n        ${name}="${value}"`);
+}, tag));
+if (!BACKUP_ATTRS.every(([name, value]) => manifest.includes(`${name}="${value}"`))) {
+  console.error('[X] No pude poner las reglas de las copias de seguridad en android/app/src/main/AndroidManifest.xml');
+  process.exit(1);
+}
 if (manifest !== beforeManifest) writeFileSync(manifestPath, manifest);
 if (!appId) console.warn('[!] AdMob: uso el ID de app de PRUEBA de Google. Antes de publicar, pon el tuyo en config.ads.appId (docs/ANUNCIOS.md).');
 
@@ -176,4 +191,4 @@ const rulesRe = new RegExp(`${RULES_START.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 const newRules = rulesRe.test(rules) ? rules.replace(rulesRe, RULES) : `${rules.replace(/\s*$/, '')}${rules.trim() ? '\n\n' : ''}${RULES}`;
 if (newRules !== rules) writeFileSync(rulesPath, newRules);
 
-console.log(`[OK] Íconos copiados. Versión de la app: ${version} (versionCode ${code}). AdMob: ${appId ? 'tu ID de app' : 'ID de prueba'}${ads.enabled ? '' : ' (anuncios apagados en config.ads)'}. ${billing}. Regreso de Google/Microsoft/Discord: listo.${r8Note}`);
+console.log(`[OK] Íconos copiados. Versión de la app: ${version} (versionCode ${code}). AdMob: ${appId ? 'tu ID de app' : 'ID de prueba'}${ads.enabled ? '' : ' (anuncios apagados en config.ads)'}. ${billing}. Regreso de Google/Microsoft/Discord: listo. Copias de seguridad: solo al celular nuevo (no a la nube).${r8Note}`);

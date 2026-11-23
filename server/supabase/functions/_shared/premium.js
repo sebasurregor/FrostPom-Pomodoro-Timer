@@ -35,10 +35,29 @@ const ms = (iso) => {
 };
 const iso = (t) => (Number.isFinite(t) ? new Date(t).toISOString() : null);
 
+/**
+ * (v4.9.1) Los paquetes de gemas (los mismos de config.premium.play.gemPacks en js/config.js; una
+ * prueba revisa que coincidan). gems = las que da en total cada compra.
+ */
+export const GEM_PACKS = Object.freeze({ gemas_60: 60, gemas_330: 330, gemas_700: 700, gemas_1500: 1500 });
+
+/**
+ * (v4.9.1) Cuántas gemas compró la persona en total, según RevenueCat (que verifica cada compra con
+ * Google). El servidor las usa para no recortar gemas compradas al guardar el progreso (save_progress).
+ */
+export function gemsPurchased(sub) {
+  let total = 0;
+  for (const [id, list] of Object.entries((sub && sub.non_subscriptions) || {})) {
+    const gems = GEM_PACKS[String(id).split(':')[0]];
+    if (gems && Array.isArray(list)) total += gems * list.length;
+  }
+  return total;
+}
+
 /** Sin suscripción. */
 export const NONE = Object.freeze({
   premium: false, status: 'none', store: null, product: null, period_type: null,
-  expires_at: null, will_renew: false, billing_issue: false, sandbox: false,
+  expires_at: null, will_renew: false, billing_issue: false, sandbox: false, gems_purchased: 0,
 });
 
 /**
@@ -53,7 +72,8 @@ export function stateFromSubscriber(body, { entitlement = ENTITLEMENT, now } = {
   const sub = (body && body.subscriber) || {};
   const t = Number.isFinite(now) ? now : (Number(body && body.request_date_ms) || Date.now());
   const ent = (sub.entitlements || {})[entitlement];
-  if (!ent || typeof ent !== 'object') return { ...NONE };
+  const gems_purchased = gemsPurchased(sub); // (v4.9.1) con o sin Premium
+  if (!ent || typeof ent !== 'object') return { ...NONE, gems_purchased };
   const product = typeof ent.product_identifier === 'string' ? ent.product_identifier : null;
   const s = (product && (sub.subscriptions || {})[product]) || {};
   // (v4.9.0) Premium de por vida: es una compra de una sola vez (non_subscriptions), no una suscripción
@@ -85,6 +105,7 @@ export function stateFromSubscriber(body, { entitlement = ENTITLEMENT, now } = {
     will_renew: premium && !lifetime && !unsub && !refunded, // (v4.9.0) lo de por vida no se "renueva"
     billing_issue: issue,
     sandbox: s.is_sandbox === true || once.is_sandbox === true,
+    gems_purchased,
   };
 }
 

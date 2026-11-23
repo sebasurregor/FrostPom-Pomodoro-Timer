@@ -67,6 +67,23 @@ end $$;
 create or replace function private.board_daily_cap_sec() returns int
 language sql immutable set search_path = '' as $$ select 4 * 60 * 60 $$;
 
+-- (v4.9.1) Tope de gemas al guardar el progreso (save_progress). Las gemas se ganan en el teléfono, así
+-- que el servidor no sabe cuántas ganó cada quien; pero sí sabe cuánto es lo MÁS que alguien puede ganar.
+-- Cada cuenta tiene un "presupuesto" de gemas que se llena solo con el tiempo:
+--   - 150 por día: lo más que da un día muy bueno (misiones 22 + anuncios 50 + subir de rango).
+--   - Hasta 3000 guardadas: para lo que llega de golpe (regalo de Premium 1000, logros 500 en total,
+--     premio de la temporada, rangos) y para quien estuvo días sin internet.
+--   - 5000 la primera vez que una cuenta guarda (el progreso que traía de antes en ese aparato).
+--   - Más las gemas COMPRADAS que RevenueCat verificó con Google (private.entitlements.purchased_gems).
+-- Cada vez que las gemas suben, se gasta presupuesto. Si alguien sube sus gemas más de lo que alcanza
+-- (editándolas a mano), el servidor guarda solo lo permitido. Gastar gemas nunca se recorta.
+create or replace function private.gem_rate_per_day() returns int
+language sql immutable set search_path = '' as $$ select 150 $$;
+create or replace function private.gem_budget_max() returns int
+language sql immutable set search_path = '' as $$ select 3000 $$;
+create or replace function private.gem_first_save() returns int
+language sql immutable set search_path = '' as $$ select 5000 $$;
+
 -- Animales del avatar (js/identity.js: AVATARS). La foto de perfil nunca se sube.
 create or replace function private.avatars() returns text[]
 language sql immutable set search_path = '' as $$
@@ -241,6 +258,10 @@ create unique index if not exists profiles_username_ci on private.profiles (lowe
 -- (v4.5.1) Escondido por el filtro de nombres nuevo (no por reportes): se vuelve a mostrar solo
 -- cuando la persona elige un nombre permitido.
 alter table private.profiles add column if not exists auto_hidden boolean not null default false;
+-- (v4.9.1) Cuándo cambió la zona horaria por última vez. El tope de 4 h es por día de la persona,
+-- según su zona: si se pudiera cambiar a cada rato (de UTC+14 a UTC−12), el mismo día real contaría
+-- como 2 o 3 días. Por eso solo se puede cambiar una vez cada 7 días (set_profile).
+alter table private.profiles add column if not exists tz_changed_at timestamptz;
 
 create table if not exists private.study_sessions (
   id           uuid primary key default gen_random_uuid(),
@@ -280,6 +301,11 @@ create table if not exists private.saves (
   bytes      int not null default 0,
   updated_at timestamptz not null default now()
 );
+-- (v4.9.1) El presupuesto de gemas de la cuenta (ver private.gem_rate_per_day). Las cuentas que ya
+-- existían empiezan con el presupuesto lleno.
+alter table private.saves add column if not exists gem_budget numeric not null default 3000;
+alter table private.saves add column if not exists gem_budget_at timestamptz not null default now();
+alter table private.saves add column if not exists gems_purchased_seen int not null default 0;
 
 -- (v4.1) Reportes de nombres del ranking. Una fila por persona que reporta y nombre reportado.
 create table if not exists private.reports (
@@ -399,7 +425,15 @@ begin
     values (uid, v, c, a, tz, coalesce(p_show, true))
     on conflict (user_id) do update
       set username = excluded.username, country = excluded.country, avatar = excluded.avatar,
-          time_zone = excluded.time_zone, show_on_board = excluded.show_on_board, last_active = now(),
+          -- (v4.9.1) La zona horaria se cambia como mucho una vez cada 7 días (si no, se queda la de
+          -- antes sin dar error): así nadie salta de zona para tener más de 4 h al día en el ranking.
+          time_zone = case when pr.time_zone = excluded.time_zone
+                             or (pr.tz_changed_at is not null and pr.tz_changed_at > now() - interval '7 days')
+                           then pr.time_zone else excluded.time_zone end,
+          tz_changed_at = case when pr.time_zone = excluded.time_zone
+                                 or (pr.tz_changed_at is not null and pr.tz_changed_at > now() - interval '7 days')
+                               then pr.tz_changed_at else now() end,
+          show_on_board = excluded.show_on_board, last_active = now(),
           -- (v4.5.1) Si lo había escondido el filtro de nombres, con el nombre nuevo vuelve a aparecer
           -- (v4.8.2) …y también si lo habían escondido los reportes o la moderación (opción a)
           hidden = case when pr.auto_hidden or lower(pr.username) <> lower(excluded.username) then false else pr.hidden end,
@@ -729,31 +763,70 @@ create or replace function public.save_progress(p_data jsonb, p_base_version int
 returns int
 language plpgsql security definer set search_path = '' as $$
 declare
-  uid  uuid := private.require_account();
-  cur  int;
-  d    jsonb;
-  size int;
+  uid    uuid := private.require_account();
+  sv     private.saves%rowtype;
+  has    boolean;
+  d      jsonb;
+  size   int;
+  bought int;
+  budget numeric;   -- (v4.9.1) presupuesto de gemas (ver private.gem_rate_per_day)
+  allow  numeric;
+  gems   numeric;
+  old    numeric := 0;
+  inc    numeric := 0;
 begin
   if p_data is null or jsonb_typeof(p_data) <> 'object' then
     raise exception 'save_invalid' using errcode = '22023';
   end if;
   d := (p_data - 'account') #- '{profile,photo}';
+  select * into sv from private.saves x where x.user_id = uid for update;
+  has := found;
+  if has and coalesce(p_base_version, 0) <> sv.version then
+    raise exception 'save_conflict' using errcode = '40001', detail = sv.version::text;
+  end if;
+
+  -- (v4.9.1) Tope de gemas: solo pueden subir lo que alcanza el presupuesto (+ las compradas nuevas)
+  bought := coalesce((select e.purchased_gems from private.entitlements e where e.user_id = uid), 0);
+  if not has then
+    budget := private.gem_first_save();
+    allow  := budget + bought;
+  else
+    budget := greatest(sv.gem_budget, least(private.gem_budget_max(),
+                sv.gem_budget + private.gem_rate_per_day() * extract(epoch from (now() - sv.gem_budget_at)) / 86400));
+    allow  := budget + greatest(bought - sv.gems_purchased_seen, 0);
+    if jsonb_typeof(sv.data #> '{progress,gems}') = 'number' then
+      old := greatest(floor((sv.data #>> '{progress,gems}')::numeric), 0);
+    end if;
+  end if;
+  if jsonb_typeof(d #> '{progress,gems}') = 'number' then
+    gems := greatest(floor((d #>> '{progress,gems}')::numeric), 0);
+    if gems - old > allow then
+      gems := old + floor(allow);   -- subió más de lo posible: se guarda solo lo permitido
+    end if;
+    inc := gems - old;
+    d := jsonb_set(d, '{progress,gems}', to_jsonb(gems));
+  end if;
+  budget := allow - greatest(inc, 0);
+  if not has then
+    budget := least(budget, private.gem_budget_max());
+  end if;
+
   size := octet_length(d::text);
   if size > 1048576 then
     raise exception 'save_too_big' using errcode = '54000';
   end if;
-  select sv.version into cur from private.saves sv where sv.user_id = uid for update;
-  if cur is null then
-    insert into private.saves (user_id, data, version, bytes) values (uid, d, 1, size);
+  if not has then
+    insert into private.saves (user_id, data, version, bytes, gem_budget, gem_budget_at, gems_purchased_seen)
+    values (uid, d, 1, size, budget, now(), bought);
     perform private.notify(uid, jsonb_build_object('k', 'p', 'v', 1)); -- (v4.5.1) tus otros aparatos lo traen ya
     return 1;
   end if;
-  if coalesce(p_base_version, 0) <> cur then
-    raise exception 'save_conflict' using errcode = '40001', detail = cur::text;
-  end if;
-  update private.saves set data = d, version = cur + 1, bytes = size, updated_at = now() where user_id = uid;
-  perform private.notify(uid, jsonb_build_object('k', 'p', 'v', cur + 1));
-  return cur + 1;
+  update private.saves x
+     set data = d, version = sv.version + 1, bytes = size, updated_at = now(),
+         gem_budget = budget, gem_budget_at = now(), gems_purchased_seen = greatest(bought, sv.gems_purchased_seen)
+   where x.user_id = uid;
+  perform private.notify(uid, jsonb_build_object('k', 'p', 'v', sv.version + 1));
+  return sv.version + 1;
 end $$;
 
 -- Elimina tu cuenta en línea por completo: progreso, ranking y la cuenta misma (con correo o no).
@@ -925,6 +998,14 @@ begin
    where r.reporter_id = uid and r.created_at > now() - interval '1 day';
   if today >= 20 then
     raise exception 'too_many_reports' using errcode = '54000';
+  end if;
+  -- (v4.9.1) Solo cuentan los reportes de cuentas con correo de al menos 3 días. Así nadie esconde
+  -- un nombre creando 3 cuentas anónimas (o nuevas) en unos minutos. Igual que con un nombre que no
+  -- existe, no se dice nada: el reporte simplemente no se anota.
+  if not exists (select 1 from auth.users u
+                  where u.id = uid and not coalesce(u.is_anonymous, false)
+                    and u.created_at <= now() - interval '3 days') then
+    return;
   end if;
   select p.user_id into target from private.profiles p
    where lower(p.username) = lower(btrim(coalesce(p_username, ''))) and p.show_on_board and not p.hidden;
@@ -1239,6 +1320,8 @@ create table if not exists private.entitlements (
   updated_at    timestamptz not null default now(),
   synced_at     timestamptz                    -- última vez que la app pidió revisar (límite de uso)
 );
+-- (v4.9.1) Gemas compradas en total (paquetes de Google Play verificados por RevenueCat). Solo sube.
+alter table private.entitlements add column if not exists purchased_gems int not null default 0 check (purchased_gems >= 0);
 
 -- Los avisos de RevenueCat que llegaron (para revisar si algo no llegó). Sin datos personales.
 create table if not exists private.billing_events (
@@ -1288,6 +1371,7 @@ declare
   uid  uuid;
   st   text := coalesce(p_state->>'status', 'none');
   exp  timestamptz;
+  gp   int;
 begin
   if p_event is not null and coalesce(p_event->>'id', '') <> '' then
     insert into private.billing_events (event_id, app_user_id, type, environment)
@@ -1310,16 +1394,21 @@ begin
   exception when others then
     raise exception 'billing_invalid' using errcode = '22023';
   end;
+  -- (v4.9.1) Gemas compradas en total según RevenueCat (un número entero, o 0 si no viene)
+  gp := case when jsonb_typeof(p_state->'gems_purchased') = 'number'
+             then least(greatest(floor((p_state->>'gems_purchased')::numeric), 0), 100000000)::int else 0 end;
   insert into private.entitlements as e (user_id, premium, status, store, product, period_type, expires_at,
-                                         will_renew, billing_issue, sandbox, updated_at)
+                                         will_renew, billing_issue, sandbox, purchased_gems, updated_at)
   values (uid, coalesce((p_state->>'premium')::boolean, false), st, left(p_state->>'store', 40),
           left(p_state->>'product', 100), left(p_state->>'period_type', 20), exp,
           coalesce((p_state->>'will_renew')::boolean, false), coalesce((p_state->>'billing_issue')::boolean, false),
-          coalesce((p_state->>'sandbox')::boolean, false), now())
+          coalesce((p_state->>'sandbox')::boolean, false), gp, now())
   on conflict (user_id) do update set
     premium = excluded.premium, status = excluded.status, store = excluded.store, product = excluded.product,
     period_type = excluded.period_type, expires_at = excluded.expires_at, will_renew = excluded.will_renew,
-    billing_issue = excluded.billing_issue, sandbox = excluded.sandbox, updated_at = now();
+    billing_issue = excluded.billing_issue, sandbox = excluded.sandbox,
+    purchased_gems = greatest(e.purchased_gems, excluded.purchased_gems), -- solo sube
+    updated_at = now();
   -- Tus otros aparatos se enteran al instante (Realtime): "revisa tu Premium". Sin datos personales.
   perform private.notify(uid, jsonb_build_object('k', 'e'));
   return true;

@@ -169,6 +169,37 @@ begin
   assert r.avatar = '🐧' and r.time_zone = 'UTC', 'FALLO: aceptó un avatar o una zona horaria inventados';
   raise notice 'OK  avatar y zona horaria inventados se reemplazan por los de siempre';
 end $$;
+
+-- (v4.9.1) La zona horaria solo se cambia una vez cada 7 días (si no, saltando de UTC+14 a UTC−12 el
+-- mismo día real contaría como varios días y se pasaría el tope de 4 h)
+set role authenticated;
+set request.jwt.claim.sub = '22222222-2222-2222-2222-222222222222';
+do $$ begin perform public.set_profile('Beto.fan', 'MX', '🦊', 'Pacific/Kiritimati'); end $$;  -- 1er cambio: sí
+do $$ begin perform public.set_profile('Beto.fan', 'MX', '🦊', 'Etc/GMT+12'); end $$;          -- 2º, enseguida: no
+reset role;
+do $$
+declare r record;
+begin
+  select time_zone, tz_changed_at into r from private.profiles where username = 'Beto.fan';
+  assert r.time_zone = 'Pacific/Kiritimati' and r.tz_changed_at is not null,
+    'FALLO: dejó cambiar la zona horaria dos veces seguidas';
+  raise notice 'OK  la zona horaria solo se cambia una vez cada 7 días (el segundo cambio se ignora)';
+end $$;
+-- Pasada la semana, se puede cambiar otra vez; con la misma zona no se gasta el cambio
+update private.profiles set tz_changed_at = now() - interval '8 days' where username = 'Beto.fan';
+set role authenticated;
+set request.jwt.claim.sub = '22222222-2222-2222-2222-222222222222';
+do $$ begin perform public.set_profile('Beto.fan', 'MX', '🦊', 'Pacific/Kiritimati'); end $$;  -- misma zona
+do $$ begin perform public.set_profile('Beto.fan', 'MX', '🦊', 'UTC'); end $$;                 -- cambio: sí
+reset role;
+do $$
+declare r record;
+begin
+  select time_zone, tz_changed_at into r from private.profiles where username = 'Beto.fan';
+  assert r.time_zone = 'UTC' and r.tz_changed_at > now() - interval '1 minute',
+    'FALLO: después de 7 días no dejó cambiar la zona horaria';
+  raise notice 'OK  después de 7 días se puede cambiar la zona horaria otra vez';
+end $$;
 do $$ begin perform pg_temp.studied('22222222-2222-2222-2222-222222222222', 20); end $$;
 
 -- ===================== Caro (sale del ranking) =====================
@@ -460,11 +491,18 @@ end $$;
 -- ===================== (v4.1) Reportar nombres del ranking =====================
 reset role;
 insert into auth.users (id, is_anonymous) values
-  ('b0000000-0000-0000-0000-000000000001', false),   -- Tomi: su nombre será reportado
-  ('b0000000-0000-0000-0000-000000000011', false),   -- quienes reportan
-  ('b0000000-0000-0000-0000-000000000012', true),
-  ('b0000000-0000-0000-0000-000000000013', false),
-  ('b0000000-0000-0000-0000-000000000014', false);
+  ('b0000000-0000-0000-0000-000000000001', false);   -- Tomi: su nombre será reportado
+-- Quienes reportan: (v4.9.1) cuentas con correo de más de 3 días (las únicas cuyos reportes cuentan)
+insert into auth.users (id, is_anonymous, created_at) values
+  ('b0000000-0000-0000-0000-000000000011', false, now() - interval '10 days'),
+  ('b0000000-0000-0000-0000-000000000012', false, now() - interval '10 days'),
+  ('b0000000-0000-0000-0000-000000000013', false, now() - interval '10 days'),
+  ('b0000000-0000-0000-0000-000000000014', false, now() - interval '10 days');
+-- (v4.9.1) Cuentas cuyos reportes NO cuentan: anónimas (aunque sean viejas) y con correo recién creadas
+insert into auth.users (id, is_anonymous, created_at) values
+  ('b0000000-0000-0000-0000-000000000021', true,  now() - interval '10 days'),
+  ('b0000000-0000-0000-0000-000000000022', true,  now() - interval '10 days'),
+  ('b0000000-0000-0000-0000-000000000023', false, now() - interval '1 day');
 -- 20 nombres más, para probar el tope diario
 insert into auth.users (id, is_anonymous)
   select ('c0000000-0000-0000-0000-' || lpad(i::text, 12, '0'))::uuid, true from generate_series(1, 21) i;
@@ -502,6 +540,24 @@ begin
     'FALLO: debían quedar 2 reportes (uno por persona, sin el de él mismo)';
   assert not (select hidden from private.profiles where username = 'tomi.reportado'), 'FALLO: se ocultó con solo 2 reportes';
   raise notice 'OK  con 2 personas el nombre sigue visible';
+end $$;
+
+-- (v4.9.1) Los reportes de cuentas anónimas o recién creadas no cuentan (sin error: no revela la regla)
+set role authenticated;
+set request.jwt.claim.sub = 'b0000000-0000-0000-0000-000000000021';
+do $$ begin perform public.report_name('tomi.reportado', 'ofensivo'); end $$;
+set request.jwt.claim.sub = 'b0000000-0000-0000-0000-000000000022';
+do $$ begin perform public.report_name('tomi.reportado', 'ofensivo'); end $$;
+set request.jwt.claim.sub = 'b0000000-0000-0000-0000-000000000023';
+do $$ begin perform public.report_name('tomi.reportado', 'ofensivo'); end $$;
+reset role;
+do $$
+begin
+  assert (select count(*) from private.reports r join private.profiles p on p.user_id = r.target_id where p.username = 'tomi.reportado') = 2,
+    'FALLO: contó reportes de cuentas anónimas o recién creadas';
+  assert not (select hidden from private.profiles where username = 'tomi.reportado'),
+    'FALLO: 3 cuentas anónimas o nuevas escondieron un nombre';
+  raise notice 'OK  los reportes de cuentas anónimas o de menos de 3 días no cuentan';
 end $$;
 set role authenticated;
 set request.jwt.claim.sub = 'b0000000-0000-0000-0000-000000000013';
@@ -1265,4 +1321,72 @@ begin
   raise notice 'OK  Nombres: sin sesión no se puede preguntar el estado';
 end $$;
 reset role;
+
+-- ===================== (v4.9.1) Tope de gemas al guardar el progreso =====================
+insert into auth.users (id, is_anonymous) values ('e4910000-0000-4000-8000-000000000001', false);
+create function pg_temp.gems() returns numeric language sql as $$
+  select (data #>> '{progress,gems}')::numeric from private.saves where user_id = 'e4910000-0000-4000-8000-000000000001' $$;
+set role authenticated;
+set request.jwt.claim.sub = 'e4910000-0000-4000-8000-000000000001';
+do $$ begin perform public.save_progress('{"progress":{"gems":999999}}', 0); end $$;   -- 1ª vez: máximo 5000
+reset role;
+do $$ begin
+  assert pg_temp.gems() = 5000, 'FALLO: la primera vez aceptó más de 5000 gemas';
+  raise notice 'OK  Gemas: la primera vez que una cuenta guarda, máximo 5000';
+end $$;
+set role authenticated;
+set request.jwt.claim.sub = 'e4910000-0000-4000-8000-000000000001';
+do $$ begin perform public.save_progress('{"progress":{"gems":5100}}', 1); end $$;     -- sin presupuesto: no sube
+do $$ begin perform public.save_progress('{"progress":{"gems":4000}}', 2); end $$;     -- gastar: siempre se puede
+reset role;
+do $$ begin
+  assert pg_temp.gems() = 4000, 'FALLO: no respetó el presupuesto o recortó un gasto';
+  raise notice 'OK  Gemas: sin presupuesto no suben; gastarlas nunca se recorta';
+end $$;
+-- Compra verificada por RevenueCat: esas gemas sí pasan, aunque no quede presupuesto
+insert into private.entitlements (user_id, purchased_gems) values ('e4910000-0000-4000-8000-000000000001', 1500);
+set role authenticated;
+set request.jwt.claim.sub = 'e4910000-0000-4000-8000-000000000001';
+do $$ begin perform public.save_progress('{"progress":{"gems":5500}}', 3); end $$;
+do $$ begin perform public.save_progress('{"progress":{"gems":7000}}', 4); end $$;     -- la misma compra no vale dos veces
+reset role;
+do $$ begin
+  assert pg_temp.gems() = 5500, 'FALLO: recortó gemas compradas o dejó usar la misma compra dos veces';
+  raise notice 'OK  Gemas: las compradas pasan completas, una sola vez';
+end $$;
+-- El presupuesto se llena con el tiempo: 150 por día (2 días = 300)
+update private.saves set gem_budget = 0, gem_budget_at = now() - interval '2 days'
+ where user_id = 'e4910000-0000-4000-8000-000000000001';
+set role authenticated;
+set request.jwt.claim.sub = 'e4910000-0000-4000-8000-000000000001';
+do $$ begin perform public.save_progress('{"progress":{"gems":9000}}', 5); end $$;
+do $$ begin perform public.save_progress('{"progress":{"xp":1}}', 6); end $$;           -- sin gemas: guarda igual
+reset role;
+do $$ begin
+  assert (select data #>> '{progress,gems}' from private.saves where user_id = 'e4910000-0000-4000-8000-000000000001') is null,
+    'FALLO: inventó gemas en un progreso que no las trae';
+  assert (select version from private.saves where user_id = 'e4910000-0000-4000-8000-000000000001') = 7, 'FALLO: no guardó';
+  raise notice 'OK  Gemas: un progreso sin gemas se guarda igual';
+end $$;
+update private.saves set data = '{"progress":{"gems":5500}}', gem_budget = 0, gem_budget_at = now() - interval '2 days'
+ where user_id = 'e4910000-0000-4000-8000-000000000001';
+set role authenticated;
+set request.jwt.claim.sub = 'e4910000-0000-4000-8000-000000000001';
+do $$ begin perform public.save_progress('{"progress":{"gems":9000}}', 7); end $$;
+reset role;
+do $$ begin
+  assert pg_temp.gems() = 5800, 'FALLO: en 2 días el presupuesto debía dar 300 gemas';
+  raise notice 'OK  Gemas: el presupuesto se llena con el tiempo (150 por día)';
+end $$;
+-- billing_apply guarda las gemas compradas y nunca las baja
+set role service_role;
+do $$ begin
+  perform public.billing_apply('e4910000-0000-4000-8000-000000000001', '{"status":"none","gems_purchased":60}'::jsonb);
+end $$;
+reset role;
+do $$ begin
+  assert (select purchased_gems from private.entitlements where user_id = 'e4910000-0000-4000-8000-000000000001') = 1500,
+    'FALLO: billing_apply bajó las gemas compradas';
+  raise notice 'OK  Gemas: las compradas que guarda billing_apply solo suben';
+end $$;
 \echo 'Todas las pruebas del servidor pasaron.'

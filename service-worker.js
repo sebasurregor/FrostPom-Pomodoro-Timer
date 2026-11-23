@@ -69,6 +69,7 @@ const PRECACHE = [
   './js/voices.js',
   './js/pet.js',
   './js/main.js',
+  './js/frame-guard.js', // (v4.9.1) la app no arranca dentro del <iframe> de otra página
   './js/native.js',
   './js/ui/native-ui.js',
   './js/ui/dom.js',

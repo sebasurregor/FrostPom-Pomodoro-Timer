@@ -1619,3 +1619,31 @@ test('anuncios (v4.8.1): encendidos con la cuenta de AdMob del autor, en modo de
   const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
   assert.match(pkg.dependencies['@capacitor-community/admob'], /^8\./);
 });
+
+test('(v4.9.1) frame-guard: la app no arranca dentro del <iframe> de otra página', async () => {
+  const FG = await import('../js/frame-guard.js'); // en Node no hay window: importarlo no hace nada
+  // Ventana normal (navegador, Android, PiP): no se toca nada
+  const top = { location: { href: 'https://x/' } };
+  top.self = top;
+  top.top = top;
+  assert.equal(FG.isFramed(top), false);
+  assert.equal(FG.guardFrame(top), false);
+  // Dentro de un marco de otro sitio: intenta salir y, si no puede, cambia la pantalla por un aviso
+  const made = [];
+  const el = () => { const e = { append: (c) => { e.child = c; } }; made.push(e); return e; };
+  let shown = null;
+  const doc = { createElement: el, body: { replaceChildren: (n) => { shown = n; } }, defaultView: { navigator: { language: 'es-CO' } } };
+  const framed = { self: {}, document: doc, location: { href: 'https://app/#/' },
+    get top() { return { location: { replace: () => { throw new Error('bloqueado'); } } }; } };
+  assert.equal(FG.isFramed(framed), true);
+  assert.equal(FG.guardFrame(framed), true);
+  assert.match(shown.textContent, /propia ventana/);
+  assert.equal(shown.child.href, 'https://app/#/');
+  assert.equal(shown.child.rel, 'noopener noreferrer');
+  // Si ni siquiera deja mirar la ventana de arriba (otro sitio), también cuenta como marco
+  assert.equal(FG.isFramed({ get self() { return 1; }, get top() { throw new Error('otro sitio'); } }), true);
+  // main.js lo importa PRIMERO y el modo sin internet lo tiene guardado
+  const main = readFileSync(new URL('../js/main.js', import.meta.url), 'utf8');
+  assert.ok(main.indexOf("import './frame-guard.js'") < main.indexOf('import { KEY'), 'frame-guard va antes que todo');
+  assert.ok(readFileSync(new URL('../service-worker.js', import.meta.url), 'utf8').includes("'./js/frame-guard.js'"));
+});

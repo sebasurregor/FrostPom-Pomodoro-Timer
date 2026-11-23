@@ -3,6 +3,8 @@
  * Aquí se conectan las piezas: qué se pinta, en qué orden, y los eventos globales
  * (cambio de ruta, otra pestaña, volver a la app, barra espaciadora).
  */
+// (v4.9.1) PRIMERO: si otra página metió la app en un <iframe>, no arranca (js/frame-guard.js)
+import './frame-guard.js';
 import { KEY, TIMER_KEY } from './storage.js';
 import * as U from './util.js';
 import * as E from './engine.js';
