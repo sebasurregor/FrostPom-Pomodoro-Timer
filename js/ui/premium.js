@@ -223,7 +223,7 @@ export function playStatusText(e) {
   const date = e.expiresAt ? fmtDate(e.expiresAt) : '';
   let text;
   if (e.status === 'grace') text = tr('Google Play no pudo cobrar tu suscripción. Revisa tu medio de pago en Google Play para no perder Premium.');
-  else if (!e.expiresAt) text = tr('Tienes Premium sin fecha de vencimiento. ¡Gracias por apoyar FrostPom!');
+  else if (!e.expiresAt) text = tr('Tienes Premium de por vida. ¡Gracias por apoyar FrostPom!');
   else if (e.status === 'trial') {
     text = e.willRenew
       ? t('Estás en tu prueba gratis hasta el {date}. Después, Google Play empieza a cobrar tu suscripción, salvo que la canceles.', { date })
@@ -260,6 +260,8 @@ const trialName = (tri) => (tri.days ? t('{n} días gratis', { n: tri.days }) : 
 const perName = (plan) => (plan.id === 'annual' ? tr('al año') : tr('al mes'));
 /** Lo que se dice antes de pagar (Google Play pide decirlo claro: precio, renovación, cómo cancelar). */
 function termsText(plan) {
+  // (v4.9.0) De por vida: un solo pago, sin renovación
+  if (plan.id === 'lifetime') return `${t('{price}, un solo pago: Premium para siempre en tu cuenta de FrostPom, sin renovaciones.', { price: plan.priceString })} ${tr('El cobro lo hace Google Play.')}`;
   const price = `${plan.priceString} ${perName(plan)}`;
   const base = plan.trial
     ? t('{trial}. Después, {price}, con renovación automática. Cancela cuando quieras en Google Play → Suscripciones; si cancelas antes de que termine la prueba, no se cobra nada.', { trial: trialName(plan.trial), price })
@@ -267,6 +269,7 @@ function termsText(plan) {
   return `${base} ${tr('El cobro lo hace Google Play.')}`;
 }
 function buyLabel(plan) {
+  if (plan.id === 'lifetime') return t('Comprar de por vida, {price}', { price: plan.priceString });
   if (plan.trial && plan.trial.days) return t('Empezar {n} días gratis', { n: plan.trial.days });
   if (plan.trial) return tr('Empezar mi prueba gratis');
   return t('Suscribirme, {price}', { price: plan.priceString });
@@ -275,9 +278,12 @@ function buyLabel(plan) {
 /** Abre la página de Google Play (en la app de Android abre la Play Store). */
 function openPlay(url) { window.open(url, '_blank', 'noopener'); }
 
-/** La ventana de Premium en la app de Android con cobro. */
-async function playDialog() {
-  if (isPremium()) return playManageDialog(paidEntry());
+/**
+ * La ventana de Premium en la app de Android con cobro.
+ * (v4.9.0) only = 'lifetime': solo el plan de por vida (para pasarse desde una suscripción).
+ */
+async function playDialog({ only = '' } = {}) {
+  if (isPremium() && !only) return playManageDialog(paidEntry());
   const block = playBlocker();
   if (block) return playBlockedDialog(block);
   const uid = playUid();
@@ -301,7 +307,9 @@ async function playDialog() {
     if (again === 'retry') return playDialog();
     return;
   }
-  const plans = [o.annual && { id: 'annual', ...o.annual }, o.monthly && { id: 'monthly', ...o.monthly }].filter(Boolean);
+  const plans = [o.annual && { id: 'annual', ...o.annual }, o.monthly && { id: 'monthly', ...o.monthly }, o.lifetime && { id: 'lifetime', ...o.lifetime }]
+    .filter(Boolean).filter((p) => !only || p.id === only);
+  if (!plans.length) { toast('Google Play no tiene ese plan disponible ahora. Inténtalo más tarde.', 'info'); return; }
   let pick = plans[0];
   let result = null;
   const terms = h('p', { class: 'dlg__note premium__terms', id: 'playTerms' });
@@ -320,8 +328,9 @@ async function playDialog() {
       paint();
     },
   },
-  h('span', { class: 'plan__name', text: p.id === 'annual' ? 'Anual' : 'Mensual' }),
-  h('span', { class: 'plan__price', text: p.id === 'annual' ? t('{price} al año', { price: p.priceString }) : t('{price} al mes', { price: p.priceString }) }),
+  h('span', { class: 'plan__name', text: p.id === 'annual' ? 'Anual' : p.id === 'lifetime' ? 'De por vida' : 'Mensual' }),
+  h('span', { class: 'plan__price', text: p.id === 'annual' ? t('{price} al año', { price: p.priceString }) : p.id === 'lifetime' ? t('{price}, un solo pago', { price: p.priceString }) : t('{price} al mes', { price: p.priceString }) }),
+  p.id === 'lifetime' ? h('span', { class: 'plan__badge plan__badge--forever', text: 'Para siempre' }) : null,
   p.id === 'annual' && p.perMonth && plans.length > 1 ? h('small', { class: 'plan__sub', text: t('Equivale a {price} al mes', { price: p.perMonth }) }) : null,
   p.id === 'annual' && o.savings ? h('span', { class: 'plan__badge', text: t('Ahorra {n} %', { n: o.savings }) }) : null));
   const restoreBtn = h('button', {
@@ -366,12 +375,18 @@ async function playDialog() {
     onOpen: paint,
   });
   if (r === 'manage') openPlay(PLAY.manageLink(paidEntry()));
-  if ((r === 'buy' || r === 'restored') && result) await afterPaid({ restored: r === 'restored' });
+  if ((r === 'buy' || r === 'restored') && result) await afterPaid({ restored: r === 'restored', upgraded: !!only });
 }
 
 /** Ya pagó (o recuperó su compra): el regalo la primera vez, y el servidor revisa la compra. */
-async function afterPaid({ restored = false, quiet = false } = {}) {
+async function afterPaid({ restored = false, quiet = false, upgraded = false } = {}) {
   const uid = playUid();
+  // (v4.9.0) Se pasó de una suscripción a de por vida: la suscripción NO se cancela sola
+  if (upgraded) {
+    toast('¡Ya eres Premium de por vida! Cancela tu suscripción en Google Play → Suscripciones para que no se cobre más.', 'good', { icon: pic('corona', 30), ms: 9000 });
+    if (uid) PLAY.serverSync(uid).then(() => { rerender(); }).catch(() => {});
+    return;
+  }
   const gift = mutate((st) => E.premiumGift(st)); // la primera vez: 1000 gemas y la mascota (celebrations.js)
   if (!gift.ok && !quiet) {
     FX.sfx.achievement();
@@ -385,6 +400,9 @@ async function afterPaid({ restored = false, quiet = false } = {}) {
 /** Ya eres Premium (pagado): estado de la suscripción y "Administrar suscripción". */
 async function playManageDialog(e) {
   const warn = !!(e && e.status === 'grace');
+  const forever = PLAY.isLifetime(e);
+  // (v4.9.0) Con una suscripción, se ofrece pasarse a de por vida (y con de por vida no hay nada que administrar)
+  const canUpgrade = !!(e && e.premium && !forever);
   const r = await openDialog({
     className: 'dlg--premium',
     title: 'Eres Premium',
@@ -394,13 +412,15 @@ async function playManageDialog(e) {
       state.premium.giftPending ? h('p', { class: 'dlg__text', text: 'Todavía no eliges tu mascota de regalo.' }) : null,
     ],
     actions: [
-      { label: 'Administrar suscripción', value: 'manage' },
+      forever ? null : { label: 'Administrar suscripción', value: 'manage' },
+      canUpgrade ? { label: 'Pasarme a de por vida', value: 'lifetime' } : null,
       state.premium.giftPending ? { label: [pic('cofre', 24), 'Elegir mascota'], value: 'gift', variant: 'btn--crown' } : null,
       { label: 'Genial', value: 'ok', variant: 'btn--gold', primary: true },
     ].filter(Boolean),
   });
   if (r === 'gift') return giftCompanionDialog();
   if (r === 'manage') openPlay(PLAY.manageLink(e));
+  if (r === 'lifetime') return playDialog({ only: 'lifetime' });
 }
 
 /** Todavía no se puede suscribir (sin cuenta en línea, sesión cerrada o menor de 13). */
@@ -499,6 +519,11 @@ async function demoEnded() {
     actions: [{ label: 'Entendido', value: 'ok' }, { label: 'Ver Premium', value: 'see', variant: 'btn--gold', primary: true }],
   });
   if (r === 'see') premiumDialog();
+}
+
+/** (v4.9.0) ¿Tiene Premium de por vida? (para avisar antes de borrar la cuenta) */
+export function hasLifetime() {
+  return PLAY.enabled() && PLAY.isLifetime(paidEntry());
 }
 
 /** ¿Tiene una suscripción de Google Play que se renueva? (para avisar antes de borrar la cuenta) */

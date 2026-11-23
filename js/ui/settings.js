@@ -22,7 +22,8 @@ import * as CLOUD from '../cloud.js';
 import { state, store, mutate, today, session, lastSavedAt } from './context.js';
 import { t, tr, lang, setLang } from '../i18n.js';
 import { notificationPermission } from '../native.js';
-import { isNative, enableFromSettings } from './native-ui.js';
+import { isNative, enableFromSettings, notifPlayer, setNotifPlayer } from './native-ui.js';
+import { isAndroid } from '../native.js';
 
 export function renderSettings() {
   renderSound();
@@ -33,6 +34,8 @@ export function renderSettings() {
   $('#accStatus').textContent = state.account ? t('Tu usuario es {name}.', { name: state.account.username }) : tr('Aún no tienes cuenta. Créala para proteger tu progreso con contraseña.');
   $('#setTheme').value = state.settings.theme || 'auto';
   $('#accPassLabel').textContent = tr(state.account ? 'Cambiar contraseña' : 'Crear cuenta');
+  // (v4.9.0) Con Google, Microsoft o Discord no hay contraseña de FrostPom que cambiar
+  $('#accPassBtn').hidden = !!(state.account && state.account.oauth);
   const mail = state.account && state.account.email;
   $('#accMailRow').hidden = !state.account || !CLOUD.isConfigured();
   $('#accMailText').textContent = mail ? CLOUD.maskEmail(mail) : tr('Sin correo: si olvidas la contraseña no podrás recuperarla.');
@@ -47,6 +50,9 @@ export function renderSettings() {
   $(s.autoBreak ? '#afterStudyAuto' : '#afterStudyWait').checked = true;
   $('#capValue').textContent = U.formatMinutes(s.dailyCapMin);
   $('#setAwake').disabled = !('wakeLock' in navigator);
+  // (v4.9.0) Estilo de la notificación del pomodoro: solo existe en la app de Android
+  $('#playerRow').hidden = !isAndroid();
+  $('#setPlayer').checked = notifPlayer();
 
   const nb = $('#notifBtn');
   if (isNative()) {
@@ -125,6 +131,7 @@ export function bindSettings() {
   }
   $$('#capStepper .stepper__btn').forEach((b) => b.addEventListener('click', () => changeCap(Number(b.dataset.cap))));
   $('#notifBtn').addEventListener('click', enableNotifications);
+  $('#setPlayer').addEventListener('change', (e) => setNotifPlayer(e.target.checked));
   $('#setRegion').addEventListener('change', (e) => {
     mutate((s) => { s.settings.timeZone = e.target.value; });
     updatePhase();

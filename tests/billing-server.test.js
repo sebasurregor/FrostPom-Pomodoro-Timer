@@ -73,6 +73,17 @@ test('premium (servidor): cada estado de la suscripción', () => {
   const forever = stateOf({ exp: null, product: 'rc_promo_premium_lifetime', store: 'promotional' });
   assert.ok(forever.premium && forever.expires_at === null && forever.status === 'active', 'un regalo de por vida');
 
+  // (v4.9.0) Premium de por vida comprado en Google Play: una compra de una sola vez (non_subscriptions)
+  const bought = P.stateFromSubscriber({ request_date_ms: NOW, subscriber: {
+    entitlements: { premium: { expires_date: null, product_identifier: 'frostpom_premium_vida', purchase_date: iso(NOW - D) } },
+    subscriptions: {},
+    non_subscriptions: { frostpom_premium_vida: [{ id: 'x1', purchase_date: iso(NOW - D), store: 'play_store', is_sandbox: true }] },
+  } });
+  assert.ok(bought.premium && bought.expires_at === null && bought.status === 'active', 'de por vida: Premium sin fecha');
+  assert.equal(bought.will_renew, false, 'de por vida no se "renueva" (la app no dice que se renueva)');
+  assert.equal(bought.store, 'play_store');
+  assert.equal(bought.sandbox, true, 'compra de prueba');
+
   assert.equal(P.stateFromSubscriber(subscriber({ exp: NOW + D }), { now: NOW + 2 * D }).premium, false, 'cuenta la hora de ahora');
   assert.ok(P.STATUSES.includes(trial.status) && P.STATUSES.includes(hold.status));
 });

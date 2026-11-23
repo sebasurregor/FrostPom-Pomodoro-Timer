@@ -34,11 +34,15 @@ object TimerNotification {
     private const val NAVY = 0xFF0D2346.toInt()
 
     /**
-     * (v4.7.2) true: la notificación es un reproductor (sesión de Android, la barra avanza sola).
-     * false: la misma notificación, sin sesión (sin barra; los botones nunca dependen de la app en
-     * memoria). Plan B si en algún teléfono los botones del reproductor dejaran de responder.
+     * (v4.7.2) true: la notificación puede ser un reproductor (sesión de Android, la barra avanza sola).
+     * false: nunca hay sesión (plan B si en algún teléfono los botones del reproductor no responden).
+     * (v4.9.0) Además, el reproductor solo se usa si la persona lo enciende en Ajustes (Texts.player):
+     * por defecto es una notificación normal, que no aparece abierta arriba al bajar la cortina.
      */
     const val MEDIA_SESSION = true
+
+    /** (v4.9.0) Una pausa larga deja de ocupar la cortina: la notificación se quita sola. */
+    const val PAUSED_TIMEOUT_MS = 30 * 60_000L
     private var companionCache: Pair<String, Bitmap?>? = null
 
     private fun canNotify(ctx: Context): Boolean =
@@ -84,11 +88,14 @@ object TimerNotification {
         val t = TimerStore.texts(ctx)
         ensureChannels(ctx, t)
         val running = st.status == TimerState.RUNNING
+        val player = MEDIA_SESSION && t.player
+        if (!player) TimerMedia.release() // (v4.9.0) sin reproductor: nada en el panel de música
         val b = builder(ctx, CHANNEL_TIMER, true)
             .setSmallIcon(smallIcon(ctx))
             .setContentTitle(t.mode(st.mode))
             .setContentIntent(openApp(ctx))
-            .setOngoing(true)
+            // (v4.9.0) En pausa se puede deslizar para quitarla; corriendo, se queda
+            .setOngoing(running)
             .setOnlyAlertOnce(true)
             .setCategory(Notification.CATEGORY_TRANSPORT)
             .setVisibility(Notification.VISIBILITY_PUBLIC)
@@ -105,6 +112,7 @@ object TimerNotification {
             b.setContentText(t.paused + " · " + clock(st.remainingMs))
                 .setShowWhen(false)
                 .setUsesChronometer(false)
+            if (Build.VERSION.SDK_INT >= 26 && !player) b.setTimeoutAfter(PAUSED_TIMEOUT_MS)
         }
         // Los botones de la notificación (Android 12 o anterior, y de respaldo si la sesión se cerró)
         b.addAction(action(ctx, R.drawable.fp_ic_prev, t.reset, TimerActionReceiver.ACTION_RESET))
@@ -116,9 +124,13 @@ object TimerNotification {
         if (st.canFinish && st.mode == TimerState.STUDY) {
             b.addAction(action(ctx, R.drawable.fp_ic_check, t.finish, TimerActionReceiver.ACTION_FINISH))
         }
-        val style = Notification.MediaStyle().setShowActionsInCompactView(0, 1, 2)
-        if (MEDIA_SESSION) TimerMedia.token(ctx, st, now, t)?.let { style.setMediaSession(it) }
-        b.setStyle(style)
+        if (player) {
+            val style = Notification.MediaStyle().setShowActionsInCompactView(0, 1, 2)
+            TimerMedia.token(ctx, st, now, t)?.let { style.setMediaSession(it) }
+            b.setStyle(style)
+        }
+        // (v4.9.0) Sin reproductor: notificación normal (la cuenta regresiva y, al expandirla, los
+        // botones), sin el panel de música que Android abre arriba al bajar la cortina.
         nm.notify(ID_ONGOING, b.build())
     }
 

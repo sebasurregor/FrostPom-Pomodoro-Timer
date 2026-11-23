@@ -65,7 +65,7 @@ export function defaultState() {
     // Premium: hoy solo existe el modo de prueba (sin cobro). Cuando la app esté en las tiendas,
     // el estado real vendrá de la compra validada en App Store / Google Play, no de este archivo.
     premium: { active: false, demo: true, since: null, bonusClaimed: false, giftPending: false },
-    account: null, // { username, hash, salt, iter, remember?, email?, emailLinked?, birth?, online?, cloudPending? } — la contraseña nunca se guarda, solo su hash
+    account: null, // { username, hash, salt, iter, remember?, email?, emailLinked?, birth?, online?, cloudPending?, oauth? } — la contraseña nunca se guarda, solo su hash
     progress: {
       xp: 0, gems: 0, achievements: U.dict(), claimed: U.dict(), owned: ['clasico'], gifted: [],
       gemOrders: [], // (v4.8.0) compras de gemas ya sumadas: [{ tx, product, gems, at }] (gem-shop.js)
@@ -199,6 +199,8 @@ export function validateState(raw) {
     // Cuenta en línea (v4.0): el correo es también para entrar desde otro equipo.
     if (acc.online === true && out.account.email) out.account.online = true;
     if (acc.cloudPending === true && out.account.email && !out.account.online) out.account.cloudPending = true;
+    // (v4.9.0) Cuenta creada o abierta con Google, Microsoft, Discord o Facebook (sin contraseña de FrostPom)
+    if (['google', 'azure', 'discord', 'facebook'].includes(acc.oauth) && out.account.online) out.account.oauth = acc.oauth;
     out.profile.nick = acc.username;
   }
 

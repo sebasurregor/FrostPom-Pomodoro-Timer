@@ -378,3 +378,19 @@ html[data-theme="dark"] .scenery::after { content: ""; position: absolute; inset
 @media (max-width: 560px) and (orientation: portrait) {
   .gate-scene__img { -webkit-mask-image: linear-gradient(transparent, #000 9%); mask-image: linear-gradient(transparent, #000 9%); }
 }
+
+/* (v4.9.0) Rendimiento en el celular. Medido con la CPU de un celular medio: los animales, el humo
+   y el viento seguían animándose aunque una ventana (entrar, crear cuenta, Premium…) o una sección a
+   pantalla completa tapara el paisaje, y eso hacía lento escribir y tocar. Ahora se pausan mientras
+   no se ven; y en el celular caminan 4 animales a la vez (antes 6). */
+.gate-open .scenery *, .dlg-open .scenery *, .sheet-full .scenery *, .is-typing .scenery *,
+.gate-open .scenery *::before, .dlg-open .scenery *::before, .sheet-full .scenery *::before, .is-typing .scenery *::before { animation-play-state: paused !important; }
+@media (pointer: coarse) {
+  .walker:nth-child(n + 5) { display: none; }
+}
+/* (v4.9.0) Los animales que caminan cambian de cuadro moviendo la tira (transform) y no el fondo:
+   ver "Sprites" al principio de components.css. */
+/* En el celular, el viento solo se dibuja cuando hay viento de verdad (nieve media o fuerte) */
+@media (pointer: coarse) {
+  .scenery:not([data-weather="medium"]):not([data-weather="heavy"]) .sc-gust { animation: none; display: none; }
+}

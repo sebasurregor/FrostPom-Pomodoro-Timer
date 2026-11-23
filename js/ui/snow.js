@@ -38,7 +38,21 @@ export const WEATHER = Object.freeze({
   gate: { n: [5.3, 3.7, 1.6], wind: 4, speed: 0.72, size: 1 }, // la nevada suave de la entrada
 });
 const MAX_FLAKES = 260; // en pantallas muy grandes no se dibujan más
-const FPS = 30;
+/**
+ * (v4.9.0) Medido con la CPU de un celular medio (Chrome, 6 veces más lento): con la app quieta en
+ * Enfocar, la nieve tenía ocupado el hilo principal ~75 % del tiempo, y eso hacía que todo (tocar,
+ * escribir, cambiar de pestaña) se sintiera lento. Ahora:
+ *  - el dibujo se pide solo cuando toca (un temporizador), no 60 veces por segundo;
+ *  - en celulares, 24 cuadros por segundo y a la resolución de la pantalla (los copos son borrosos);
+ *  - en celulares modestos (4 núcleos o menos, o 2 GB o menos), menos copos.
+ */
+const coarse = () => typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+const modest = () => {
+  const n = typeof navigator !== 'undefined' ? navigator : {};
+  return (n.hardwareConcurrency && n.hardwareConcurrency <= 4) || (n.deviceMemory && n.deviceMemory <= 2);
+};
+const FPS = coarse() ? 24 : 30;
+const DENSITY = modest() ? 0.6 : 1;
 
 /** Copo pre-dibujado (borde nítido o difuminado), para no calcular el degradado en cada cuadro. */
 function dot(color, soft) {
@@ -86,7 +100,6 @@ export function createSnow(host, { weather = 'light', className = 'snow', active
   let current = WEATHER[weather] ? weather : 'light';
   let raf = 0;
   let last = 0;
-  let acc = 0;
 
   const reduce = () => document.documentElement.classList.contains('reduce-motion');
 
@@ -97,7 +110,7 @@ export function createSnow(host, { weather = 'light', className = 'snow', active
     const area = (W * H) / 100000;
     list = [];
     LAYERS[current === 'gate' ? 'gate' : 'scene'].forEach((L, layer) => {
-      const n = Math.round(w.n[layer] * area);
+      const n = Math.round(w.n[layer] * area * DENSITY);
       for (let i = 0; i < n; i++) {
         list.push({
           layer, soft: L.soft,
@@ -117,7 +130,7 @@ export function createSnow(host, { weather = 'light', className = 'snow', active
     const nw = Math.round(rect.width);
     const nh = Math.round(rect.height);
     if (!nw || !nh) return false;
-    scale = Math.min(window.devicePixelRatio || 1, 1.25); // copos difuminados: no hace falta más resolución
+    scale = coarse() ? 1 : Math.min(window.devicePixelRatio || 1, 1.25); // copos difuminados: no hace falta más resolución
     if (nw !== W || nh !== H) {
       W = nw;
       H = nh;
@@ -147,27 +160,34 @@ export function createSnow(host, { weather = 'light', className = 'snow', active
     ctx.globalAlpha = 1;
   }
 
+  let wait = 0; // el temporizador hasta el próximo cuadro
   function frame(now) {
     raf = 0;
     if (!running()) { ctx.clearRect(0, 0, canvas.width, canvas.height); return; }
-    const dt = last ? Math.min(0.1, (now - last) / 1000) : 0;
+    const dt = last ? Math.min(0.1, (now - last) / 1000) : 1 / FPS;
     last = now;
-    acc += dt;
-    if (acc >= 1 / FPS - 0.004) { // ~30 cuadros por segundo: suficiente para la nieve y la mitad de trabajo
-      draw(acc, now / 1000);
-      acc = 0;
-    }
-    raf = requestAnimationFrame(frame);
+    draw(dt, now / 1000);
+    schedule();
+  }
+  // (v4.9.0) El próximo cuadro se pide justo cuando toca (y se dibuja al ritmo de la pantalla)
+  function schedule() {
+    clearTimeout(wait);
+    wait = setTimeout(() => { wait = 0; if (!raf) raf = requestAnimationFrame(frame); }, Math.max(0, 1000 / FPS - 8));
   }
 
   const running = () => !document.hidden && !reduce() && current !== 'clear' && W > 0 && active();
 
   /** Revisa si hay que empezar a animar (al cambiar de pantalla, de clima o de ajuste). */
+  let measuring = 0;
   function refresh() {
-    if (!W || !H) resize();
-    if (raf || !running()) return;
+    if (!W || !H) {
+      // (v4.9.0) La primera medida va en el próximo cuadro: medir mientras la app todavía se arma
+      // obligaba al navegador a calcular toda la página una vez de más al abrir
+      if (!measuring) measuring = requestAnimationFrame(() => { measuring = 0; if (resize()) refresh(); });
+      return;
+    }
+    if (raf || wait || !running()) return;
     last = 0;
-    acc = 1;
     raf = requestAnimationFrame(frame);
   }
 

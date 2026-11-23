@@ -10,6 +10,7 @@ import { state, mutate, prefs, session, isPremium } from './context.js';
 import { requirePremium } from './premium.js';
 import { pic } from './pics.js';
 import { t, tr } from '../i18n.js';
+import { isNative } from '../native.js';
 
 let previewTimer = 0;
 
@@ -86,8 +87,14 @@ export function renderSound() {
 }
 
 export function bindSound() {
-  // La grabación elegida se descarga al abrir la app, para que después suene también sin internet
-  FX.prefetchAmbient(state.settings.ambient || state.settings.lastAmbient);
+  // La grabación elegida se descarga para que después suene también sin internet.
+  // (v4.9.0) Ya no al abrir: unos segundos después, cuando la app está quieta (la lluvia pesa 1 MB
+  // y competía con lo que se carga al entrar). En la app de Android no hace falta: vienen dentro.
+  const id = state.settings.ambient || state.settings.lastAmbient;
+  if (id && !isNative()) {
+    const idle = typeof requestIdleCallback === 'function' ? requestIdleCallback : (f) => setTimeout(f, 1000);
+    setTimeout(() => idle(() => FX.prefetchAmbient(id), { timeout: 10_000 }), 4000);
+  }
   $('#ambientBtn').addEventListener('click', toggleSilence);
   $('#ambientVol').addEventListener('input', (e) => FX.setAmbientVolume(Number(e.target.value)));
   $('#ambientVol').addEventListener('change', (e) => mutate((st) => { st.settings.ambientVolume = U.clamp(Number(e.target.value), 0, 100); }));

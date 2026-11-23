@@ -5,13 +5,18 @@
    Sprites e íconos
    ===================================================================== */
 /* Animales animados (hojas de sprites del autor en assets/sprites).
-   Cada hoja tiene los cuadros en fila; steps(n, jump-none) recorre 0 % → 100 %. */
+   Cada hoja tiene los cuadros en fila. (v4.9.0) El cuadro se cambia moviendo la tira entera
+   (transform en ::before) y ya no con background-position: así lo anima la tarjeta gráfica y el
+   procesador queda libre. Antes, cada animal animado obligaba al navegador a recalcular los
+   estilos 60 veces por segundo (en un celular sencillo, eso se notaba como lentitud). Se ve igual. */
 /* Va antes de .sprite a propósito: si el animal que camina es un sprite, gana el inline-block de .sprite */
 .walker__art { display: block; }
 
 .walker--penguin .sprite { --size: 60px; }
 .sprite {
   --size: 96px;
+  position: relative;
+  overflow: hidden;
   display: inline-block;
   width: var(--size);
   height: var(--size);
@@ -20,36 +25,49 @@
   vertical-align: bottom;
 }
 .sprite--quieto { background-image: url("../assets/sprites/pinguino-quieto.webp"); background-size: 100% 100%; }
-.sprite--saludo {
+/* La tira: tan ancha como todos los cuadros juntos; steps(n, jump-none) se detiene en cada uno */
+.sprite:is(.sprite--saludo, .sprite--amor, .sprite--camina, .sprite--oso-camina, .sprite--zorro-camina)::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  will-change: transform;
+}
+@keyframes sprite-strip-3 { from { transform: translateX(0); } to { transform: translateX(-66.6667%); } }
+@keyframes sprite-strip-4 { from { transform: translateX(0); } to { transform: translateX(-75%); } }
+.sprite--saludo::before {
+  width: 300%;
   background-image: url("../assets/sprites/pinguino-saludo.webp");
-  background-size: 300% 100%;
-  animation: sprite-run 0.9s steps(3, jump-none) infinite alternate;
+  animation: sprite-strip-3 0.9s steps(3, jump-none) infinite alternate;
 }
-@keyframes sprite-run { from { background-position-x: 0%; } to { background-position-x: 100%; } }
-.sprite--camina {
+.sprite--camina::before {
+  width: 400%;
   background-image: url("../assets/sprites/pinguino-camina.webp");
-  background-size: 400% 100%;
-  animation: sprite-run 1.2s steps(4, jump-none) infinite;
+  animation: sprite-strip-4 1.2s steps(4, jump-none) infinite;
 }
-/* Los corazones hacen el ciclo completo una y otra vez */
-.sprite--amor {
+/* Los corazones hacen el ciclo completo una y otra vez (y el pingüino rebota: eso va en el span) */
+.sprite--amor { animation: sprite-bounce 0.6s ease-in-out infinite alternate; }
+.sprite--amor::before {
+  width: 300%;
   background-image: url("../assets/sprites/pinguino-amor.webp");
-  background-size: 300% 100%;
-  animation: sprite-run 1.2s steps(3, jump-none) infinite alternate, sprite-bounce 0.6s ease-in-out infinite alternate;
+  animation: sprite-strip-3 1.2s steps(3, jump-none) infinite alternate;
 }
 @keyframes sprite-bounce { from { transform: translateY(0); } to { transform: translateY(-5px); } }
-.reduce-motion .sprite { animation: none !important; }
-.reduce-motion .sprite--amor { background-position-x: 100%; }
-.sprite--oso-camina {
+.reduce-motion .sprite, .reduce-motion .sprite::before { animation: none !important; }
+.reduce-motion .sprite--amor::before { transform: translateX(-66.6667%); }
+.sprite--oso-camina::before {
+  width: 400%;
   background-image: url("../assets/sprites/oso-camina.webp");
-  background-size: 400% 100%;
-  animation: sprite-run 1.3s steps(4, jump-none) infinite;
+  animation: sprite-strip-4 1.3s steps(4, jump-none) infinite;
 }
 /* El zorro también camina por el paisaje con su ciclo de 4 cuadros */
-.sprite--zorro-camina {
+.sprite--zorro-camina::before {
+  width: 400%;
   background-image: url("../assets/sprites/zorro-camina.webp");
-  background-size: 400% 100%;
-  animation: sprite-run 0.8s steps(4, jump-none) infinite;
+  animation: sprite-strip-4 0.8s steps(4, jump-none) infinite;
 }
 
 /* Íconos a color (assets/icons) */
@@ -749,66 +767,78 @@ html[data-theme="dark"] .custom { border-color: #8A6D1F; }
 
 #buddy { cursor: pointer; }
 
-.reduce-motion .psprite.is-amor { background-position-x: 66.667%; }
-.reduce-motion .psprite.is-triste { background-position-x: 0%; }
-.reduce-motion .psprite:is(.is-lloroso, .is-llorando, .is-debil) { background-position-x: 25%; }
+.reduce-motion .psprite.is-amor::before { transform: translateX(-50%); }
+.reduce-motion .psprite.is-triste::before { transform: none; }
+.reduce-motion .psprite:is(.is-lloroso, .is-llorando, .is-debil)::before { transform: translateX(-20%); }
 /* Hojas de 320 × 320 por cuadro (tools/preparar_sprites.py). Se ven 1,25 veces más grandes que
    el dibujo de siempre, pero con márgenes negativos: el animal queda en el mismo lugar y del mismo
    tamaño, y sobra espacio arriba y a los lados para los corazones y las lágrimas. */
 .psprite {
   --size: 96px;
   --n: 1;
+  position: relative;
+  overflow: hidden;
   width: calc(var(--size) * 1.25);
   height: calc(var(--size) * 1.25);
   margin: calc(var(--size) * -0.25) calc(var(--size) * -0.125) 0;
-  background-repeat: no-repeat;
-  background-position: 0 0;
-  background-size: calc(var(--n) * 100%) 100%;
   pointer-events: none;
+}
+/* (v4.9.0) Como los sprites de arriba: la tira de --n cuadros se mueve con transform */
+.psprite::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: calc(var(--n) * 100%);
+  height: 100%;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
 }
 .psprite--4 { --n: 4; }
 .psprite--5 { --n: 5; }
-.psprite--tumba { background-image: url("../assets/sprites/tumba.webp"); }
-.psprite--pinguino-llora { background-image: url("../assets/sprites/pinguino-llora.webp"); }
-.psprite--oso-llora { background-image: url("../assets/sprites/oso-llora.webp"); }
-.psprite--oso-marino-llora { background-image: url("../assets/sprites/oso-marino-llora.webp"); }
-.psprite--tiburon-llora { background-image: url("../assets/sprites/tiburon-llora.webp"); }
-.psprite--zorro-llora { background-image: url("../assets/sprites/zorro-llora.webp"); }
-.psprite--oso-marino-amor { background-image: url("../assets/sprites/oso-marino-amor.webp"); }
-.psprite--tiburon-amor { background-image: url("../assets/sprites/tiburon-amor.webp"); }
-.psprite--zorro-amor { background-image: url("../assets/sprites/zorro-amor.webp"); }
-/* Corazones: feliz → ojos de corazón → lluvia de corazones → suspiro, y otra vez */
-.psprite.is-amor { animation: pet-love 1.8s infinite; animation-timing-function: step-end; }
+.psprite--tumba::before { background-image: url("../assets/sprites/tumba.webp"); }
+.psprite--pinguino-llora::before { background-image: url("../assets/sprites/pinguino-llora.webp"); }
+.psprite--oso-llora::before { background-image: url("../assets/sprites/oso-llora.webp"); }
+.psprite--oso-marino-llora::before { background-image: url("../assets/sprites/oso-marino-llora.webp"); }
+.psprite--tiburon-llora::before { background-image: url("../assets/sprites/tiburon-llora.webp"); }
+.psprite--zorro-llora::before { background-image: url("../assets/sprites/zorro-llora.webp"); }
+.psprite--oso-marino-amor::before { background-image: url("../assets/sprites/oso-marino-amor.webp"); }
+.psprite--tiburon-amor::before { background-image: url("../assets/sprites/tiburon-amor.webp"); }
+.psprite--zorro-amor::before { background-image: url("../assets/sprites/zorro-amor.webp"); }
+/* Corazones (4 cuadros): feliz → ojos de corazón → lluvia de corazones → suspiro, y otra vez.
+   Cada cuadro mide 1/4 de la tira: -25 % es el segundo, -50 % el tercero… */
+.psprite.is-amor::before { animation: pet-love 1.8s infinite; animation-timing-function: step-end; will-change: transform; }
 @keyframes pet-love {
-  0% { background-position-x: 0%; }
-  20% { background-position-x: 33.333%; }
-  45% { background-position-x: 66.667%; }
-  78%, 100% { background-position-x: 100%; }
+  0% { transform: translateX(0); }
+  20% { transform: translateX(-25%); }
+  45% { transform: translateX(-50%); }
+  78%, 100% { transform: translateX(-75%); }
 }
-/* Llanto (5 cuadros: triste, ojos llorosos, berrinche, se seca las lágrimas, suspira).
-   Entre más hambre, más se nota. */
-.psprite:is(.is-triste, .is-lloroso, .is-llorando, .is-debil) { animation-timing-function: step-end; animation-iteration-count: infinite; }
-.psprite.is-triste { animation-name: pet-sad; animation-duration: 5s; }
+/* Llanto (5 cuadros, cada uno 1/5 de la tira: triste, ojos llorosos, berrinche, se seca las
+   lágrimas, suspira). Entre más hambre, más se nota. */
+.psprite:is(.is-triste, .is-lloroso, .is-llorando, .is-debil)::before { animation-timing-function: step-end; animation-iteration-count: infinite; will-change: transform; }
+.psprite.is-triste::before { animation-name: pet-sad; animation-duration: 5s; }
 @keyframes pet-sad {
-  0% { background-position-x: 0%; }
-  80%, 100% { background-position-x: 100%; }
+  0% { transform: translateX(0); }
+  80%, 100% { transform: translateX(-80%); }
 }
-.psprite.is-lloroso { animation-name: pet-teary; animation-duration: 3.4s; }
+.psprite.is-lloroso::before { animation-name: pet-teary; animation-duration: 3.4s; }
 @keyframes pet-teary {
-  0% { background-position-x: 25%; }
-  48% { background-position-x: 75%; }
-  70% { background-position-x: 25%; }
-  88%, 100% { background-position-x: 0%; }
+  0% { transform: translateX(-20%); }
+  48% { transform: translateX(-60%); }
+  70% { transform: translateX(-20%); }
+  88%, 100% { transform: translateX(0); }
 }
-.psprite:is(.is-llorando, .is-debil) { animation-name: pet-sob; animation-duration: 2.6s; }
+.psprite:is(.is-llorando, .is-debil)::before { animation-name: pet-sob; animation-duration: 2.6s; }
 @keyframes pet-sob {
-  0% { background-position-x: 25%; }
-  15% { background-position-x: 50%; }
-  50% { background-position-x: 75%; }
-  70% { background-position-x: 100%; }
-  85%, 100% { background-position-x: 50%; }
+  0% { transform: translateX(-20%); }
+  15% { transform: translateX(-40%); }
+  50% { transform: translateX(-60%); }
+  70% { transform: translateX(-80%); }
+  85%, 100% { transform: translateX(-40%); }
 }
-.psprite.is-debil { animation-duration: 4.2s; filter: grayscale(0.55) brightness(0.95); }
+.psprite.is-debil { filter: grayscale(0.55) brightness(0.95); }
+.psprite.is-debil::before { animation-duration: 4.2s; }
 
 /* Etiqueta con el nombre: caja oscura semitransparente y letra blanca de píxeles, flotando
    sobre la cabeza (al estilo de los juegos de bloques). --head = dónde está la cabeza. */
@@ -1600,6 +1630,24 @@ html[data-theme="dark"] .acc-mail { background: var(--card-soft); }
 .acc-delete { margin-top: 4px; }
 
 .signin-switch { text-align: center; margin: 10px 0 0; font-weight: 700; color: var(--text); }
+/* (v4.9.0) "Continuar con Google / Microsoft / Discord" */
+.oauth { margin: 12px 0 2px; display: grid; gap: 8px; }
+.oauth__or { display: flex; align-items: center; gap: 10px; margin: 0; color: var(--on-paper-muted, #5b6b84); font-size: 0.85rem; font-weight: 700; }
+.oauth__or::before, .oauth__or::after { content: ""; flex: 1; height: 2px; border-radius: 2px; background: currentColor; opacity: 0.25; }
+.oauth__btns { display: grid; gap: 8px; }
+.oauth__btn {
+  display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 46px; padding: 8px 14px;
+  border: 2px solid var(--ink, #0D2346); border-radius: var(--r-md, 14px); background: #fff; color: #1f1f1f;
+  font: inherit; font-weight: 800; cursor: pointer; box-shadow: 0 3px 0 var(--ink, #0D2346);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.oauth__btn:hover { transform: translateY(-1px); }
+.oauth__btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--ink, #0D2346); }
+.oauth__btn:focus-visible { outline: 3px solid #37D0EE; outline-offset: 2px; }
+.oauth__logo { width: 20px; height: 20px; flex: none; }
+.oauth__btn--discord { background: #5865F2; color: #fff; }
+.oauth__btn--facebook { background: #1877F2; color: #fff; }
+@media (prefers-reduced-motion: reduce) { .oauth__btn { transition: none; } }
 
 /* CAPTCHA de Cloudflare Turnstile: casi siempre invisible; si Cloudflare duda,
    la casilla aparece aquí, dentro de la ventana, encima de los botones. */
@@ -1719,6 +1767,9 @@ html[data-theme="dark"] .toast--warn { background: #3A3015; border-color: #8A6D1
   overflow: visible;
 }
 .dlg::backdrop { background: rgba(8, 22, 48, 0.7); backdrop-filter: blur(4px); }
+/* (v4.9.0) En el celular, el desenfoque detrás de cada ventana costaba mucho a la tarjeta gráfica
+   (se recalcula sobre toda la pantalla): un fondo un poco más oscuro se ve casi igual */
+@media (pointer: coarse) { .dlg::backdrop { background: rgba(8, 22, 48, 0.8); backdrop-filter: none; -webkit-backdrop-filter: none; } }
 .dlg[open] { animation: dlg-in 0.3s cubic-bezier(.2, 1.3, .4, 1); }
 @keyframes dlg-in { from { opacity: 0; transform: translateY(16px) scale(0.96); } }
 .dlg__box {
@@ -1921,6 +1972,9 @@ html[data-theme="dark"] .streak-lost__art { background: linear-gradient(180deg, 
   position: absolute; top: -10px; right: 8px; padding: 1px 8px; border-radius: var(--r-round);
   background: var(--mint, #2EE6B6); color: var(--ink); border: 2px solid var(--ink); font-weight: 800; font-size: 0.72rem;
 }
+/* (v4.9.0) De por vida: ocupa toda la fila, debajo del anual y el mensual, con su insignia dorada */
+.plan[data-plan="lifetime"] { grid-column: 1 / -1; }
+.plan__badge--forever { background: #FFC531; }
 .premium__terms { font-size: 0.82rem; line-height: 1.4; margin: 2px 0 4px; }
 .premium__links { margin: 2px 0 0; text-align: center; }
 .premium__warn, #premiumStatus.is-warn { background: #FFF6E0; border: 2px solid #F2C76B; color: #7A4B00; border-radius: var(--r-md); padding: 8px 10px; }

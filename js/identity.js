@@ -191,6 +191,7 @@ export function countryName(code) {
   }
 }
 export function countryList() {
+  const order = new Intl.Collator(lang); // (v4.9.0) uno solo para todo el orden (más rápido que localeCompare)
   return COUNTRY_CODES.map((code) => ({ code, name: countryName(code), flag: flagEmoji(code) }))
-    .sort((a, b) => a.name.localeCompare(b.name, lang));
+    .sort((a, b) => order.compare(a.name, b.name));
 }

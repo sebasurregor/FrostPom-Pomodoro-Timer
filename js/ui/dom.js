@@ -45,7 +45,10 @@ export function svg(tag, attrs, ...kids) {
   return el;
 }
 
-export const fmtInt = (n) => Math.round(n).toLocaleString(locale);
+// (v4.9.0) Un solo formateador (toLocaleString creaba uno nuevo en cada número: al abrir la app se
+// formatean cientos y eso se notaba en un celular sencillo)
+let intFormat = null;
+export const fmtInt = (n) => (intFormat || (intFormat = new Intl.NumberFormat(locale))).format(Math.round(n));
 export const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export function download(name, text, type) {

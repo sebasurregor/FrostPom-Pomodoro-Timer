@@ -7,7 +7,13 @@ Claude Code, porque en la nube de Claude no se pueden descargar Android ni Gradl
 
 ## Qué hace
 
-- **Notificación en curso, estilo reproductor (como Spotify)**: en la pantalla de bloqueo y en el
+- **(v4.9.0) Notificación en curso normal, y el reproductor solo si lo pides.** Por defecto es una
+  notificación normal (en su lugar de la lista, con la cuenta regresiva y los botones). El estilo
+  reproductor se enciende en **Ajustes → Notificación tipo reproductor** (solo en la app de Android).
+  Antes era siempre reproductor, y Android pone los reproductores **arriba y abiertos** en el panel:
+  por eso al bajar la cortina "se abría sola", incluso con FrostPom cerrada. Además, en pausa la
+  notificación ya **se puede quitar** con el dedo y se va sola a los 30 minutos.
+- **Notificación estilo reproductor (opcional, como Spotify)**: en la pantalla de bloqueo y en el
   panel rápido sale con los animales del ártico de fondo, el modo ("Modo enfoque"), la frase, la
   barra que avanza sola y los botones ⏮ volver a empezar · ⏸/▶ · ⏭ saltar · ✓ terminar y guardar.
   No suena nada: solo usa el aspecto de reproductor (una "sesión de reproducción" de Android).
@@ -209,6 +215,22 @@ SIN firmar con mi llave: no me pidas contraseñas) y revisa con bundletool o apk
 manifiesto del módulo base tenga los receivers FrostWidget y TimerActionReceiver. Dime qué
 encontraste antes de arreglar nada. No hagas commits.
 ```
+
+## v4.9.0: la notificación que "se abría sola"
+
+Lo que pasaba: con la sesión de reproducción, Android (y más One UI de Samsung) trata a FrostPom
+como música: la pone **arriba del todo y expandida** al bajar la cortina, y la deja ahí aunque la
+app esté cerrada (la notificación vive aparte de la app). Arreglo:
+
+- `TimerStore.player` (lo manda la web: `player` en los textos de la notificación) decide el estilo.
+  Por defecto `false` → notificación normal **sin** `MediaStyle` ni sesión (`TimerMedia.release()`).
+- Corriendo, sigue fija (`setOngoing(true)`); **en pausa** se puede deslizar y, en el modo normal,
+  tiene `setTimeoutAfter(30 min)` (`PAUSED_TIMEOUT_MS`), así no se queda para siempre si te olvidaste.
+- Con el reproductor encendido en Ajustes, todo es como en la v4.8 (los widgets no cambian).
+
+Cómo probarlo: inicia un pomodoro, cierra la app (deslízala en Recientes) y baja la cortina: la
+notificación debe estar en la lista normal, plegada. Pausa y deslízala: debe irse. Después enciende
+**Ajustes → Notificación tipo reproductor**, vuelve a empezar y debe salir el reproductor como antes.
 
 ## En Google Play
 

@@ -107,6 +107,44 @@ export async function openPage(page) {
 }
 
 // ---------------------------------------------------------------------
+// (v4.9.0) Entrar con Google, Microsoft, Discord… (js/ui/oauth-ui.js)
+// ---------------------------------------------------------------------
+/**
+ * Abre la página de inicio de sesión en una pestaña del navegador del teléfono (Custom Tab: Google
+ * no deja iniciar sesión dentro de la app) y espera el regreso por el enlace de la app.
+ * Devuelve { url } con el enlace de regreso, { cancel: true } si la persona cerró la pestaña,
+ * o null si no se pudo abrir.
+ */
+export async function authInBrowser(url, isReturn) {
+  const p = await plugins();
+  if (!p) return null;
+  let done = false;
+  let finish = () => {};
+  const result = new Promise((resolve) => { finish = (v) => { if (!done) { done = true; resolve(v); } }; });
+  const subs = [];
+  subs.push(await quiet(() => p.App.addListener('appUrlOpen', ({ url: back }) => {
+    if (!isReturn(back)) return;
+    quiet(() => p.Browser.close());
+    finish({ url: back });
+  })));
+  // Si la persona cierra la pestaña sin terminar, se espera un momento por si el regreso viene detrás
+  subs.push(await quiet(() => p.Browser.addListener('browserFinished', () => setTimeout(() => finish({ cancel: true }), 1500))));
+  const opened = await quiet(() => p.Browser.open({ url }).then(() => true));
+  if (!opened) finish(null);
+  const out = await result;
+  for (const s of subs) if (s && typeof s.remove === 'function') quiet(() => s.remove());
+  return out;
+}
+
+/** Si Android abrió la app con un enlace (por ejemplo, el regreso de Google tras cerrarse la app). */
+export async function launchUrl() {
+  const p = await plugins();
+  if (!p) return '';
+  const r = await quiet(() => p.App.getLaunchUrl());
+  return (r && typeof r.url === 'string' && r.url) || '';
+}
+
+// ---------------------------------------------------------------------
 // Botón "atrás" de Android y estado de la app
 // ---------------------------------------------------------------------
 /**

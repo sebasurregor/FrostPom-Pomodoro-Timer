@@ -115,7 +115,10 @@ def feed_first(pg):
 def frames_seen(pg, sel, ms=2600, step=100):
     seen = set()
     for _ in range(ms // step):
-        seen.add(pg.evaluate(f"(() => {{ const e = document.querySelector('{sel}'); return e ? getComputedStyle(e).backgroundPositionX : 'none'; }})()"))
+        # (v4.9.0) El cuadro es cuánto se movió la tira (::before) medido en anchos del animal
+        seen.add(pg.evaluate(f"""(() => {{ const e = document.querySelector('{sel}'); if (!e) return 'none';
+          const t = getComputedStyle(e, '::before').transform; const m = new DOMMatrix(t === 'none' ? '' : t);
+          return String(Math.round(-m.m41 / e.offsetWidth)); }})()"""))
         pg.wait_for_timeout(step)
     return seen
 
@@ -136,8 +139,8 @@ def main():
         feed_first(pg)
         pg.wait_for_timeout(150)
         check('sprite--amor' in art_class(pg), 'el pingüino pone ojos de corazón al comer')
-        anim = pg.evaluate("getComputedStyle(document.querySelector('#buddy .sprite--amor')).animationName")
-        check('sprite-run' in anim, f'la animación de los corazones no la tapa el salto ({anim})')
+        anim = pg.evaluate("getComputedStyle(document.querySelector('#buddy .sprite--amor'), '::before').animationName")
+        check('sprite-strip' in anim, f'la animación de los corazones no la tapa el salto ({anim})')
         body = pg.evaluate("getComputedStyle(document.querySelector('#buddy .buddy__body')).animationName")
         check(body == 'pet-eat', 'el salto va en la envoltura del compañero')
         seen = frames_seen(pg, '#buddy .sprite--amor', 2400)
@@ -343,7 +346,7 @@ def main():
         print('H. Menos animaciones')
         ctx, pg, errs, missing = open_app(browser, state(None, {'pinguino': {'fullness': 0, 'at': ago(5)}}, reduce=True))
         seen = frames_seen(pg, '#buddy .psprite', 1500)
-        check(seen == {'25%'}, f'el llanto queda quieto en un cuadro ({seen})')
+        check(seen == {'1'}, f'el llanto queda quieto en un cuadro ({seen})')
         done(ctx, errs, missing)
 
         # ------------------------------------------------------------------ J

@@ -4,7 +4,7 @@
  * teléfono o al navegador lo puede leer cualquiera. Ver docs/SEGURIDAD.md.
  */
 export const config = Object.freeze({
-  version: '4.8.2',
+  version: '4.9.0',
   // Dirección pública de la app. La app de Android abre aquí las normas, la privacidad y la
   // página para eliminar la cuenta (en el navegador del teléfono). Ver js/native.js.
   publicUrl: 'https://sebasurregor.github.io/FrostPom-Pomodoro-Timer/',
@@ -22,6 +22,15 @@ export const config = Object.freeze({
     // contraseña, y su progreso (menos la foto) se guarda en Supabase. Necesita el SQL de
     // server/supabase/schema.sql. Paso a paso: docs/CUENTAS-EN-LINEA.md
     online: true,
+    // (v4.9.0) Entrar o crear la cuenta con otras cuentas. Enciende cada una (true) SOLO después de
+    // configurarla en Supabase → Authentication → Sign In / Providers y de poner las direcciones de
+    // regreso. Paso a paso: docs/INICIAR-CON-OTRAS-CUENTAS.md. Facebook necesita que Meta apruebe la app.
+    oauth: Object.freeze({
+      google: false,
+      azure: false, // Microsoft (cuentas personales de Outlook/Hotmail y de colegios o empresas)
+      discord: false,
+      facebook: false,
+    }),
   }),
   captcha: Object.freeze({
     // (v4.0.3) CAPTCHA de Cloudflare Turnstile: frena a los programas que crean cuentas en masa.

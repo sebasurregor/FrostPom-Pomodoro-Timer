@@ -1,4 +1,4 @@
-# FrostPom: Pomodoro Timer (v4.8.2)
+# FrostPom: Pomodoro Timer (v4.9.0)
 
 > Antes se llamaba **StudyTimer**. Publicada en **https://sebasurregor.github.io/FrostPom-Pomodoro-Timer/**
 
@@ -40,7 +40,7 @@ Diseño: paisaje polar simple (montañas en #2d68bc, #749eda y #93c0ed) con ping
 | **Ranking** | **Ranking global** (`docs/RANKING-GLOBAL.md`): podio y tabla de la semana y la temporada, el servidor mide el tiempo, máximo 4 h al día, aparecen los de 13+ con su nombre de usuario y se puede salir (y borrar los minutos). Con `mode: 'local'`: tu marca y el aviso "llega pronto". |
 | **Tienda (en Enfocar)** | El ícono de la bolsa junto al compañero del reloj abre la bandeja de comida. **Arrastra** la comida hasta tu compañero con el mouse o con el dedo (con el teclado: Tab + Enter). 12 comidas de 2 a 8 gemas; la barriguita baja un poco cada hora y cada animal tiene favoritas. Es solo por cariño: no da XP. |
 | **Perfil** | Tu personaje, resumen de estadísticas, **compañeros de edición limitada** (se ganan con logros), **foto de perfil** (opcional, solo en tu dispositivo), temas del temporizador (con gemas o Premium), **temporadas** (barra con los días que faltan, (i) con la explicación y tus medallas) y logros. Desde aquí se entra a **Ajustes**. |
-| **Ajustes** | Cuenta (en línea: último guardado, y "Cerrar sesión" sin borrar nada; de antes: "Conectar"), región y "Eliminar mi cuenta", Premium, sonidos de concentración y tonos, recordatorios, temporizador ("Menos animaciones"), límite saludable diario, ranking y **guardado automático**. |
+| **Ajustes** | Cuenta (en línea: último guardado, y "Cerrar sesión" sin borrar nada; de antes: "Conectar"; (v4.9.0) se puede entrar con Google, Microsoft o Discord: `docs/INICIAR-CON-OTRAS-CUENTAS.md`), (v4.9.0, Android) **Notificación tipo reproductor** (apagada: notificación normal), región y "Eliminar mi cuenta", Premium, sonidos de concentración y tonos, recordatorios, temporizador ("Menos animaciones"), límite saludable diario, ranking y **guardado automático**. |
 
 ### Cómo se gana
 

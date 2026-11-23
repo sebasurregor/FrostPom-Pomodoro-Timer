@@ -56,6 +56,8 @@ export function stateFromSubscriber(body, { entitlement = ENTITLEMENT, now } = {
   if (!ent || typeof ent !== 'object') return { ...NONE };
   const product = typeof ent.product_identifier === 'string' ? ent.product_identifier : null;
   const s = (product && (sub.subscriptions || {})[product]) || {};
+  // (v4.9.0) Premium de por vida: es una compra de una sola vez (non_subscriptions), no una suscripción
+  const once = product && Array.isArray((sub.non_subscriptions || {})[product]) ? sub.non_subscriptions[product].slice(-1)[0] || {} : {};
   const lifetime = ent.expires_date === null || ent.expires_date === undefined;
   const exp = ms(ent.expires_date);
   const grace = ms(ent.grace_period_expires_date) ?? ms(s.grace_period_expires_date);
@@ -76,13 +78,13 @@ export function stateFromSubscriber(body, { entitlement = ENTITLEMENT, now } = {
   return {
     premium,
     status,
-    store: typeof s.store === 'string' ? s.store : null,
+    store: typeof s.store === 'string' ? s.store : typeof once.store === 'string' ? once.store : null,
     product,
     period_type: typeof s.period_type === 'string' ? s.period_type : null,
     expires_at: lifetime ? null : iso(until),
-    will_renew: premium && !unsub && !refunded,
+    will_renew: premium && !lifetime && !unsub && !refunded, // (v4.9.0) lo de por vida no se "renueva"
     billing_issue: issue,
-    sandbox: s.is_sandbox === true,
+    sandbox: s.is_sandbox === true || once.is_sandbox === true,
   };
 }
 

@@ -4,8 +4,8 @@ e2e_multidispositivo.py): Auth (cuentas anónimas, correo + contraseña, código
 las funciones del servidor (ranking, progreso de las cuentas en línea y, desde la v4.5, el reloj en
 vivo), en memoria. Las reglas reales se prueban aparte en PostgreSQL: server/supabase/test/run_local.sh
 """
-import json, re, time, datetime, base64
-from urllib.parse import urlparse, parse_qs
+import json, re, time, datetime, base64, hashlib
+from urllib.parse import urlparse, parse_qs, urlencode
 
 BLOCK_RE = re.compile(r'^[A-Za-z0-9-]{8,64}$')
 DEVICE_RE = re.compile(r'^[A-Za-z0-9-]{4,32}$')
@@ -34,6 +34,11 @@ class FakeSupabase:
     def __init__(self):
         self.n = 0
         self.users = {}      # uid -> {anon, email}
+        # (v4.9.0) Entrar con Google, Microsoft, Discord: el correo que "devuelve" cada proveedor,
+        # los códigos de un solo uso (código -> {challenge, provider}) y qué responde el proveedor
+        self.oauth_email = {'google': 'ana.google@gmail.com', 'azure': 'ana@outlook.com', 'discord': 'ana.discord@gmail.com', 'facebook': 'ana.fb@gmail.com'}
+        self.oauth_codes = {}
+        self.oauth_deny = False
         self.tokens = {}     # access -> uid
         self.refresh = {}    # refresh -> uid
         self.profiles = {}   # uid -> {username, country, avatar, show, xp}
@@ -85,7 +90,8 @@ class FakeSupabase:
         self.refresh[ref] = uid
         u = self.users[uid]
         return {'access_token': acc, 'refresh_token': ref, 'expires_in': 3600, 'token_type': 'bearer',
-                'user': {'id': uid, 'is_anonymous': u['anon'], 'email': u.get('email') or ''}}
+                'user': {'id': uid, 'is_anonymous': u['anon'], 'email': u.get('email') or '',
+                         'app_metadata': {'provider': u.get('provider') or ('email' if u.get('email') else 'anonymous')}}}
 
     def add_account(self, email, password, save=None):
         uid = self.new_uid()
@@ -148,6 +154,32 @@ class FakeSupabase:
                 return ok({'code': 400, 'error_code': 'captcha_failed', 'msg': 'captcha protection: request disallowed (captcha verification process failed)'}, 400)
             if tok:
                 self.used_tokens.add(tok)
+
+        # (v4.9.0) OAuth con PKCE: /authorize "pasa por Google" y vuelve a redirect_to con ?code=…
+        if path == '/auth/v1/authorize':
+            q = parse_qs(urlparse(req.url).query)
+            prov = (q.get('provider') or [''])[0]
+            back = (q.get('redirect_to') or [''])[0]
+            self.calls.append(('oauth_authorize', {'provider': prov, 'redirect_to': back, 'method': (q.get('code_challenge_method') or [''])[0], 'scopes': (q.get('scopes') or [''])[0]}, None))
+            if self.oauth_deny:
+                loc = back + ('&' if '?' in back else '?') + urlencode({'error': 'access_denied', 'error_description': 'The user denied'})
+            else:
+                code = f'code-{len(self.oauth_codes) + 1}-abcdefgh'
+                self.oauth_codes[code] = {'challenge': (q.get('code_challenge') or [''])[0], 'provider': prov}
+                loc = back + ('&' if '?' in back else '?') + urlencode({'code': code})
+            return route.fulfill(status=302, headers={'Location': loc}, body='')
+        if path == '/auth/v1/token' and 'grant_type=pkce' in req.url:
+            info = self.oauth_codes.pop(body.get('auth_code'), None)
+            ver = str(body.get('code_verifier') or '')
+            want = base64.urlsafe_b64encode(hashlib.sha256(ver.encode()).digest()).decode().rstrip('=')
+            if not info or want != info['challenge']:
+                return ok({'error_code': 'flow_state_not_found', 'msg': 'invalid flow state, no valid flow state found'}, 404)
+            email = self.oauth_email.get(info['provider'])
+            u = self.uid_of(email) if email else None
+            if not u:
+                u = self.new_uid(); self.users[u] = {'anon': False, 'email': email, 'provider': info['provider']}
+            self.calls.append(('oauth_login', {'provider': info['provider'], 'email': email}, u))
+            return ok(self.session(u))
 
         if path == '/auth/v1/signup':
             if 'signup' in self.abort:

@@ -159,7 +159,7 @@ En cualquier caso responde **"No"** a "¿Podría atraer de forma no intencional 
 | Tipo de dato (en Play Console) | ¿Se recoge? | Para qué | ¿Opcional? |
 |---|---|---|---|
 | Información personal → **Correo electrónico** | Sí | Funcionalidad de la app, Administración de la cuenta | No (las cuentas en línea, de 13+, lo necesitan) |
-| Información personal → **Nombre** (el nombre de usuario, que es un apodo) | Sí | Funcionalidad de la app (ranking) | No |
+| Información personal → **Nombre** (el nombre de usuario, que es un apodo; v4.9.0: y, si entras con Google, Microsoft o Discord, el nombre que manda esa cuenta, que Supabase guarda y FrostPom no muestra) | Sí | Funcionalidad de la app (ranking), Administración de la cuenta | No |
 | Información personal → **ID de usuario** (el de la cuenta de Supabase) | Sí | Funcionalidad de la app, Administración de la cuenta | No |
 | Información personal → **Otra información** (el país, si lo eliges) | Sí | Funcionalidad de la app (ranking) | Sí |
 | Actividad en la app → **Interacciones con la app** (pomodoros, minutos, progreso) | Sí | Funcionalidad de la app | No |

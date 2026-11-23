@@ -30,6 +30,11 @@ function icon(open) {
 export function enhancePasswords(root) {
   root.querySelectorAll('input[type="password"]:not([data-eye])').forEach((input) => {
     input.dataset.eye = '1';
+    // (v4.9.0) Al mostrarla, el campo pasa a ser de texto y el teclado de Android empezaba a
+    // corregir, poner mayúsculas o añadir un espacio al elegir una sugerencia. Con esto no lo hace.
+    input.setAttribute('autocapitalize', 'none');
+    input.setAttribute('autocorrect', 'off');
+    input.setAttribute('spellcheck', 'false');
     const wrap = document.createElement('div');
     wrap.className = 'pass-wrap';
     input.replaceWith(wrap);

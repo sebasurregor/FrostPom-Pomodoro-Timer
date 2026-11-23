@@ -22,7 +22,9 @@ export const isConfigured = () => !!(cfg().url && cfg().key);
 
 /** Correo con forma válida (no garantiza que exista: eso lo prueba el código). */
 export function cleanEmail(value) {
-  const v = String(value || '').trim().toLowerCase();
+  // (v4.9.0) Un correo nunca lleva espacios: el teclado de Android pone uno después del punto
+  // ("correo@gmail. com"), así que se quitan todos en vez de decir que está mal escrito.
+  const v = String(value || '').replace(/\s+/g, '').toLowerCase();
   if (v.length > 254) return '';
   return /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(v) ? v : '';
 }
@@ -210,6 +212,20 @@ export async function signIn(email, password) {
   if (!e) throw new CloudError('email');
   const s = sessionFrom(await call('/token?grant_type=password', { body: { email: e, password } }));
   if (!s) throw new CloudError('server');
+  return s;
+}
+
+/**
+ * (v4.9.0) Entrar con Google, Microsoft, Discord…: cambia el código de un solo uso (y el secreto
+ * que inventó la app, PKCE) por la sesión. Devuelve la sesión con el proveedor. Ver js/oauth.js.
+ */
+export async function exchangeCode(code, verifier) {
+  const data = await call('/token?grant_type=pkce', { body: { auth_code: String(code || ''), code_verifier: String(verifier || '') } });
+  const s = sessionFrom(data);
+  if (!s || !s.uid) throw new CloudError('auth');
+  const app = (data.user && data.user.app_metadata) || {};
+  s.provider = typeof app.provider === 'string' ? app.provider : '';
+  s.anon = false;
   return s;
 }
 

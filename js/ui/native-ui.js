@@ -108,9 +108,24 @@ function nativeTexts() {
     endStudy: { title: tr('¡Sesión completa!'), body: tr('Vuelve a FrostPom para guardar tu sesión y ganar tu XP.') },
     endBreak: { title: tr('Descanso terminado'), body: tr('Cuando quieras, empieza otra sesión.') },
     done: tr('Abre FrostPom para guardar tu sesión.'),
+    // (v4.9.0) false = notificación normal (por defecto); true = estilo reproductor (Ajustes)
+    player: notifPlayer(),
     channel: tr('Pomodoro en curso'),
     channelDesc: tr('La cuenta regresiva de tu pomodoro, con sus botones.'),
   };
+}
+
+/**
+ * (v4.9.0) ¿La notificación es tipo reproductor? Apagado por defecto: el reproductor es lo que
+ * Android pone arriba y ya abierto al bajar la cortina (como la música), y a varias personas les
+ * parecía que "se abría solo". Es un ajuste de este teléfono (no viaja con la cuenta).
+ */
+export function notifPlayer() {
+  try { return store.pref.get('notif_player') === '1'; } catch { return false; }
+}
+export function setNotifPlayer(on) {
+  try { if (on) store.pref.set('notif_player', '1'); else store.pref.remove('notif_player'); } catch { /* nada */ }
+  syncNativeTimer();
 }
 
 /** Le cuenta al teléfono cómo está el reloj (solo si cambió algo desde la última vez). */

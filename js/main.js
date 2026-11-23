@@ -29,7 +29,8 @@ import { renderRanking, bindRanking } from './ui/ranking.js';
 import { bindFeeding, renderShopBtn, openTray, petLabel } from './ui/feeding.js';
 import { needsSettle, currentPetId, petStatus } from './pet.js';
 import { renderSettings, bindSettings } from './ui/settings.js';
-import { onboarding, loginGate, createAccountFlow, renameIfBlocked } from './ui/account.js';
+import { onboarding, loginGate, createAccountFlow, renameIfBlocked, oauthReturn } from './ui/account.js';
+import { resumeOAuth } from './ui/oauth-ui.js';
 import { t, translateDom, isEnglish } from './i18n.js';
 import { applyTheme } from './ui/theme.js';
 import { mountGateSnow } from './ui/gate-snow.js';
@@ -230,6 +231,10 @@ function hintReducedMotion() {
 
 /** Bienvenida, inicio de sesión u oferta de crear cuenta, según el caso. */
 async function greet() {
+  // (v4.9.0) ¿Vuelve de entrar con Google, Microsoft o Discord? (en la web, la página se recargó)
+  // Si entró, la cuenta ya quedó lista y abierta: lo de abajo sigue como siempre (sin pedir nada)
+  const back = await resumeOAuth().catch(() => null);
+  if (back) await oauthReturn(back).catch(() => false);
   if (!state.profile.onboarded) return onboarding();
   if (state.account) return loginGate().then(maybePaywall);
   if (!store.tab.get('acc_later')) return createAccountFlow().then(() => store.tab.set('acc_later', '1'));
@@ -259,7 +264,15 @@ function boot() {
   // Cuentas en línea (v4.0) primero: si hay progreso más nuevo en la nube, se trae antes del ranking.
   // (v4.5) Después, el reloj en vivo con tus otros aparatos.
   // (v4.5.1) Si tu nombre ya no está permitido (normas nuevas), se pide otro antes de unirte al ranking.
-  Promise.resolve(greet()).then(bootCloud).then(() => renameIfBlocked().catch(() => {})).then(() => bootLive().catch(() => {})).then(bootBoard).catch(() => {}).finally(() => {
+  // (v4.9.0) El reloj en vivo y la revisión de Premium arrancan en paralelo: antes el ranking, Premium
+  // y los anuncios esperaban a que el reloj terminara de hablar con el servidor (varias idas y vueltas
+  // seguidas; con internet del celular eran segundos).
+  let premiumReady = null;
+  Promise.resolve(greet()).then(bootCloud).then(() => {
+    bootLive().catch(() => {});
+    premiumReady = bootPlayPremium().catch(() => {});
+    return renameIfBlocked().catch(() => {});
+  }).then(bootBoard).catch(() => {}).finally(() => {
     checkSeason(); checkPet();
     // (v4.5.3) Anuncios (solo en la app de Android, 13+): el consentimiento de Google, si tu país lo
     // pide, y AdMob. Se espera un momento para que la racha apagada ya ofrezca "Ver un anuncio".
@@ -267,7 +280,7 @@ function boot() {
     // el progreso de la nube: quizá estudiaste en otro aparato)
     // (v4.7.0) Primero se pregunta al servidor por tu Premium pagado (así nadie con Premium ve el
     // anuncio del descanso), después los anuncios.
-    bootPlayPremium().catch(() => {}).then(() => bootGems()).catch(() => {}).then(() => bootAds()).catch(() => false).then(() => checkStreak({ running: session.running })).catch(() => {});
+    (premiumReady || bootPlayPremium()).catch(() => {}).then(() => bootGems()).catch(() => {}).then(() => bootAds()).catch(() => false).then(() => checkStreak({ running: session.running })).catch(() => {});
   });
   syncStorePremium(); // con cobro real: Premium sigue a la suscripción de Microsoft Store
   hintReducedMotion();

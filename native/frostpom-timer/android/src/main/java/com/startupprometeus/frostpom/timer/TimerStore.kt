@@ -131,6 +131,9 @@ class Texts(private val ctx: Context, private val json: JSONObject?) {
     fun bubble(mode: String): String =
         if (mode == TimerState.STUDY) pick("bubble.study", R.string.fp_bubble_study) else pick("bubble.break", R.string.fp_bubble_break)
 
+    /** (v4.9.0) true = notificación tipo reproductor (Ajustes de la app); por defecto, normal. */
+    val player: Boolean get() = json?.optBoolean("player", false) ?: false
+
     val paused: String get() = pick("paused", R.string.fp_paused)
     val start: String get() = pick("start", R.string.fp_start)
     val pause: String get() = pick("pause", R.string.fp_pause)

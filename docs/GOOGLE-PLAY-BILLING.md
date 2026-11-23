@@ -1,4 +1,4 @@
-# Cobrar Premium en Android con Google Play (v4.7.0)
+# Cobrar Premium en Android con Google Play (v4.7.0; de por vida y precios: v4.9.0)
 
 > **Estado:** programado y probado en la v4.7.0, pero **apagado** (`config.premium.play.enabled = false`) hasta que termines los pasos de la sección 5. Mientras esté apagado, Premium en Android sigue en modo prueba, como antes.
 >
@@ -276,6 +276,60 @@ Están en `config.premium.play.gemPacks` (`js/config.js`). Si algún día cambia
 4. **Seguridad de los datos:** no hay nada nuevo que marcar. "Historial de compras" ya está (paso 9); solo cuenta también los paquetes.
 5. **Ficha de Play Store:** la ficha ya no dice que las gemas "no se compran con dinero" (`docs/google-play/FICHA.md`). Copia el texto nuevo cuando publiques. Google marca sola que la app "ofrece compras dentro de la aplicación".
 
+## 5c. Premium de por vida (v4.9.0)
+
+### Lo que decidiste (22 de noviembre de 2026)
+
+Además de la suscripción mensual y la anual, **Premium para siempre con un solo pago** de **US$ 29,99**. Es una compra **de una sola vez que no se gasta** (no consumible): se compra una vez por cuenta y queda para siempre.
+
+### Cómo funciona
+
+- En la ventana de Premium (app de Android, cuenta en línea 13+) sale un tercer plan, **"De por vida"**, con la etiqueta **"Para siempre"** y el precio de Google en la moneda de cada persona ("{precio}, un solo pago").
+- Al comprarlo: confeti y **"¡Ya eres Premium de por vida!"**. En Ajustes dice "Tienes Premium de por vida" y ya no sale "Administrar suscripción" (no hay nada que renovar ni cancelar).
+- **Si ya tenía la suscripción**, en "Administrar" aparece **"Pasarme a de por vida"**. Después de comprar, la app le recuerda **cancelar la suscripción en Google Play** (Google no la cancela sola).
+- Funciona como la suscripción: RevenueCat da el entitlement `premium` **sin fecha de vencimiento** y el servidor lo guarda como Premium de por vida (`expires_at` vacío). Si Google **reembolsa** la compra, RevenueCat quita el entitlement y Premium se apaga.
+- Antes de **borrar la cuenta**, la app avisa que Premium de por vida se pierde con ella.
+
+### Lo que tienes que hacer tú
+
+1. **Play Console → tu app → Monetizar con Play → Productos → Productos únicos → Crear producto único:**
+   - **ID del producto:** `frostpom_premium_vida` (no se puede cambiar ni volver a usar).
+   - **Nombre:** "FrostPom Premium de por vida". **Descripción:** "Todo Premium para siempre, con un solo pago."
+   - **Opción de compra:** ID `compra`, tipo **Comprar** (*Buy*).
+   - **Precio:** edición masiva → todos los países → **US$ 29,99** → Aplicar. Revisa el de Colombia.
+   - **Activar** (el producto y la opción de compra).
+2. **RevenueCat → Product catalog → Products → + New** (en la app de Play Store): `frostpom_premium_vida`, y márcalo como **No consumible** (*Non-consumable*). **Esto es lo más importante:** si queda como consumible, RevenueCat lo "gasta" y Google dejaría comprarlo otra vez.
+3. **Entitlements → `premium` → Attach:** adjunta `frostpom_premium_vida` (así da Premium).
+4. **Offerings → `default` → + New package:** identificador **`$rc_lifetime`** (*Lifetime*) → producto `frostpom_premium_vida`. La app busca el paquete de tipo *Lifetime*: no hace falta cambiar nada en `js/config.js`.
+5. **Supabase (recomendado):** vuelve a desplegar las funciones `rc-webhook` y `premium-sync` con el código de `server/supabase/pegar-en-supabase/` (mismo procedimiento del paso 6). La versión vieja ya entiende "sin vencimiento", pero la nueva no marca la compra de por vida como "se renueva" y guarda bien la tienda.
+6. **Prueba** con tu correo de probador (paso 8): compra "De por vida" con la tarjeta de prueba que siempre aprueba → confeti, Ajustes dice "Premium de por vida". Para volver a probar, en Play Console → **Pedidos** reembolsa la compra de prueba (o en RevenueCat → el cliente → *Delete customer*).
+7. **Ficha y privacidad:** nada nuevo que marcar en Seguridad de los datos ("Historial de compras" ya está). La política de privacidad ya menciona Premium de por vida.
+
+## 5d. Corregir los precios (22 de noviembre de 2026)
+
+Lo que se vio en las capturas y cómo arreglarlo:
+
+| Qué se vio | ¿Está mal? | Qué hacer |
+| --- | --- | --- |
+| `gemas_60` a **COP 329.000** | **Sí.** Debería costar **US$ 0,99** (Google calcula los pesos: unos pocos miles, no cientos de miles). | Play Console → Productos únicos → `gemas_60` → opción de compra → **Precios** → edición masiva → **US$ 0,99** → Aplicar → revisa Colombia → **Guardar**. El precio de un producto único se puede cambiar cuando quieras. Revisa también `gemas_330` (US$ 4,99), `gemas_700` (US$ 9,99) y `gemas_1500` (US$ 19,99). |
+| Premium: "prueba gratis de **3 minutos**" | **No.** Con un correo de probador, Google acorta la prueba de 7 días a 3 minutos. A la gente le sale "7 días". | Nada. |
+| "COP 10.000 / **5 min**" | **No.** Con probadores, un mes dura 5 minutos. | Nada (revisa solo que el precio sea el que quieres). |
+| Un plan a **"COP 66.000 / 5 min"** | **Probablemente sí.** Si es el plan **anual**, con un probador debería renovarse cada **30 minutos** (un año de prueba = 30 min). Si dice 5 minutos, ese plan quedó con período de **1 mes** (o 1 semana). | Ver abajo. |
+
+**Arreglar el plan anual** (Play Console → Monetizar con Play → Productos → Suscripciones → `frostpom_premium`):
+
+1. Abre el plan base `anual` y mira **Período de facturación**. Si dice **1 año**, está bien y no hagas nada más (en ese caso, cuéntame qué plan era el de COP 66.000).
+2. Si dice 1 mes (o 1 semana): el período de un plan base **activo** normalmente ya no se puede cambiar, así que:
+   1. **Agregar plan base:** ID `anual-12m` (los ID viejos no se pueden volver a usar), **Renovación automática**, período **1 año**, precio **US$ 19,99** (o el que decidas), "Actualizar tipos de cambio", revisa Colombia. **Activar.**
+   2. **Agregar oferta** en ese plan nuevo: ID `prueba-7-dias-anual`, **Nunca tuvo esta suscripción**, **Prueba gratuita de 7 días**. **Activar.**
+   3. En el plan viejo `anual`: **Desactivar**. Nadie nuevo puede comprarlo; las suscripciones de prueba que existan siguen hasta que se cancelen (puedes cancelarlas en Pedidos).
+   4. **RevenueCat → Products → Import** (o + New): `frostpom_premium:anual-12m`. Adjúntalo al entitlement **`premium`**.
+   5. **Offerings → `default` → paquete `$rc_annual`** → cambia el producto a `frostpom_premium:anual-12m` y guarda. (Puedes quitar el viejo `frostpom_premium:anual` del paquete; déjalo en el entitlement para las suscripciones de prueba que sigan vivas.)
+   6. Abre la app desde Prueba interna: el plan anual debe decir el precio anual, "Ahorras X %" frente al mensual y, con el probador, renovar cada **30 min**.
+3. Haz lo mismo con el plan `mensual` si no dice **1 mes**.
+
+**Recuerda:** los precios **solo** se cambian en Play Console. La app muestra el que manda Google, en la moneda de cada persona; `js/config.js` no tiene precios de Google Play.
+
 ## 6. Costos
 
 - **Google** se queda con el **15 %** de las suscripciones. De los **paquetes de gemas** también se queda una comisión (15 % en el nivel para desarrolladores pequeños, si estás inscrito; revisa "Tarifas de servicio" en la ayuda de Play Console).
@@ -293,6 +347,8 @@ Están en `config.premium.play.gemPacks` (`js/config.js`). Si algún día cambia
 | `npm run android:actualizar` se detiene por la clave | Pegaste la clave secreta (`sk_…`) en la app. Bórrala, **créala de nuevo en RevenueCat** (la vieja ya no es secreta si llegó a GitHub) y pon la pública (`goog_…`). |
 | "Comprar gemas" dice que no pudo traer los paquetes | Los cuatro productos únicos (y su opción de compra) deben estar **activos** en Play Console, la app instalada desde Play con un correo de probador, y los productos agregados en RevenueCat. Las credenciales de Google pueden tardar hasta 36 h. |
 | Pagué gemas y no llegaron | Cierra y abre la app (se revisan las compras que falten). Si el pago está "pendiente" en Google, llegan cuando se apruebe. En `chrome://inspect` busca `[FrostPom] gemas`. En Play Console → **Pedidos** puedes ver el pedido (el número `GPA.…`). |
+| No sale el plan "De por vida" | El producto `frostpom_premium_vida` debe estar **activo** (con su opción de compra), en RevenueCat como **No consumible**, adjunto a `premium` y en la oferta `default` como paquete **`$rc_lifetime`**. |
+| Compré "De por vida" y se pudo comprar otra vez | En RevenueCat el producto quedó como consumible: márcalo como **No consumible** y reembolsa la compra repetida en Play Console → Pedidos. |
 | Quiero apagar el cobro ya | `enabled: false` en `js/config.js` y publica. Quien ya pagó sigue con su suscripción en Google Play: cancélalas o reembólsalas desde Play Console → Pedidos. |
 
 ## 8. Lo que queda para después

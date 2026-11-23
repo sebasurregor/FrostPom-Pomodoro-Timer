@@ -1,5 +1,24 @@
 # Cambios de la v2 a la v3
 
+## v4.9.0: más rápida, la notificación que no se abre sola, Premium de por vida y entrar con Google, Microsoft o Discord
+
+**Antes de publicar:** vuelve a pegar tus claves en `js/config.js` (Turnstile y `goog_…`) y `npm run android:actualizar` (la línea **[OK]** debe terminar con "Regreso de Google/Microsoft/Discord: listo."). **No hay cambios en la base de datos.** Recomendado: volver a desplegar `rc-webhook` y `premium-sync` (`server/supabase/pegar-en-supabase/`).
+
+**Tus decisiones (22 nov 2026):** notificación normal y el reproductor opcional; entrar con Google, Microsoft y Discord (Facebook programado pero apagado); Premium de por vida a **US$ 29,99**; yo optimizo aquí y tú mides en tu Galaxy con Claude Code.
+
+- **Más rápida (sobre todo en el celular):**
+  - Los animales animados (los que caminan, el pingüino que saluda, los corazones y el llanto de tu compañero) ya no cambian de cuadro con `background-position` sino moviendo una tira con `transform`: lo hace la tarjeta gráfica. En las medidas (celular simulado, procesador 6 veces más lento): **Enfocar pasó de 38–72 % del procesador ocupado a 2–4 %**, y una ventana con el pingüino (por ejemplo, Premium) **de 25–46 % a 2 %**. Se ve igual.
+  - En el celular caminan 4 animales a la vez (antes 6), la nieve va a 24 cuadros por segundo (con menos copos en celulares modestos), el paisaje se queda quieto detrás de las ventanas y mientras escribes, y las ventanas ya no desenfocan el fondo (era lo más pesado para la tarjeta gráfica).
+  - Al abrir: la ventana de entrar sale **~25 % antes** (0,78 s frente a 1,02 s en la prueba lenta), la lluvia (1 MB) ya no se descarga al abrir (en la web espera a que la app esté quieta; en Android no hace falta), y el reloj en vivo y Premium ya no hacen esperar al ranking ni a lo demás.
+- **La notificación ya no se abre sola:** por defecto es una notificación **normal**; el estilo reproductor queda en **Ajustes → Notificación tipo reproductor** (solo Android). En pausa se puede quitar y se va sola a los 30 min. Detalle: `native/frostpom-timer/LEEME.md`, "v4.9.0".
+- **Premium de por vida** (US$ 29,99, un solo pago): tercer plan en la ventana de Premium, "Pasarme a de por vida" para quien ya está suscrito, aviso antes de borrar la cuenta. Lo que haces en Play Console y RevenueCat (`frostpom_premium_vida`, **No consumible**, paquete `$rc_lifetime`): `docs/GOOGLE-PLAY-BILLING.md`, sección 5c.
+- **Corregir los precios:** `gemas_60` estaba a COP 329.000 (debe ser US$ 0,99) y el plan anual parece tener período de 1 mes. Paso a paso: `docs/GOOGLE-PLAY-BILLING.md`, sección 5d. La "prueba de 3 minutos" y el "/5 min" son normales con correos de probador.
+- **Entrar con Google, Microsoft o Discord:** botones arriba en la bienvenida y en "Inicia sesión". El correo se llena solo; el nombre de usuario viene sugerido (al azar, no el nombre real); la edad se pide antes si falta (13+). Une la cuenta con la que ya tenga ese correo. Se encienden en `config.accounts.oauth` después de configurarlos: `docs/INICIAR-CON-OTRAS-CUENTAS.md`. Logos oficiales en `assets/oauth/` (`LEEME.md`).
+- **"Las contraseñas no coinciden" aunque se veían iguales:** pasaba cuando el teclado ponía un espacio al final (o la autocorrección cambiaba algo) al mostrar la contraseña. Ahora los campos de contraseña no autocorrigen ni ponen mayúsculas, la app dice exactamente si la diferencia es un espacio, la contraseña no puede empezar ni terminar con espacio, se quitan los espacios del correo (el tester tenía "email. com") y el aviso sale en inglés si la app está en inglés.
+- **Política de privacidad:** explica entrar con otras cuentas y Premium de por vida. **Súbela con `git push`.** En Play Console → Seguridad de los datos, a **Nombre** (ya marcado) agrégale el propósito **Administración de la cuenta**: `docs/INICIAR-CON-OTRAS-CUENTAS.md`, sección 10.
+- Pruebas nuevas: `tests/oauth.test.js`, `tests/registro.test.js` y `tests/e2e_v490.py`.
+- versionCode 40900.
+
 ## v4.8.2: nombres escondidos en el ranking (opción a) y diagnóstico en Ajustes
 
 **Antes de publicar:** vuelve a pegar tus claves en `js/config.js`. **Hay un cambio de servidor:** copia de seguridad y corre el `server/supabase/schema.sql` nuevo (botón verde "Run and enable RLS"); no borra datos.

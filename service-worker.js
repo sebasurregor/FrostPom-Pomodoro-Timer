@@ -7,7 +7,7 @@
  *  - Solo se guarda en caché lo de este mismo sitio y respuestas correctas. Nunca respuestas de APIs
  *    ni de otros dominios (podrían contener datos personales).
  */
-const VERSION = '4.8.2';
+const VERSION = '4.9.0';
 const CACHE = `frostpom-${VERSION}`;
 const PRECACHE = [
   './',
@@ -56,6 +56,8 @@ const PRECACHE = [
   './js/gem-shop.js', // (v4.8.0) paquetes de gemas con Google Play
   './js/ui/ads-ui.js',
   './js/ui/gems-ui.js', // (v4.8.0) "¿Necesitas más gemas?"
+  './js/oauth.js', // (v4.9.0) entrar con Google, Microsoft, Discord
+  './js/ui/oauth-ui.js',
   './js/ui/streak.js', // (v4.5.2) la racha: el fuego que se enciende, crece y se congela
   './js/session.js',
   './js/engine.js',

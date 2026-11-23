@@ -93,6 +93,26 @@ if (!manifest.includes(meta)) {
   console.error('[X] No pude poner el ID de AdMob en android/app/src/main/AndroidManifest.xml');
   process.exit(1);
 }
+// (v4.9.0) El enlace de regreso al entrar con Google, Microsoft o Discord (js/oauth.js: NATIVE_REDIRECT).
+// Va dentro de MainActivity (launchMode singleTask: el regreso llega a la app que ya estaba abierta).
+const deepLink = '<data android:scheme="com.startupprometeus.frostpom" android:host="login-callback" />';
+if (!manifest.includes(deepLink)) {
+  const filter = `
+            <!-- FrostPom v4.9.0: regreso de "Continuar con Google/Microsoft/Discord" (tools/app-android.mjs) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                ${deepLink}
+            </intent-filter>
+`;
+  const withLink = manifest.replace(/(<activity\b[^>]*android:name="\.MainActivity"[\s\S]*?)(\s*<\/activity>)/, (m, open, close) => `${open}${filter}${close}`);
+  if (withLink === manifest) {
+    console.error('[X] No pude poner el enlace de regreso (login-callback) en android/app/src/main/AndroidManifest.xml');
+    process.exit(1);
+  }
+  manifest = withLink;
+}
 if (manifest !== beforeManifest) writeFileSync(manifestPath, manifest);
 if (!appId) console.warn('[!] AdMob: uso el ID de app de PRUEBA de Google. Antes de publicar, pon el tuyo en config.ads.appId (docs/ANUNCIOS.md).');
 
@@ -156,4 +176,4 @@ const rulesRe = new RegExp(`${RULES_START.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 const newRules = rulesRe.test(rules) ? rules.replace(rulesRe, RULES) : `${rules.replace(/\s*$/, '')}${rules.trim() ? '\n\n' : ''}${RULES}`;
 if (newRules !== rules) writeFileSync(rulesPath, newRules);
 
-console.log(`[OK] Íconos copiados. Versión de la app: ${version} (versionCode ${code}). AdMob: ${appId ? 'tu ID de app' : 'ID de prueba'}${ads.enabled ? '' : ' (anuncios apagados en config.ads)'}. ${billing}.${r8Note}`);
+console.log(`[OK] Íconos copiados. Versión de la app: ${version} (versionCode ${code}). AdMob: ${appId ? 'tu ID de app' : 'ID de prueba'}${ads.enabled ? '' : ' (anuncios apagados en config.ads)'}. ${billing}. Regreso de Google/Microsoft/Discord: listo.${r8Note}`);

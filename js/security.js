@@ -40,6 +40,8 @@ function safeEqual(a, b) {
 export function checkPassword(pw) {
   if (typeof pw !== 'string' || pw.length < 8) return { ok: false, reason: tr('La contraseña debe tener al menos 8 caracteres.') };
   if (pw.length > 64) return { ok: false, reason: tr('La contraseña es demasiado larga (máximo 64).') };
+  // (v4.9.0) Un espacio al principio o al final casi siempre lo puso el teclado sin que lo vieras
+  if (pw !== pw.trim()) return { ok: false, reason: tr('La contraseña no puede empezar ni terminar con un espacio.') };
   if (!/[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/.test(pw) || !/\d/.test(pw)) return { ok: false, reason: tr('Usa al menos una letra y un número.') };
   if (/^(.)\1+$/.test(pw) || /12345678|password|contrasena|contraseña|qwerty/i.test(pw)) return { ok: false, reason: tr('Esa contraseña es muy fácil de adivinar.') };
   return { ok: true };

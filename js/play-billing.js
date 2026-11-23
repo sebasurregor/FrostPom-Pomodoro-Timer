@@ -150,14 +150,20 @@ export function trialOf(product) {
   return null;
 }
 
-/** El paquete mensual y el anual de la oferta (la de config o la actual de RevenueCat). */
+/**
+ * El paquete mensual, el anual y (v4.9.0) el de por vida de la oferta (la de config o la actual de
+ * RevenueCat). El de por vida es el paquete "Lifetime" ($rc_lifetime): una compra de una sola vez.
+ */
 export function packagesOf(offerings, offeringId = '') {
   const o = (offeringId && offerings && offerings.all && offerings.all[offeringId]) || (offerings && offerings.current);
-  if (!o) return { monthly: null, annual: null };
+  if (!o) return { monthly: null, annual: null, lifetime: null };
   const list = Array.isArray(o.availablePackages) ? o.availablePackages : [];
   const find = (type) => list.find((p) => p && p.packageType === type) || null;
-  return { monthly: o.monthly || find('MONTHLY'), annual: o.annual || find('ANNUAL') };
+  return { monthly: o.monthly || find('MONTHLY'), annual: o.annual || find('ANNUAL'), lifetime: o.lifetime || find('LIFETIME') };
 }
+
+/** (v4.9.0) ¿Esta copia es Premium de por vida? (sin fecha de vencimiento) */
+export const isLifetime = (entry) => !!(entry && entry.premium && entry.expiresAt === null);
 
 /** Por qué no se pudo comprar, según el error del complemento. */
 export function failReason(e) {
@@ -351,16 +357,17 @@ export async function offer(uid) {
   } catch (e) {
     return { ok: false, reason: failReason(e) === 'offline' ? 'offline' : 'unavailable' };
   }
-  const { monthly, annual } = packagesOf(offerings, cfg().offering || '');
-  const plan = (pkg) => {
+  const { monthly, annual, lifetime } = packagesOf(offerings, cfg().offering || '');
+  const plan = (pkg, once = false) => {
     if (!pkg || !pkg.product) return null;
     const p = pkg.product;
-    return { pkg, priceString: p.priceString || '', price: Number(p.price) || 0, perMonth: p.pricePerMonthString || '', trial: trialOf(p) };
+    return { pkg, priceString: p.priceString || '', price: Number(p.price) || 0, perMonth: once ? '' : p.pricePerMonthString || '', trial: once ? null : trialOf(p) };
   };
   const m = plan(monthly);
   const a = plan(annual);
-  if (!m && !a) return { ok: false, reason: 'unavailable' };
-  return { ok: true, monthly: m, annual: a, savings: m && a ? savings(m.price, a.price) : 0 };
+  const l = plan(lifetime, true);
+  if (!m && !a && !l) return { ok: false, reason: 'unavailable' };
+  return { ok: true, monthly: m, annual: a, lifetime: l, savings: m && a ? savings(m.price, a.price) : 0 };
 }
 
 /** Compra un plan. Devuelve { ok: true, entry } o { ok: false, reason }. */

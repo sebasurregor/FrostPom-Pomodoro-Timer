@@ -490,6 +490,8 @@
             <label class="switch"><input type="checkbox" id="setVibrate"><span class="switch__ui" aria-hidden="true"></span><span class="switch__text"><b>Vibración</b></span></label>
             <label class="switch"><input type="checkbox" id="setAwake"><span class="switch__ui" aria-hidden="true"></span><span class="switch__text"><b>Pantalla encendida</b></span></label>
             <label class="switch"><input type="checkbox" id="setMotion"><span class="switch__ui" aria-hidden="true"></span><span class="switch__text"><b>Menos animaciones</b></span></label>
+            <!-- v4.9.0: solo en la app de Android. Apagado = notificación normal (no se abre sola arriba) -->
+            <label class="switch" id="playerRow" hidden><input type="checkbox" id="setPlayer"><span class="switch__ui" aria-hidden="true"></span><span class="switch__text"><b>Notificación tipo reproductor</b><small>Como la de la música: grande y arriba al bajar la cortina.</small></span></label>
             <div class="btn-row">
               <button class="btn btn--paper btn--sm" type="button" id="notifBtn">Activar notificaciones</button>
             </div>

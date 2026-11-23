@@ -14,11 +14,12 @@ import { penguin } from './companions.js';
 import { countryPicker } from './widgets.js';
 import { chooseAndLoad, photoCropper } from './photo.js';
 import { pic } from './pics.js';
-import { skipPaywallToday, hasPlaySubscription } from './premium.js';
+import { skipPaywallToday, hasPlaySubscription, hasLifetime } from './premium.js';
+import { oauthButtons, startOAuth, failText as oauthFailText, providerLabel, setOAuthNotice, takeOAuthNotice } from './oauth-ui.js';
 import * as BOARD from '../board.js';
 import { birthField, applyRename, adoptEmailSession, deleteBoardOnAccountDelete, errorText as boardErrorText } from './board-ui.js';
 import * as SYNC from '../sync.js';
-import { createOnline, afterOnlineCreated, signInFlow, deleteOnlineAccount, changeOnlinePassword, isOnline, signOutOnline, justSignedOut, reloadApp } from './cloud-ui.js';
+import { createOnline, afterOnlineCreated, signInFlow, deleteOnlineAccount, changeOnlinePassword, isOnline, signOutOnline, justSignedOut, reloadApp, oauthEnter, oauthUnlock } from './cloud-ui.js';
 import { state, store, mutate, migrated } from './context.js';
 import { t, tr } from '../i18n.js';
 
@@ -110,12 +111,23 @@ export function keepSignedInField(id) {
   return { box, field };
 }
 
-/** Reglas de una contraseña nueva. Devuelve el motivo del error o '' si está bien. */
+/**
+ * Reglas de una contraseña nueva. Devuelve el motivo del error (ya traducido) o '' si está bien.
+ * (v4.9.0) Un tester veía las dos contraseñas iguales y aun así "no coinciden": al tocar el ojo, el
+ * campo pasa a texto y el teclado de Android puede añadir un espacio al final (al elegir una
+ * sugerencia) o escribir la misma letra con otro código (é compuesta o separada). Ahora las letras
+ * se comparan normalizadas, y si solo cambia un espacio se dice exactamente eso.
+ */
 export function newPasswordError(pass1, pass2, username) {
   const pc = SEC.checkPassword(pass1);
   if (!pc.ok) return pc.reason;
-  if (pass1 !== pass2) return 'Las dos contraseñas no coinciden.';
-  if (pass1.toLowerCase().includes(username.toLowerCase())) return 'La contraseña no puede contener tu nombre de usuario.';
+  const a = String(pass1).normalize('NFC');
+  const b = String(pass2).normalize('NFC');
+  if (a !== b) {
+    if (a.replace(/\s+/g, '') === b.replace(/\s+/g, '')) return tr('Las contraseñas solo se diferencian en un espacio (a veces lo pone el teclado al final). Bórralo y vuelve a intentarlo.');
+    return tr('Las dos contraseñas no coinciden.');
+  }
+  if (a.toLowerCase().includes(username.toLowerCase())) return tr('La contraseña no puede contener tu nombre de usuario.');
   return '';
 }
 
@@ -228,13 +240,16 @@ function accountFields({ withPassword = true, withEmail = false, withBirth = fal
     } catch (e) { err.textContent = e.message; return null; }
   }
   const setError = (msg) => { err.textContent = msg; };
-  return { nodes, validate, focus: () => name.focus(), setError, session: () => session };
+  // (v4.9.0) Para "Continuar con Google…": el mes y el año ya elegidos ('' si todavía no)
+  const birthValue = () => (birth ? birth.value() : '');
+  return { nodes, validate, focus: () => name.focus(), setError, session: () => session, birthValue, focusBirth: () => birth && birth.focus() };
 }
 
 /** Al abrir la app con cuenta, se pide la contraseña (una vez por pestaña). */
 export async function loginGate() {
   if (!state.account || isUnlocked()) return;
   if (await enterRemembered()) return;
+  if (state.account.oauth) return oauthGate();
   const keep = keepSignedInField('loginKeep');
   const user = h('input', { type: 'text', class: 'acc-input', id: 'loginUser', autocomplete: 'username', autocapitalize: 'off', value: state.account.username });
   const pass = h('input', { type: 'password', class: 'acc-input', id: 'loginPass', autocomplete: 'current-password', maxlength: '64' });
@@ -282,6 +297,73 @@ export async function loginGate() {
   markUnlocked();
   if (keep.box.checked) await rememberDevice();
   else forgetDevice();
+}
+
+/**
+ * (v4.9.0) Abrir la app con una cuenta de Google, Microsoft o Discord (sin "mantener la sesión
+ * iniciada", o si pasó mucho tiempo): se vuelve a entrar con ese proveedor.
+ */
+/**
+ * (v4.9.0) Al abrir la app después de entrar con Google… en la web (la página se recargó al volver,
+ * o la app de Android se cerró mientras tanto). Devuelve true si la persona ya quedó adentro.
+ */
+export async function oauthReturn(r) {
+  if (!r) return false;
+  if (!r.ok) {
+    const why = oauthFailText(r);
+    // Sin cuenta, lo siguiente es la bienvenida: allí se dice (un aviso suelto se perdía detrás)
+    if (!state.account) setOAuthNotice(why);
+    else if (why) toast(why, 'warn', { ms: 6000 });
+    return false;
+  }
+  const { session, pending } = r;
+  if (pending.intent === 'unlock' || pending.intent === 'reconnect') {
+    if (!state.account) { await CLOUD.signOut(session.access); return false; }
+    const ok = await oauthUnlock(session, { reconnect: pending.intent === 'reconnect' });
+    if (ok && pending.intent === 'unlock') {
+      markUnlocked();
+      if (pending.keep !== false) await rememberDevice(); else forgetDevice();
+    }
+    return ok;
+  }
+  if (state.account) { await CLOUD.signOut(session.access); return false; } // ya hay otra cuenta aquí
+  skipPaywallToday();
+  return oauthEnter(session, pending);
+}
+
+async function oauthGate() {
+  const provider = state.account.oauth;
+  const name = providerLabel(provider);
+  const keep = keepSignedInField('loginKeep');
+  const err = h('p', { class: 'form-error', role: 'alert' });
+  const res = await openDialog({
+    className: 'dlg--onb dlg--gate',
+    dismissable: false,
+    title: '¡Hola de nuevo!',
+    body: [
+      h('div', { class: 'onb__mascot' }, penguin('saludo', { size: 96 })),
+      h('p', { class: 'dlg__text', text: t('{user}, entra con tu cuenta de {name} para seguir.', { user: state.account.username, name }) }),
+      err,
+      keep.field,
+    ],
+    actions: [
+      { label: 'Usar otra cuenta', value: 'other' },
+      { label: t('Continuar con {name}', { name }), value: 'go', variant: 'btn--gold', primary: true },
+    ],
+  });
+  if (res === 'other') {
+    if (await otherAccountFlow()) return;
+    return loginGate();
+  }
+  const r = await startOAuth(provider, { intent: 'unlock', keep: keep.box.checked });
+  if (r.ok && (await oauthUnlock(r.session))) {
+    markUnlocked();
+    if (keep.box.checked) await rememberDevice(); else forgetDevice();
+    return;
+  }
+  const why = oauthFailText(r);
+  if (why) toast(why, 'warn', { ms: 6000 });
+  return oauthGate();
 }
 
 /**
@@ -439,6 +521,8 @@ export async function changePasswordFlow() {
  */
 export async function deleteAccountFlow() {
   const hasAccount = !!state.account;
+  const oauthAcc = !!(state.account && state.account.oauth);
+  const delName = h('input', { type: 'text', class: 'acc-input', id: 'delName', autocomplete: 'off', autocapitalize: 'none', spellcheck: 'false', maxlength: '20', 'aria-label': 'Tu nombre de usuario' });
   const pass = h('input', { type: 'password', class: 'acc-input', id: 'delPass', autocomplete: 'current-password', maxlength: '64', 'aria-label': 'Tu contraseña' });
   const err = h('p', { class: 'form-error', role: 'alert' });
   const res = await openDialog({
@@ -447,7 +531,10 @@ export async function deleteAccountFlow() {
       h('p', { class: 'dlg__text', text: 'Se borran para siempre tu cuenta, tu rango, tus temporadas, tu calendario, tus logros y tus ajustes. No se puede deshacer.' }),
       // (v4.7.0) Borrar la cuenta no cancela la suscripción de Google Play (eso solo lo puede hacer Google Play)
       hasPlaySubscription() ? h('p', { class: 'dlg__text premium__warn', id: 'delPlayWarn', text: 'Tienes una suscripción de Google Play: eliminar tu cuenta NO la cancela. Cancélala primero en Google Play → Suscripciones.' }) : null,
-      hasAccount ? [h('label', { class: 'pin-label', for: 'delPass', text: 'Escribe tu contraseña para confirmar' }), pass] : null,
+      hasLifetime() ? h('p', { class: 'dlg__text premium__warn', id: 'delLifetimeWarn', text: 'Tienes Premium de por vida: va unido a esta cuenta, así que si la eliminas lo pierdes.' }) : null,
+      hasAccount && !oauthAcc ? [h('label', { class: 'pin-label', for: 'delPass', text: 'Escribe tu contraseña para confirmar' }), pass] : null,
+      // (v4.9.0) Cuenta con Google/Microsoft/Discord: no tiene contraseña de FrostPom, se escribe el nombre
+      oauthAcc ? [h('label', { class: 'pin-label', for: 'delName', text: 'Escribe tu nombre de usuario para confirmar' }), delName] : null,
       err,
     ],
     actions: [
@@ -456,8 +543,12 @@ export async function deleteAccountFlow() {
         label: hasAccount ? 'Eliminar mi cuenta' : 'Borrar todo', value: 'ok', variant: 'btn--coral', primary: true,
         validate: async () => {
           if (!hasAccount) return true;
-          const v = await verifyWithGuard(pass.value, { wrong: 'La contraseña no es correcta.' });
-          if (!v.ok) { err.textContent = v.message; pass.value = ''; return false; }
+          if (oauthAcc) {
+            if (delName.value.trim().toLowerCase() !== state.account.username.toLowerCase()) { err.textContent = tr('Ese no es tu nombre de usuario.'); return false; }
+          } else {
+            const v = await verifyWithGuard(pass.value, { wrong: 'La contraseña no es correcta.' });
+            if (!v.ok) { err.textContent = v.message; pass.value = ''; return false; }
+          }
           // Cuenta en línea: se borra completa en el servidor (progreso, ranking y la cuenta)
           const d = await deleteOnlineAccount();
           if (!d.ok) { err.textContent = d.message; return false; }
@@ -465,7 +556,7 @@ export async function deleteAccountFlow() {
         },
       },
     ],
-    onOpen: () => (hasAccount ? pass.focus() : null),
+    onOpen: () => (oauthAcc ? delName.focus() : hasAccount ? pass.focus() : null),
   });
   if (res !== 'ok') return;
   await deleteBoardOnAccountDelete(); // el ranking global también (si hay internet)
@@ -495,6 +586,14 @@ export async function onboarding() {
   let country = state.profile.country || '';
   const r = G.rankForXp(state.progress.xp);
   const keep = keepSignedInField('onbKeep');
+  let oauthPick = null;
+  function pickOAuth(id) {
+    // 13+: si ya eligió el mes y el año, se revisa aquí; si no, se pregunta en el paso siguiente
+    const born = acc.birthValue();
+    if (born && !BOARD.oldEnough(born)) { acc.setError(tr('Entrar con otra cuenta es desde los 13 años. Crea tu cuenta con un nombre y una contraseña: se queda en este equipo.')); return; }
+    oauthPick = { id, born };
+    dlg.close('oauth');
+  }
   const res = await openDialog({
     className: 'dlg--onb dlg--gate',
     dismissable: false,
@@ -502,6 +601,8 @@ export async function onboarding() {
     body: [
       h('div', { class: 'onb__mascot' }, penguin('saludo', { size: 104, label: 'Un pingüino te saluda' })),
       migrated ? h('p', { class: 'dlg__text', text: t('Trajimos tu progreso de la versión anterior: ya eres {rank} con {xp} XP.', { rank: r.name, xp: fmtInt(state.progress.xp) }) }) : null,
+      // (v4.9.0) Lo más rápido arriba: crear la cuenta con Google, Microsoft o Discord
+      SYNC.enabled() ? oauthButtons(pickOAuth, { after: 'o crea tu cuenta con un nombre y una contraseña' }) : null,
       h('div', { class: 'onb__acc' }, ...acc.nodes),
       h('p', { class: 'onb__label', text: 'Tu nacionalidad (opcional)' }),
       countryPicker(country, (v) => { country = v; }),
@@ -513,12 +614,29 @@ export async function onboarding() {
       consentLine(),
     ],
     actions: [{ label: 'Crear cuenta', value: 'ok', variant: 'btn--gold btn--xl', primary: true, validate: async () => { accRec = await acc.validate(); return !!accRec; } }],
-    onOpen: acc.focus,
+    onOpen: () => {
+      const n = takeOAuthNotice(); // (v4.9.0) por qué no se pudo entrar con Google…
+      if (n) acc.setError(n); else acc.focus();
+    },
   });
   if (res === 'signin') {
     skipPaywallToday();
     if (await signInFlow()) return; // entró con su cuenta y trajo su progreso
     return onboarding(); // tocó la flecha para volver
+  }
+  if (res === 'oauth' && oauthPick) {
+    skipPaywallToday();
+    // La edad va ANTES de salir a Google (las cuentas en línea son desde los 13 años)
+    const born = oauthPick.born || (await askBirthFirst(oauthPick.id));
+    if (!born) return onboarding();
+    if (!BOARD.oldEnough(born)) {
+      setOAuthNotice(tr('Entrar con otra cuenta es desde los 13 años. Crea tu cuenta con un nombre y una contraseña: se queda en este equipo.'));
+      return onboarding();
+    }
+    const o = await startOAuth(oauthPick.id, { intent: 'join', birth: born, country, keep: keep.box.checked });
+    if (o.ok && (await oauthEnter(o.session, o.pending))) return;
+    setOAuthNotice(oauthFailText(o)); // se dice dentro de la bienvenida
+    return onboarding();
   }
   if (res !== 'ok' || !accRec) return onboarding();
   skipPaywallToday();
@@ -539,6 +657,29 @@ export async function onboarding() {
     mutate((s) => { s.profile.photo = photo; });
     toast('¡Foto de perfil lista!', 'good', { icon: pic('foto', 24) });
   }
+}
+
+/** (v4.9.0) Antes de crear la cuenta con Google…: el mes y el año (la misma pregunta neutra del registro). */
+async function askBirthFirst(provider) {
+  const birth = birthField('oaFirstBirth', '', { hint: false });
+  const err = h('p', { class: 'form-error', role: 'alert' });
+  let born = '';
+  const res = await openDialog({
+    className: 'dlg--onb dlg--gate',
+    dismissable: false,
+    back: 'back',
+    title: '¿Cuándo naciste?',
+    body: [
+      h('p', { class: 'dlg__text', text: t('Antes de seguir con {name}, cuéntanos el mes y el año en que naciste.', { name: providerLabel(provider) }) }),
+      birth.nodes, err,
+    ],
+    actions: [{ label: 'Seguir', value: 'ok', variant: 'btn--gold', primary: true, validate: () => {
+      born = birth.value();
+      if (!born) { err.textContent = tr('Elige el mes y el año en que naciste.'); return false; }
+      return true;
+    } }],
+  });
+  return res === 'ok' ? born : '';
 }
 
 /** Paso 2 del registro: foto de perfil opcional. Devuelve la foto (data URL) o null. */

@@ -74,7 +74,7 @@ FAKE_PURCHASES = r"""
 (() => {
   const cap = window.Capacitor; const st = window.__cap;
   const saved = JSON.parse(sessionStorage.getItem('__rc') || '{}');
-  st.rc = Object.assign({ buy: 'ok', restore: 'none', trial: true, offline: false, user: '', configured: false }, saved);
+  st.rc = Object.assign({ buy: 'ok', restore: 'none', trial: true, offline: false, user: '', configured: false, lifetime: true }, saved);
   cap.PluginHeaders.push({ name: 'Purchases', methods: [
     ...['configure', 'logIn', 'logOut', 'getOfferings', 'purchasePackage', 'restorePurchases', 'getCustomerInfo', 'removeCustomerInfoUpdateListener'].map((name) => ({ name, rtype: 'promise' })),
     { name: 'addCustomerInfoUpdateListener', rtype: 'callback' },
@@ -89,6 +89,10 @@ FAKE_PURCHASES = r"""
     productIdentifier: 'frostpom_premium', productPlanIdentifier: plan, isSandbox: true, unsubscribeDetectedAt: null, billingIssueDetectedAt: null } } : {} } });
   const server = (plan, trial) => ({ premium: true, status: trial ? 'trial' : 'active', store: 'play_store', product: 'frostpom_premium:' + plan, period_type: trial ? 'trial' : 'normal',
     expires_at: iso(Date.now() + days(trial)), will_renew: true, billing_issue: false, sandbox: true });
+  // (v4.9.0) De por vida: una compra de una sola vez, sin fecha de vencimiento
+  const lifeInfo = () => ({ entitlements: { active: {}, all: { premium: { identifier: 'premium', isActive: true, willRenew: false, periodType: 'NORMAL', expirationDate: null, store: 'PLAY_STORE',
+    productIdentifier: 'frostpom_premium_vida', isSandbox: true, unsubscribeDetectedAt: null, billingIssueDetectedAt: null } } } });
+  const lifeServer = () => ({ premium: true, status: 'active', store: 'play_store', product: 'frostpom_premium_vida', period_type: null, expires_at: null, will_renew: false, billing_issue: false, sandbox: true });
   const fail = (code, message, extra = {}) => Promise.reject(Object.assign(new Error(message), { code, data: { code: Number(code), message, ...extra } }));
   const base = cap.nativePromise;
   cap.nativePromise = (plugin, method, options) => {
@@ -102,12 +106,14 @@ FAKE_PURCHASES = r"""
       if (r.offline) return fail('10', 'Error performing request.');
       const m = pkg('$rc_monthly', 'MONTHLY', product('frostpom_premium:mensual', 2.99, 'US$ 2,99', 'US$ 2,99'));
       const a = pkg('$rc_annual', 'ANNUAL', product('frostpom_premium:anual', 19.99, 'US$ 19,99', 'US$ 1,67'));
-      const o = { identifier: 'default', availablePackages: [m, a], monthly: m, annual: a };
+      const l = { identifier: '$rc_lifetime', packageType: 'LIFETIME', product: { identifier: 'frostpom_premium_vida', title: 'FrostPom Premium de por vida', price: 29.99, priceString: 'US$ 29,99', currencyCode: 'USD', productCategory: 'NON_SUBSCRIPTION' }, offeringIdentifier: 'default' };
+      const o = { identifier: 'default', availablePackages: r.lifetime ? [m, a, l] : [m, a], monthly: m, annual: a, lifetime: r.lifetime ? l : null };
       return Promise.resolve({ all: { default: o }, current: o });
     }
     if (method === 'purchasePackage') {
       if (r.buy === 'cancel') return fail('1', 'Purchase was cancelled.', { userCancelled: true });
       if (r.buy === 'pending') return fail('20', 'The payment is pending.');
+      if (options.aPackage.packageType === 'LIFETIME') return window.__rcBought(r.user, lifeServer()).then(() => ({ productIdentifier: 'frostpom_premium_vida', customerInfo: lifeInfo() }));
       const plan = options.aPackage.packageType === 'ANNUAL' ? 'anual' : 'mensual';
       return window.__rcBought(r.user, server(plan, r.trial)).then(() => ({ productIdentifier: 'frostpom_premium', customerInfo: info(plan, r.trial) }));
     }
@@ -297,6 +303,13 @@ with sync_playwright() as p:
     txt = body(pg)
     check('US$ 19,99 al año' in txt and 'Ahorra 44 %' in txt and 'Equivale a US$ 1,67 al mes' in txt and 'US$ 2,99 al mes' in txt,
           'los planes con el precio de Google: anual (ahorra 44 %) y mensual')
+    check('DE POR VIDA' in txt.upper() and 'US$ 29,99, un solo pago' in txt and 'Para siempre' in txt,
+          '(v4.9.0) y el de por vida: US$ 29,99, un solo pago')
+    pg.click('#dlg .plan[data-plan="lifetime"]'); pg.wait_for_timeout(150)
+    check('un solo pago' in pg.inner_text('#playTerms') and 'sin renovaciones' in pg.inner_text('#playTerms') and pg.inner_text('#dlg [data-primary="true"]') == 'Comprar de por vida, US$ 29,99',
+          'de por vida: las condiciones dicen «un solo pago, sin renovaciones» y el botón «Comprar de por vida»')
+    pg.screenshot(path=f'{SHOTS}/play-de-por-vida.png')
+    pg.click('#dlg .plan[data-plan="annual"]'); pg.wait_for_timeout(150)
     terms = pg.inner_text('#playTerms')
     check('7 días gratis' in terms and 'renovación automática' in terms and 'Google Play → Suscripciones' in terms and 'no se cobra nada' in terms,
           'antes de pagar se dice claro: prueba gratis, renovación automática y cómo cancelar')
@@ -423,6 +436,57 @@ with sync_playwright() as p:
           'en inglés: «Start 7 days free», «Restore purchases», «Save 44%»')
     pg.screenshot(path=f'{SHOTS}/play-ingles.png')
     check(not errs, 'sin errores en la consola' + (': ' + ' | '.join(errs[:3]) if errs else ''))
+    ctx.close()
+
+    # ---------- H. (v4.9.0) Premium de por vida: comprar, sin «Administrar», y pasarse desde una suscripción ----------
+    fake = FakeSupabase()
+    ctx, pg, errs = device(browser, fake)
+    boot(pg)
+    register(pg, 'vida_pl', '2000-05', 'vida@example.com')
+    close_dialogs(pg)
+    uid = fake.uid_of('vida@example.com')
+    open_premium(pg)
+    pg.click('#dlg .plan[data-plan="lifetime"]'); pg.wait_for_timeout(150)
+    pg.click('#dlg [data-primary="true"]'); pg.wait_for_timeout(600); pg.clock.run_for(800); pg.wait_for_timeout(300)
+    bought = calls(pg, 'purchasePackage')
+    check(bought and bought[-1][2]['aPackage']['identifier'] == '$rc_lifetime', 'de por vida: se compra el paquete «Lifetime»')
+    check(premium(pg), 'de por vida: Premium al instante')
+    check(until(pg, lambda: (fake.entitlements.get(uid) or {}).get('product') == 'frostpom_premium_vida'), 'y el servidor lo guarda (sin fecha de vencimiento)')
+    close_dialogs(pg)
+    open_premium(pg)
+    check(title(pg) == 'Eres Premium' and 'Premium de por vida' in body(pg) and not pg.query_selector("#dlg button:has-text('Administrar suscripción')"),
+          'de por vida: «Tienes Premium de por vida» y sin «Administrar suscripción» (no hay nada que cancelar)')
+    pg.screenshot(path=f'{SHOTS}/play-vida-eres.png')
+    close_dialogs(pg)
+    boot(pg); close_dialogs(pg)
+    check(premium(pg), 'de por vida: al volver a abrir sigue siendo Premium (lo dice el servidor)')
+    pg.goto(URL + '#/ajustes'); pg.wait_for_timeout(300); pg.clock.run_for(400)
+    pg.click('#accDeleteBtn'); pg.wait_for_timeout(300)
+    check(pg.query_selector('#delLifetimeWarn'), 'al eliminar la cuenta avisa que el Premium de por vida se pierde')
+    pg.click("#dlg button:has-text('Cancelar')"); pg.wait_for_timeout(200)
+    check(not errs, 'H: sin errores' + (': ' + ' | '.join(errs[:3]) if errs else ''))
+    ctx.close()
+
+    # Con una suscripción mensual: «Pasarme a de por vida»
+    fake = FakeSupabase()
+    ctx, pg, errs = device(browser, fake)
+    boot(pg)
+    register(pg, 'sube_pl', '2000-05', 'sube@example.com')
+    close_dialogs(pg)
+    pg.evaluate("window.__cap.rc.trial = false")
+    open_premium(pg)
+    pg.click('#dlg .plan[data-plan="monthly"]'); pg.wait_for_timeout(150)
+    pg.click('#dlg [data-primary="true"]'); pg.wait_for_timeout(600); pg.clock.run_for(800); pg.wait_for_timeout(300)
+    close_dialogs(pg)
+    open_premium(pg)
+    check(pg.query_selector("#dlg button:has-text('Pasarme a de por vida')") and pg.query_selector("#dlg button:has-text('Administrar suscripción')"),
+          'con suscripción: «Pasarme a de por vida» (y «Administrar suscripción»)')
+    pg.click("#dlg button:has-text('Pasarme a de por vida')"); pg.wait_for_timeout(500); pg.clock.run_for(800); pg.wait_for_timeout(300)
+    check(len(pg.query_selector_all('#dlg .plan')) == 1 and pg.query_selector('#dlg .plan[data-plan="lifetime"]'), 'pasarse: solo se ofrece el de por vida')
+    pg.click('#dlg [data-primary="true"]'); pg.wait_for_timeout(600); pg.clock.run_for(800); pg.wait_for_timeout(300)
+    log = pg.evaluate("[...document.querySelectorAll('#toasts .toast')].map(t => t.textContent).join(' | ')")
+    check('Cancela tu suscripción en Google Play' in log, 'al pasarse, recuerda cancelar la suscripción (Google no la cancela sola)')
+    check(not errs, 'H2: sin errores' + (': ' + ' | '.join(errs[:3]) if errs else ''))
     ctx.close()
     browser.close()
 

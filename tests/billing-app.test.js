@@ -95,9 +95,17 @@ test('play-billing: precios, prueba gratis y errores', () => {
 
   const monthly = { identifier: '$rc_monthly', packageType: 'MONTHLY', product: { price: 2.99 } };
   const annual = { identifier: '$rc_annual', packageType: 'ANNUAL', product: { price: 19.99 } };
-  assert.deepEqual(PLAY.packagesOf({ current: { availablePackages: [annual, monthly] } }), { monthly, annual });
-  assert.deepEqual(PLAY.packagesOf({ current: { monthly, annual: null, availablePackages: [monthly] }, all: { otra: { availablePackages: [annual] } } }, 'otra'), { monthly: null, annual });
-  assert.deepEqual(PLAY.packagesOf(null), { monthly: null, annual: null });
+  const lifetime = { identifier: '$rc_lifetime', packageType: 'LIFETIME', product: { price: 29.99 } };
+  assert.deepEqual(PLAY.packagesOf({ current: { availablePackages: [annual, monthly] } }), { monthly, annual, lifetime: null });
+  assert.deepEqual(PLAY.packagesOf({ current: { monthly, annual: null, availablePackages: [monthly] }, all: { otra: { availablePackages: [annual] } } }, 'otra'), { monthly: null, annual, lifetime: null });
+  assert.deepEqual(PLAY.packagesOf(null), { monthly: null, annual: null, lifetime: null });
+  // (v4.9.0) De por vida: el paquete "Lifetime" de RevenueCat
+  assert.deepEqual(PLAY.packagesOf({ current: { availablePackages: [annual, monthly, lifetime] } }), { monthly, annual, lifetime });
+  assert.equal(PLAY.isLifetime({ premium: true, expiresAt: null }), true);
+  assert.equal(PLAY.isLifetime({ premium: true, expiresAt: '2027-01-01T00:00:00.000Z' }), false);
+  assert.equal(PLAY.isLifetime({ premium: false, expiresAt: null }), false);
+  const forever = PLAY.fromCustomerInfo({ entitlements: { all: { premium: { isActive: true, periodType: 'NORMAL', expirationDate: null, willRenew: false, productIdentifier: 'frostpom_premium_vida', store: 'PLAY_STORE' } } } });
+  assert.ok(forever.premium && forever.status === 'active' && forever.expiresAt === null && !forever.willRenew, 'una compra de por vida en el teléfono');
 
   assert.equal(PLAY.failReason({ code: '1' }), 'cancel');
   assert.equal(PLAY.failReason({ code: '0', data: { userCancelled: true } }), 'cancel');

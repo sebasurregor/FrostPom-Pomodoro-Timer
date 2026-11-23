@@ -22,6 +22,7 @@ import { penguin } from './companions.js';
 import { birthField, ensureJoined } from './board-ui.js';
 import { settleClaims } from './live.js';
 import { markUnlocked, rememberDevice, forgetDevice, keepSignedInField, newPasswordError, verifyWithGuard } from './account.js';
+import { oauthButtons, startOAuth, failText as oauthFailText, providerLabel, setOAuthNotice, takeOAuthNotice } from './oauth-ui.js';
 import { state, store, mutate, replaceState } from './context.js';
 import { t, tr, locale } from '../i18n.js';
 import * as U from '../util.js';
@@ -82,6 +83,7 @@ export async function signInFlow(prefill = '', { signedOut = false, notice = '' 
     h('p', { text: 'Ábrela allá y ve a Ajustes → Tu cuenta → Conectar. Después entra aquí con el mismo correo y la misma contraseña.' }));
   let session = null;
   let remote = null;
+  let picked = '';
   // (v4.5.2) Mientras escribes, se prepara la entrada: al tocar "Entrar" ya no se espera a Cloudflare
   CLOUD.warmOnInput([mail, pass], 1);
   const res = await openDialog({
@@ -91,6 +93,8 @@ export async function signInFlow(prefill = '', { signedOut = false, notice = '' 
     title: 'Inicia sesión',
     body: [
       h('div', { class: 'onb__mascot' }, penguin('saludo', { size: 88 })),
+      // (v4.9.0) Arriba: entrar con Google, Microsoft, Discord… (los que estén encendidos en config)
+      oauthButtons((id) => { picked = id; dlg.close('oauth'); }, { after: 'o con tu correo y tu contraseña' }),
       h('p', { class: 'dlg__text', text: notice === 'connect-first'
         ? 'Primero conecta tu cuenta en el equipo donde la creaste (Ajustes → Tu cuenta → Conectar). Después entra aquí con tu correo y tu contraseña: tu progreso llega contigo.'
         : signedOut
@@ -129,9 +133,19 @@ export async function signInFlow(prefill = '', { signedOut = false, notice = '' 
         }
       },
     }],
-    onOpen: () => (prefill ? pass : mail).focus(),
+    onOpen: () => {
+      const n = takeOAuthNotice(); // (v4.9.0) por qué no se pudo entrar con Google…
+      if (n) err.textContent = n;
+      (prefill ? pass : mail).focus();
+    },
   });
   if (res === 'forgot') return forgotOnlineFlow(CLOUD.cleanEmail(mail.value));
+  if (res === 'oauth' && picked) {
+    const r = await startOAuth(picked, { intent: 'signin', keep: keep.box.checked });
+    if (r.ok && (await oauthEnter(r.session, r.pending))) return true;
+    setOAuthNotice(oauthFailText(r)); // se dice dentro de "Inicia sesión"
+    return signInFlow(prefill, { signedOut, notice });
+  }
   if (res !== 'ok' || !session) return false;
   if (!remote) {
     // (v4.5.1) Entró, pero la cuenta no tiene progreso guardado: ¿vive en otro equipo?
@@ -191,8 +205,10 @@ async function notOnlineYetDialog(email, status) {
 }
 
 /** Con la sesión abierta: arma la cuenta de este equipo con el progreso de la nube. */
-async function finishSignIn({ email, password, remote, keep, suggest = '' }) {
-  const rec = await SEC.hashPassword(password);
+async function finishSignIn({ email, password, remote, keep, suggest = '', oauth = '' }) {
+  // (v4.9.0) Con Google/Microsoft/Discord no hay contraseña de FrostPom: la cuenta de este equipo
+  // guarda la huella de un secreto al azar que nadie conoce, y se abre otra vez con ese proveedor
+  const rec = await SEC.hashPassword(oauth ? localSecret() : password);
   let next;
   // (v4.5.1) Solo se revisa la FORMA del nombre: si el filtro nuevo no lo permite, se pide otro
   // nombre después (antes, el progreso se descartaba y había que empezar de cero)
@@ -208,7 +224,7 @@ async function finishSignIn({ email, password, remote, keep, suggest = '' }) {
     next.profile.avatar = makeNickname().avatar;
   }
   next.profile.onboarded = true;
-  next.account = { username: next.profile.nick, ...rec, email, emailLinked: true, online: true };
+  next.account = { username: next.profile.nick, ...rec, email, emailLinked: true, online: true, ...(oauth ? { oauth } : {}) };
   // Si esta cuenta cerró sesión antes en este equipo, su foto sigue aquí (nunca se sube)
   const id = BOARD.load().uid;
   const photo = id ? store.photoFor(id) : '';
@@ -246,6 +262,138 @@ async function chooseNameFlow(suggest = '') {
     onOpen: () => name.focus(),
   });
   return chosen;
+}
+
+// ---------------------------------------------------------------------
+// (v4.9.0) Después de entrar con Google, Microsoft, Discord… (js/ui/oauth-ui.js)
+// ---------------------------------------------------------------------
+/** Un secreto al azar para la cuenta de este equipo (nadie lo conoce ni lo necesita). */
+function localSecret() {
+  const b = new Uint8Array(24);
+  crypto.getRandomValues(b);
+  return `${Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('')}Aa9`;
+}
+
+/**
+ * Entró con un proveedor en un equipo SIN cuenta (al crear la cuenta o en "Inicia sesión"):
+ * si la cuenta ya tiene progreso, se trae; si es nueva, se termina de crear (nombre y edad).
+ * Devuelve true si quedó adentro; false si no (la app vuelve a la bienvenida).
+ */
+export async function oauthEnter(session, pending = {}) {
+  // El que eligió la persona (Supabase dice el PRIMERO con el que se creó la cuenta: "email" si
+  // antes se registró con correo y contraseña y ahora entra con Microsoft con el mismo correo)
+  const provider = pending.provider || session.provider || '';
+  if (!session.email) {
+    // Sin correo no hay cuenta en línea posible (pasa con Microsoft si falta el permiso "email")
+    await CLOUD.signOut(session.access);
+    setOAuthNotice(t('{name} no compartió tu correo, y FrostPom lo necesita para guardar tu cuenta. Prueba con otra forma de entrar.', { name: providerLabel(provider) }));
+    return false;
+  }
+  if (pending.intent === 'join') {
+    // Desde "Crea tu cuenta": si este equipo ya sumaba en el ranking sin cuenta, su lugar pasa a esta
+    await BOARD.adoptSession(session, { takeover: true });
+  } else {
+    BOARD.forget(); // "Inicia sesión": este equipo no tenía cuenta, empieza limpio
+    await BOARD.adoptSession(session);
+  }
+  let remote = null;
+  try { remote = await SYNC.pull(); } catch { remote = null; }
+  if (remote && remote.data && remote.data.profile && checkUsernameFormat(remote.data.profile.nick).ok) {
+    return finishSignIn({ email: session.email, remote, keep: pending.keep !== false, oauth: provider });
+  }
+  const status = await accountStatus();
+  if (status && status.name) {
+    // La cuenta existe (con ese correo) y tiene nombre en el ranking, pero su progreso vive en otro equipo
+    const choice = await notOnlineYetDialog(session.email, status);
+    if (choice !== 'here') {
+      await CLOUD.signOut(session.access);
+      BOARD.forget();
+      return false;
+    }
+    return finishSignIn({ email: session.email, remote: null, keep: pending.keep !== false, suggest: status.name, oauth: provider });
+  }
+  return newOAuthAccount(session, { ...pending, provider });
+}
+
+/** Cuenta nueva con un proveedor: nombre de usuario (anónimo) y, si falta, el mes y el año. */
+async function newOAuthAccount(session, pending) {
+  const suggest = makeNickname().nick;
+  const name = h('input', { type: 'text', class: 'acc-input', id: 'oaName', maxlength: '20', autocomplete: 'username', autocapitalize: 'off', spellcheck: 'false', value: checkUsername(suggest).ok ? suggest : '' });
+  const birth = pending.birth ? null : birthField('oaBirth', '', { hint: false });
+  const err = h('p', { class: 'form-error', role: 'alert' });
+  let chosen = null;
+  const res = await openDialog({
+    className: 'dlg--onb dlg--gate',
+    dismissable: false,
+    title: 'Termina de crear tu cuenta',
+    body: [
+      h('div', { class: 'onb__mascot' }, penguin('saludo', { size: 88 })),
+      h('p', { class: 'dlg__text', text: t('Entraste con {name} ({mail}). Elige cómo te llamarás en FrostPom: puedes dejar este nombre al azar o escribir otro que no revele quién eres.', { name: providerLabel(pending.provider), mail: CLOUD.maskEmail(session.email) }) }),
+      h('label', { class: 'pin-label', for: 'oaName', text: 'Nombre de usuario' }), name,
+      h('p', { class: 'acc-hint', text: '3 a 20 caracteres: letras, números, punto o guion bajo.' }),
+      birth ? birth.nodes : null,
+      err,
+    ],
+    actions: [
+      { label: 'Cancelar', value: 'cancel' },
+      { label: 'Crear mi cuenta', value: 'ok', variant: 'btn--gold', primary: true, validate: async () => {
+        const c = checkUsername(name.value);
+        if (!c.ok) { err.textContent = c.reason; name.focus(); return false; }
+        const born = pending.birth || (birth ? birth.value() : '');
+        if (!born) { err.textContent = tr('Elige el mes y el año en que naciste.'); return false; }
+        if (!BOARD.oldEnough(born)) { chosen = { young: true }; return true; }
+        err.textContent = tr('Comprobando…');
+        if (BOARD.enabled() && (await BOARD.nameAvailable(c.value)) === false) { err.textContent = tr('Ese nombre ya lo usa otra persona en FrostPom. Prueba con otro.'); return false; }
+        err.textContent = '';
+        chosen = { username: c.value, born };
+        return true;
+      } },
+    ],
+    onOpen: () => name.select(),
+  });
+  if (res !== 'ok' || !chosen || chosen.young) {
+    // Menor de 13 (o canceló): la cuenta que acaba de crear el proveedor se borra en el servidor
+    try { await BOARD.callServer('delete_my_cloud_account', {}); } catch { await CLOUD.signOut(session.access); }
+    BOARD.forget();
+    if (chosen && chosen.young) setOAuthNotice(tr('Las cuentas en línea son desde los 13 años. Puedes crear una cuenta en este equipo con un nombre y una contraseña.'));
+    return false;
+  }
+  const rec = await SEC.hashPassword(localSecret());
+  mutate((s) => {
+    s.profile.nick = chosen.username;
+    if (!s.profile.avatar) s.profile.avatar = makeNickname().avatar;
+    if (pending.country) s.profile.country = pending.country;
+    s.profile.onboarded = true;
+    s.account = { username: chosen.username, ...rec, email: session.email, emailLinked: true, online: true, birth: chosen.born, oauth: pending.provider };
+  });
+  markUnlocked();
+  if (pending.keep !== false) await rememberDevice(); else forgetDevice();
+  await afterOnlineCreated(session);
+  toast(t('Cuenta creada. ¡Bienvenido, {name}!', { name: chosen.username }), 'good');
+  return true;
+}
+
+/**
+ * Volvió a entrar con su proveedor (para abrir la app o desde "Volver a entrar"): solo vale si es
+ * la MISMA cuenta de este equipo. Devuelve true si quedó adentro.
+ */
+export async function oauthUnlock(session, { reconnect = false } = {}) {
+  const acc = state.account;
+  if (!acc || !session || CLOUD.cleanEmail(session.email) !== acc.email) {
+    if (session) await CLOUD.signOut(session.access);
+    toast(t('Esa cuenta no es la de este equipo ({mail}). Entra con la misma con la que la creaste.', { mail: CLOUD.maskEmail(acc ? acc.email : '') }), 'warn', { ms: 7000 });
+    return false;
+  }
+  await BOARD.adoptSession(session, { takeover: true });
+  if (reconnect) {
+    await startOrResume();
+    await ensureJoined().catch(() => null);
+    BOARD.retryTransfer().catch(() => {});
+    toast('Listo: tu progreso se vuelve a guardar en tu cuenta.', 'good');
+    document.dispatchEvent(new CustomEvent('frostpom:cloud'));
+    document.dispatchEvent(new CustomEvent('frostpom:board'));
+  }
+  return true;
 }
 
 /** "¿Olvidaste la contraseña?" en la pantalla de iniciar sesión: código al correo + contraseña nueva. */
@@ -523,6 +671,18 @@ async function confirmEmailFlow(email, { text = '' } = {}) {
 export async function reconnectFlow() {
   if (!isOnline()) return;
   const email = state.account.email;
+  // (v4.9.0) Cuenta creada con Google, Microsoft o Discord: se vuelve a entrar con ese proveedor
+  if (state.account.oauth) {
+    const name = providerLabel(state.account.oauth);
+    const go = await confirmDialog('Vuelve a entrar a tu cuenta',
+      t('Entra otra vez con {name} ({mail}) para seguir guardando tu progreso.', { name, mail: CLOUD.maskEmail(email) }),
+      t('Continuar con {name}', { name }), 'btn--gold');
+    if (!go) return;
+    const r = await startOAuth(state.account.oauth, { intent: 'reconnect' });
+    if (r.ok) await oauthUnlock(r.session, { reconnect: true });
+    else if (oauthFailText(r)) toast(oauthFailText(r), 'warn', { ms: 6000 });
+    return;
+  }
   // (v4.5.1) La sesión de este equipo es de OTRO correo: el progreso se estaba guardando allá
   const other = BOARD.sessionMismatch(email) ? BOARD.load().email : '';
   const pass = h('input', { type: 'password', class: 'acc-input', id: 'recPass', maxlength: '64', autocomplete: 'current-password' });
@@ -619,7 +779,9 @@ export async function signOutOnline({ title = '¿Cerrar sesión?', confirmLabel 
   if (!isOnline()) return false;
   const email = state.account.email;
   const ok = await confirmDialog(title,
-    t('Tu progreso queda guardado en tu cuenta ({mail}). Para volver, entra con tu correo y tu contraseña, en este o en cualquier equipo.', { mail: CLOUD.maskEmail(email) }),
+    state.account.oauth
+      ? t('Tu progreso queda guardado en tu cuenta ({mail}). Para volver, entra con {name}, en este o en cualquier equipo.', { mail: CLOUD.maskEmail(email), name: providerLabel(state.account.oauth) })
+      : t('Tu progreso queda guardado en tu cuenta ({mail}). Para volver, entra con tu correo y tu contraseña, en este o en cualquier equipo.', { mail: CLOUD.maskEmail(email) }),
     confirmLabel, 'btn--gold'); // no se borra nada: no es un botón rojo
   if (!ok) return false;
   clearTimeout(timer);
