@@ -365,7 +365,7 @@ async function playDialog({ only = '' } = {}) {
         label: buyLabel(pick), value: 'buy', variant: 'btn--gold', primary: true,
         validate: async () => {
           err.textContent = tr('Abriendo Google Play…');
-          const res = await PLAY.buy(uid, pick.pkg);
+          const res = await PLAY.buy(uid, pick.pkg, pick.product); // (v4.9.1) o el producto directo de Google
           if (res.ok) { result = res; err.textContent = ''; return true; }
           err.textContent = buyFailText(res.reason);
           return false;

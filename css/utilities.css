@@ -21,8 +21,9 @@
 /* Con la pantalla de entrada abierta, la app de abajo queda tapada: no se pinta ni se anima */
 .gate-open .scenery, .gate-open .shell { visibility: hidden; }
 .gate-open .scenery *, .gate-open .shell * { animation-play-state: paused !important; }
-/* Mientras escribes en el celular (html.is-typing, ver main.js), el paisaje y la fogata se quedan quietos */
-.is-typing .scenery *, .is-typing .gate-scene * { animation-play-state: paused !important; }
+/* Mientras escribes en el celular (.is-typing en el paisaje y en la entrada, ver main.js), el paisaje y la
+   fogata se quedan quietos. (v4.9.1) La marca va en ellos y no en <html>: así no se recalcula toda la página. */
+.scenery.is-typing *, .gate-scene.is-typing * { animation-play-state: paused !important; }
 /* Con una ventana abierta (fondo oscuro y borroso), la app de atrás se queda quieta */
 .dlg-open .scenery *, .dlg-open .shell * { animation-play-state: paused !important; }
 /* Con una sección abierta como ventana, lo de atrás se queda quieto */

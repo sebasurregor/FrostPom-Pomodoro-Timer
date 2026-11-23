@@ -154,12 +154,36 @@ export function trialOf(product) {
  * El paquete mensual, el anual y (v4.9.0) el de por vida de la oferta (la de config o la actual de
  * RevenueCat). El de por vida es el paquete "Lifetime" ($rc_lifetime): una compra de una sola vez.
  */
-export function packagesOf(offerings, offeringId = '') {
+export function packagesOf(offerings, offeringId = '', ids = {}) {
   const o = (offeringId && offerings && offerings.all && offerings.all[offeringId]) || (offerings && offerings.current);
   if (!o) return { monthly: null, annual: null, lifetime: null };
   const list = Array.isArray(o.availablePackages) ? o.availablePackages : [];
   const find = (type) => list.find((p) => p && p.packageType === type) || null;
-  return { monthly: o.monthly || find('MONTHLY'), annual: o.annual || find('ANNUAL'), lifetime: o.lifetime || find('LIFETIME') };
+  // (v4.9.1) Si el paquete tiene otro tipo (por ejemplo, uno propio llamado "anual-12m"), se reconoce
+  // por el ID del producto de Google: "suscripción:planBase" o el del producto de una sola compra.
+  const byProduct = (match) => (match ? list.find((p) => p && p.product && match(String(p.product.identifier || ''), String(p.identifier || ''))) || null : null);
+  const annualId = typeof ids.annual === 'string' && ids.annual ? ids.annual : '';
+  const lifetimeId = typeof ids.lifetime === 'string' && ids.lifetime ? ids.lifetime : '';
+  return {
+    monthly: o.monthly || find('MONTHLY'),
+    annual: o.annual || find('ANNUAL') || byProduct(annualId && ((prod, pkg) => prod.split(':')[1] === annualId || prod === annualId || pkg === annualId)),
+    lifetime: o.lifetime || find('LIFETIME') || byProduct(lifetimeId && ((prod, pkg) => prod.split(':')[0] === lifetimeId || pkg === lifetimeId)),
+  };
+}
+
+/**
+ * (v4.9.1) Entre los productos que da Google (getProducts), el del plan anual: "suscripción:planBase"
+ * con planBase = el de config.premium.play.annualPlan.
+ */
+export function annualFromProducts(products, annualPlan) {
+  if (!annualPlan || !Array.isArray(products)) return null;
+  return products.find((p) => p && typeof p.identifier === 'string' && p.identifier.split(':')[1] === annualPlan) || null;
+}
+
+/** (v4.9.1) El producto de por vida entre los que da Google (sin la opción de compra ":…"). */
+export function lifetimeFromProducts(products, lifetimeProduct) {
+  if (!lifetimeProduct || !Array.isArray(products)) return null;
+  return products.find((p) => p && typeof p.identifier === 'string' && p.identifier.split(':')[0] === lifetimeProduct) || null;
 }
 
 /** (v4.9.0) ¿Esta copia es Premium de por vida? (sin fecha de vencimiento) */
@@ -357,26 +381,51 @@ export async function offer(uid) {
   } catch (e) {
     return { ok: false, reason: failReason(e) === 'offline' ? 'offline' : 'unavailable' };
   }
-  const { monthly, annual, lifetime } = packagesOf(offerings, cfg().offering || '');
-  const plan = (pkg, once = false) => {
-    if (!pkg || !pkg.product) return null;
-    const p = pkg.product;
-    return { pkg, priceString: p.priceString || '', price: Number(p.price) || 0, perMonth: once ? '' : p.pricePerMonthString || '', trial: once ? null : trialOf(p) };
+  const ids = { annual: cfg().annualPlan || '', lifetime: cfg().lifetimeProduct || '' };
+  const { monthly, annual, lifetime } = packagesOf(offerings, cfg().offering || '', ids);
+  // Cada plan es un paquete de la oferta (pkg) o, (v4.9.1) si no está en la oferta, el producto de
+  // Google directo (product): se compra igual (buy), y RevenueCat le da Premium por su entitlement.
+  const plan = (pkg, once = false, product = null) => {
+    const p = (pkg && pkg.product) || product;
+    if (!p) return null;
+    return { pkg: pkg || null, product: pkg ? null : p, priceString: p.priceString || '', price: Number(p.price) || 0, perMonth: once ? '' : p.pricePerMonthString || '', trial: once ? null : trialOf(p) };
   };
+  let annualProduct = null;
+  let lifetimeProduct = null;
+  if (!annual && ids.annual) {
+    // La suscripción es la misma del mensual ("frostpom_premium:mensual" → "frostpom_premium")
+    const sub = monthly && monthly.product && String(monthly.product.identifier || '').split(':')[0];
+    if (sub) {
+      try {
+        const r = await box.api.getProducts({ productIdentifiers: [sub], type: 'SUBSCRIPTION' });
+        annualProduct = annualFromProducts(r && r.products, ids.annual);
+      } catch { /* sin plan anual */ }
+    }
+  }
+  if (!lifetime && ids.lifetime) {
+    try {
+      const r = await box.api.getProducts({ productIdentifiers: [ids.lifetime], type: 'NON_SUBSCRIPTION' });
+      lifetimeProduct = lifetimeFromProducts(r && r.products, ids.lifetime);
+    } catch { /* sin plan de por vida */ }
+  }
   const m = plan(monthly);
-  const a = plan(annual);
-  const l = plan(lifetime, true);
+  const a = plan(annual, false, annualProduct);
+  const l = plan(lifetime, true, lifetimeProduct);
   if (!m && !a && !l) return { ok: false, reason: 'unavailable' };
   return { ok: true, monthly: m, annual: a, lifetime: l, savings: m && a ? savings(m.price, a.price) : 0 };
 }
 
-/** Compra un plan. Devuelve { ok: true, entry } o { ok: false, reason }. */
-export async function buy(uid, pkg) {
+/**
+ * Compra un plan: el paquete de la oferta (pkg) o, (v4.9.1) si el plan no está en la oferta, el
+ * producto de Google directo (product). Devuelve { ok: true, entry } o { ok: false, reason }.
+ */
+export async function buy(uid, pkg, product = null) {
   const box = await connect(uid);
   if (!box) return { ok: false, reason: 'unavailable' };
+  if (!pkg && !product) return { ok: false, reason: 'unavailable' };
   let res;
   try {
-    res = await box.api.purchasePackage({ aPackage: pkg });
+    res = pkg ? await box.api.purchasePackage({ aPackage: pkg }) : await box.api.purchaseStoreProduct({ product });
   } catch (e) {
     const reason = failReason(e);
     if (reason === 'owned') return restore(uid); // ya la tenías (en otra cuenta o sin terminar)

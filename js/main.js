@@ -180,15 +180,29 @@ function checkNewDay() {
  * (v4.2.1) En el celular, mientras escribes en un campo, el paisaje, la fogata y la nieve se quedan
  * quietos: así el teclado responde al instante (en celulares sencillos las animaciones lo frenaban).
  * Vuelven a moverse 2 segundos después de la última tecla (o al salir del campo).
+ *
+ * (v4.9.1) La marca "is-typing" va SOLO en el paisaje y en la escena de entrada, no en <html>: medido,
+ * cambiar una clase de <html> que usan reglas con "*" obligaba a recalcular los estilos de TODA la
+ * página (~6 ms en un computador, ~50 ms en un celular medio) justo al empezar a escribir y en cada
+ * pausa: eran los "microlags" al escribir el usuario. Ahora cuesta casi nada. La nieve se entera por
+ * el atributo data-typing de <html>, que ninguna regla de CSS usa (no hace recalcular nada).
  */
 function watchTyping() {
   if (!window.matchMedia || !window.matchMedia('(pointer: coarse)').matches) return;
   const html = document.documentElement;
+  const roots = () => document.querySelectorAll('.scenery, .gate-scene');
   let timer = 0;
-  const stop = () => { clearTimeout(timer); html.classList.remove('is-typing'); };
+  let on = false;
+  const set = (value) => {
+    if (on === value) return;
+    on = value;
+    html.toggleAttribute('data-typing', value);
+    for (const r of roots()) r.classList.toggle('is-typing', value);
+  };
+  const stop = () => { clearTimeout(timer); set(false); };
   const typing = (e) => {
     if (!e.target || !e.target.matches || !e.target.matches('input, textarea')) return;
-    html.classList.add('is-typing');
+    set(true);
     clearTimeout(timer);
     timer = setTimeout(stop, 2000);
   };

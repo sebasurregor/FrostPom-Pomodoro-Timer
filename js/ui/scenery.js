@@ -242,7 +242,7 @@ export function mount(container) {
   snow = createSnow(rootEl, {
     weather: rootEl.dataset.weather,
     className: 'scenery__snow',
-    active: () => !html.classList.contains('gate-open') && !html.classList.contains('dlg-open') && !html.classList.contains('sheet-full') && !html.classList.contains('is-typing'),
+    active: () => !html.classList.contains('gate-open') && !html.classList.contains('dlg-open') && !html.classList.contains('sheet-full') && !html.hasAttribute('data-typing'),
   });
 }
 

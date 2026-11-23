@@ -14,7 +14,7 @@ export function mountGateSnow(scene = document.getElementById('gateScene')) {
     weather: 'gate',
     className: 'gate-snow',
     seed: 2026,
-    // solo mientras se ve la entrada, y quieta mientras escribes en el celular (ver main.js: is-typing)
-    active: () => document.documentElement.classList.contains('gate-open') && !document.documentElement.classList.contains('is-typing'),
+    // solo mientras se ve la entrada, y quieta mientras escribes en el celular (ver main.js: data-typing)
+    active: () => document.documentElement.classList.contains('gate-open') && !document.documentElement.hasAttribute('data-typing'),
   });
 }

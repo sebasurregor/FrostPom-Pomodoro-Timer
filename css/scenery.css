@@ -383,8 +383,8 @@ html[data-theme="dark"] .scenery::after { content: ""; position: absolute; inset
    y el viento seguían animándose aunque una ventana (entrar, crear cuenta, Premium…) o una sección a
    pantalla completa tapara el paisaje, y eso hacía lento escribir y tocar. Ahora se pausan mientras
    no se ven; y en el celular caminan 4 animales a la vez (antes 6). */
-.gate-open .scenery *, .dlg-open .scenery *, .sheet-full .scenery *, .is-typing .scenery *,
-.gate-open .scenery *::before, .dlg-open .scenery *::before, .sheet-full .scenery *::before, .is-typing .scenery *::before { animation-play-state: paused !important; }
+.gate-open .scenery *, .dlg-open .scenery *, .sheet-full .scenery *, .scenery.is-typing *,
+.gate-open .scenery *::before, .dlg-open .scenery *::before, .sheet-full .scenery *::before, .scenery.is-typing *::before { animation-play-state: paused !important; }
 @media (pointer: coarse) {
   .walker:nth-child(n + 5) { display: none; }
 }

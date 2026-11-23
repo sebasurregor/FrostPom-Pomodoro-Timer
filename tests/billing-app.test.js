@@ -185,3 +185,30 @@ test('Premium con Google Play: sin claves secretas', () => {
   assert.equal(pkg.dependencies['@revenuecat/purchases-capacitor'], '14.1.0');
   assert.equal(pkg.version, config.version);
 });
+
+test('(v4.9.1) planes anual y de por vida: se reconocen por su ID aunque el paquete tenga otro tipo', () => {
+  assert.equal(config.premium.play.annualPlan, 'anual-12m');
+  assert.equal(config.premium.play.lifetimeProduct, 'frostpom_premium_vida');
+  const ids = { annual: 'anual-12m', lifetime: 'frostpom_premium_vida' };
+  const monthly = { identifier: '$rc_monthly', packageType: 'MONTHLY', product: { identifier: 'frostpom_premium:mensual', price: 10000 } };
+  // Paquetes propios (CUSTOM) en la oferta: se reconocen por el producto de Google
+  const annual = { identifier: 'anual-12m', packageType: 'CUSTOM', product: { identifier: 'frostpom_premium:anual-12m', price: 90000 } };
+  const lifetime = { identifier: 'vida', packageType: 'CUSTOM', product: { identifier: 'frostpom_premium_vida', price: 150000 } };
+  assert.deepEqual(PLAY.packagesOf({ current: { availablePackages: [monthly, annual, lifetime] } }, '', ids), { monthly, annual, lifetime });
+  // Sin los IDs (como antes), un paquete propio no se reconoce
+  assert.deepEqual(PLAY.packagesOf({ current: { availablePackages: [monthly, annual, lifetime] } }), { monthly, annual: null, lifetime: null });
+  // Con la opción de compra que agrega Google ("…:compra") también
+  const lifetime2 = { identifier: 'x', packageType: 'CUSTOM', product: { identifier: 'frostpom_premium_vida:compra' } };
+  assert.equal(PLAY.packagesOf({ current: { availablePackages: [lifetime2] } }, '', ids).lifetime, lifetime2);
+  // El tipo de RevenueCat (Annual / Lifetime) sigue ganando
+  const rcAnnual = { identifier: '$rc_annual', packageType: 'ANNUAL', product: { identifier: 'frostpom_premium:otro' } };
+  assert.equal(PLAY.packagesOf({ current: { availablePackages: [annual, rcAnnual] } }, '', ids).annual, rcAnnual);
+  // Si no están en la oferta: los productos que da Google directo
+  const subs = [{ identifier: 'frostpom_premium:mensual' }, { identifier: 'frostpom_premium:anual-12m', priceString: '$ 90.000' }];
+  assert.equal(PLAY.annualFromProducts(subs, 'anual-12m'), subs[1]);
+  assert.equal(PLAY.annualFromProducts(subs, ''), null);
+  assert.equal(PLAY.annualFromProducts(null, 'anual-12m'), null);
+  const once = [{ identifier: 'gemas_60' }, { identifier: 'frostpom_premium_vida' }];
+  assert.equal(PLAY.lifetimeFromProducts(once, 'frostpom_premium_vida'), once[1]);
+  assert.equal(PLAY.lifetimeFromProducts([{ identifier: 'frostpom_premium_vidas' }], 'frostpom_premium_vida'), null);
+});

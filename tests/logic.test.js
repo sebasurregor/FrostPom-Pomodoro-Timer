@@ -1647,3 +1647,23 @@ test('(v4.9.1) frame-guard: la app no arranca dentro del <iframe> de otra págin
   assert.ok(main.indexOf("import './frame-guard.js'") < main.indexOf('import { KEY'), 'frame-guard va antes que todo');
   assert.ok(readFileSync(new URL('../service-worker.js', import.meta.url), 'utf8').includes("'./js/frame-guard.js'"));
 });
+
+test('(v4.9.1) escribir en el celular: la pausa de animaciones no recalcula toda la página', () => {
+  const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
+  // La marca va en el paisaje y en la entrada, nunca en <html> (eso causaba los microlags al escribir)
+  const main = read('js/main.js');
+  assert.ok(!/html\.classList\.(add|remove|toggle)\('is-typing'/.test(main), 'is-typing no va en <html>');
+  assert.match(main, /querySelectorAll\('\.scenery, \.gate-scene'\)/);
+  assert.match(main, /toggleAttribute\('data-typing'/);
+  for (const css of ['css/utilities.css', 'css/scenery.css']) {
+    assert.ok(!/\.is-typing\s+\.(scenery|gate-scene)/.test(read(css)), `${css}: la regla usa .scenery.is-typing, no .is-typing .scenery`);
+  }
+  assert.match(read('css/utilities.css'), /\.scenery\.is-typing \*, \.gate-scene\.is-typing \*/);
+  // La nieve se entera por data-typing (que ninguna regla de CSS usa)
+  assert.match(read('js/ui/snow.js'), /attributeFilter: \['class', 'data-typing'\]/);
+  assert.match(read('js/ui/gate-snow.js'), /hasAttribute\('data-typing'\)/);
+  assert.match(read('js/ui/scenery.js'), /hasAttribute\('data-typing'\)/);
+  for (const css of ['css/base.css', 'css/components.css', 'css/layout.css', 'css/scenery.css', 'css/utilities.css']) {
+    assert.ok(!read(css).includes('data-typing'), `${css}: ninguna regla usa data-typing (así cambiarlo no cuesta nada)`);
+  }
+});

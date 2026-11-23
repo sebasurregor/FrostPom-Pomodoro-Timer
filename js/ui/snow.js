@@ -193,7 +193,8 @@ export function createSnow(host, { weather = 'light', className = 'snow', active
 
   window.addEventListener('resize', () => { resize(); refresh(); });
   document.addEventListener('visibilitychange', refresh);
-  new MutationObserver(refresh).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+  // (v4.9.1) también data-typing: mientras escribes en el celular se queda quieta (ver main.js)
+  new MutationObserver(refresh).observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-typing'] });
 
   return {
     canvas,

@@ -4,7 +4,7 @@
  * teléfono o al navegador lo puede leer cualquiera. Ver docs/SEGURIDAD.md.
  */
 export const config = Object.freeze({
-  version: '4.9.1',
+  version: '4.9.2',
   // Dirección pública de la app. La app de Android abre aquí las normas, la privacidad y la
   // página para eliminar la cuenta (en el navegador del teléfono). Ver js/native.js.
   publicUrl: 'https://sebasurregor.github.io/FrostPom-Pomodoro-Timer/',
@@ -97,6 +97,10 @@ export const config = Object.freeze({
       revenueCatKey: 'goog_usnfxhcfEMnuKypsIlNaZNPosfo',
       entitlement: 'premium', // el "entitlement" de RevenueCat
       offering: '', // '' = la oferta marcada como "current" en RevenueCat (la "default")
+      // (v4.9.1) Los IDs de Play Console de los otros planes. La app los busca en la oferta por tipo
+      // (Annual / Lifetime) y, si no, por estos IDs; y si no están en la oferta, se los pide a Google.
+      annualPlan: 'anual-12m', // el ID del plan base anual de la suscripción
+      lifetimeProduct: 'frostpom_premium_vida', // el ID del producto de una sola compra (de por vida)
       // (v4.8.0) Paquetes de gemas: productos de UNA sola compra en Google Play (Play Console →
       // Productos integrados). id = el ID del producto en Play Console (idéntico); gems = las que
       // da en total; bonus = cuántas de esas son de regalo. El PRECIO lo pones en Play Console
