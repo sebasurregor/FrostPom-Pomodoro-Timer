@@ -26,9 +26,9 @@ export const config = Object.freeze({
     // configurarla en Supabase → Authentication → Sign In / Providers y de poner las direcciones de
     // regreso. Paso a paso: docs/INICIAR-CON-OTRAS-CUENTAS.md. Facebook necesita que Meta apruebe la app.
     oauth: Object.freeze({
-      google: false,
-      azure: false, // Microsoft (cuentas personales de Outlook/Hotmail y de colegios o empresas)
-      discord: false,
+      google: true,
+      azure: true, // Microsoft (cuentas personales de Outlook/Hotmail y de colegios o empresas)
+      discord: true,
       facebook: false,
     }),
   }),
