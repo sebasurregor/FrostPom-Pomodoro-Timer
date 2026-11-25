@@ -4,7 +4,7 @@
  * teléfono o al navegador lo puede leer cualquiera. Ver docs/SEGURIDAD.md.
  */
 export const config = Object.freeze({
-  version: '4.9.2',
+  version: '4.9.3',
   // Dirección pública de la app. La app de Android abre aquí las normas, la privacidad y la
   // página para eliminar la cuenta (en el navegador del teléfono). Ver js/native.js.
   publicUrl: 'https://sebasurregor.github.io/FrostPom-Pomodoro-Timer/',

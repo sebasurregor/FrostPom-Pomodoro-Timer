@@ -1,5 +1,11 @@
 # Cambios de la v2 a la v3
 
+## v4.9.3: entrar con Google, Microsoft y Discord (encendido) y el tope de gemas reforzado
+
+- **Entrar con otras cuentas, encendido:** Google, Microsoft y Discord en `true` en `js/config.js` (Facebook sigue apagado hasta que Meta apruebe la app). Logos oficiales en `assets/oauth/` (`google.svg`, `azure.svg` y `discord.svg`, este en blanco porque el botón de Discord es azul).
+- **Seguridad, tope de gemas:** `save_progress()` solo aplicaba el tope cuando las gemas llegaban como número. Si llegaban como texto (`"999999"`), el servidor no las revisaba y la app las leía como número en todos los aparatos. Ahora, si no son un número, se guardan las de antes. Probado en un PostgreSQL de pruebas (texto, número enorme, gastar, `true`, `null`, sin gemas y cuenta nueva). **Se corre en Supabase** (SQL Editor) con la función de `server/supabase/schema.sql`; no cambia tablas ni datos.
+- Nota: la prueba `oauth: los proveedores vienen apagados…` falla a propósito mientras los proveedores estén encendidos (revisa que los zips salgan apagados).
+
 ## v4.9.0: más rápida, la notificación que no se abre sola, Premium de por vida y entrar con Google, Microsoft o Discord
 
 **Antes de publicar:** vuelve a pegar tus claves en `js/config.js` (Turnstile y `goog_…`) y `npm run android:actualizar` (la línea **[OK]** debe terminar con "Regreso de Google/Microsoft/Discord: listo."). **No hay cambios en la base de datos.** Recomendado: volver a desplegar `rc-webhook` y `premium-sync` (`server/supabase/pegar-en-supabase/`).

@@ -798,6 +798,12 @@ begin
       old := greatest(floor((sv.data #>> '{progress,gems}')::numeric), 0);
     end if;
   end if;
+  -- (v4.9.3) Gemas que no son un número (por ejemplo "999999" como texto): la app las leería como
+  -- número y se saltarían el tope. En ese caso se guardan las gemas que había antes.
+  if jsonb_typeof(d -> 'progress') = 'object' and (d -> 'progress') ? 'gems'
+     and jsonb_typeof(d #> '{progress,gems}') <> 'number' then
+    d := jsonb_set(d, '{progress,gems}', to_jsonb(old));
+  end if;
   if jsonb_typeof(d #> '{progress,gems}') = 'number' then
     gems := greatest(floor((d #>> '{progress,gems}')::numeric), 0);
     if gems - old > allow then
